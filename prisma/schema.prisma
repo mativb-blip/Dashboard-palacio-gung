@@ -1,0 +1,168 @@
+// Prisma schema — base de datos de usuarios y roles del dashboard.
+// Las tablas Account/Session/VerificationToken siguen la forma que espera
+// el adapter de Prisma de Auth.js/NextAuth (login por email/contraseña).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  COMMENTER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(COMMENTER)
+  /// Hash bcrypt — nunca la contraseña en texto plano. Opcional a nivel de
+  /// fila: un Admin puede crear el usuario y cargarle la contraseña después.
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// Fila única (id fijo) con la personalización de marca de todo el
+/// dashboard — editable solo por un Administrador. Cada campo es opcional
+/// (null = usar el default de la marca actual, ver DEFAULT_BRAND en
+/// src/lib/dashboard/site-settings.ts) para que un deployment nuevo (otra
+/// cuenta, otra base de datos) solo tenga que cargar los suyos.
+model SiteSettings {
+  id                 String   @id @default("singleton")
+
+  /// Nombre visible en Topbar, login, título de pestaña y placeholder de arte.
+  brandName          String?
+  /// Colores de marca — sobreescriben --color-brand-blue/-blue-700/-red en
+  /// tiempo de ejecución (ver layout.tsx), sin tocar ninguna clase Tailwind.
+  brandColorPrimary     String?
+  brandColorPrimaryDark String?
+  brandColorAccent      String?
+  /// Handle mostrado en el preview de Instagram (nueva-propuesta).
+  instagramHandle       String?
+
+  /// Remitente del correo de notificación de comentarios (Gmail SMTP).
+  senderEmail        String?  @db.Text
+  /// Destinatario(s) de la notificación de comentarios nuevos.
+  commentNotifyTo    String?  @db.Text
+  commentNotifyCc    String?  @db.Text
+
+  loginBackgroundUrl String?  @db.Text
+  loginLogoUrl       String?  @db.Text
+  updatedAt          DateTime @updatedAt
+}
+
+/// Propuesta de contenido — antes vivía entera en localStorage (ver
+/// decisión del 2026-07-23 en el comentario de src/lib/dashboard/storage.ts,
+/// ya migrado). `format`/`status` quedan como String simple (no enum) a
+/// propósito: coinciden letra por letra con los union types de
+/// src/types/dashboard.ts, así toda la lógica de estilos/íconos ya escrita
+/// (toneHex, statusPillStyle, fmtShort, isVerticalFormat) sigue funcionando
+/// sin tocar un mapeo enum↔string en cada lugar que la usa.
+model Proposal {
+  id        String   @id @default(cuid())
+  /// ISO yyyy-mm-dd — string, no DateTime, para no romper las comparaciones
+  /// lexicográficas (`p.date >= start`) que ya usa proposalsInPeriod().
+  date      String
+  time      String
+  network   String
+  format    String
+  status    String
+  title     String
+  caption   String   @db.Text
+  hashtags  String   @db.Text
+  artN      Int      @default(1)
+  /// URLs de artes — o bien rutas estáticas (contenido semilla) o data URLs
+  /// base64 (subidas desde ArtUploadZone). Igual que antes de la migración;
+  /// pasar a un storage real de archivos queda fuera de este cambio.
+  images    String[] @default([])
+  /// Solo Reels: portada va en `images[0]`, el video acá.
+  video     String?  @db.Text
+  aspect    String?
+  dim       String?
+  /// Aprobación por departamento (6 casillas fijas, ver CaptionPanel) — el
+  /// insumo real de `computeProposalStatus` en vez del `status` de arriba.
+  departmentApprovals Boolean[] @default([false, false, false, false, false, false])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comments ProposalComment[]
+
+  @@index([date])
+}
+
+model ProposalComment {
+  id         String   @id @default(cuid())
+  proposalId String
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  /// "general" o el índice del arte (como string) al que aplica.
+  scope      String   @default("general")
+  author     String
+  text       String   @db.Text
+  /// Capturas de pantalla adjuntas al comentario — data URLs base64, mismo
+  /// criterio que Proposal.images.
+  images     String[] @default([])
+  avatarBg   String
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([proposalId])
+}
+
+/// Suscripción de Web Push de un navegador/dispositivo (ver
+/// src/lib/dashboard/notify-push.ts) — sin login de por medio, cualquiera
+/// con sesión que active notificaciones queda suscripto desde ese browser.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique @db.Text
+  p256dh    String   @db.Text
+  auth      String   @db.Text
+  createdAt DateTime @default(now())
+}

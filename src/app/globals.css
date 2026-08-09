@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/*
+ * Design System del dashboard — ver Desing/README.md § Design Tokens.
+ * --brand-blue, --brand-red y --brand-ink vienen dados por el handoff; --panel-2
+ * y --line-2 coinciden con el fill/border del placeholder de arte
+ * (Desing/ArtTile.dc.html: #F6F6F7 / #E2E2E6). --line y --tx-2/--tx-3 no
+ * traen valor hex exacto en el handoff (solo su rol de uso) y quedan
+ * aproximados aquí — ajustar si el design system real los expone.
+ */
+@theme {
+  --color-brand-blue: #163f6b;
+  --color-brand-blue-700: #102e4e;
+  --color-brand-red: #e81f35;
+  --color-brand-ink: #1a1a1a;
+  --color-panel-2: #f6f6f7;
+  --color-tx-2: #4a4a52;
+  --color-tx-3: #98989f;
+  --color-line: #e7e7ea;
+  --color-line-2: #e2e2e6;
+
+  --font-sans: Arial, Helvetica, sans-serif;
+  /* Scansky es una fuente de pago del cliente, no incluida en este repo y
+     no disponible en Google Fonts. Mientras no se compre la licencia, se usa
+     Outfit (Google Fonts, misma categoría "Geometric") vía next/font/google
+     en src/app/layout.tsx, con Sora de fallback si Outfit no cargara. Cuando
+     se disponga del archivo real de Scansky, cargarlo con next/font/local y
+     anteponerlo acá. */
+  --font-thin: var(--font-outfit), var(--font-sora), Arial, sans-serif;
+
+  /* Breakpoint del dashboard: desktop ≥861px (Desing/README.md § Layout) */
+  --breakpoint-desktop: 861px;
+}
+
+:root {
+  --background: #ffffff;
+}
+
+body {
+  background: var(--background);
+  color: var(--color-brand-ink);
+  font-family: var(--font-sans);
+}
+
+textarea::placeholder,
+input[type="text"]::placeholder {
+  color: var(--color-tx-3);
+}
+
+textarea:focus,
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--color-brand-blue) !important;
+  box-shadow: 0 0 0 3px rgba(22, 63, 107, 0.1);
+}
+
+@keyframes art-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.art-fade-in {
+  animation: art-fade-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art-fade-in {
+    animation: none;
+  }
+}
+
+/* Vocabulario de motion compartido por todo overlay modal (PostPreviewModal,
+   PhotoLightbox): fade del fondo + fade/scale de 0.96→1 del contenido, 180ms
+   ease-out. Un solo par de keyframes reusado en vez de uno por componente. */
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-backdrop-in {
+  animation: modal-backdrop-in 180ms ease-out;
+}
+
+.modal-card-in {
+  animation: modal-card-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop-in,
+  .modal-card-in {
+    animation: none;
+  }
+}
+
+/* Confirmación de un check (casillas de departamento): un momento de
+   compromiso, no un simple fade — leve overshoot tipo spring (damping ~0.8). */
+@keyframes check-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.check-pop-in {
+  animation: check-pop-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .check-pop-in {
+    animation: none;
+  }
+}
