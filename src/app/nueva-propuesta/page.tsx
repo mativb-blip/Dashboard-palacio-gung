@@ -12,6 +12,18 @@ import type { ProposalFormat } from "@/types/dashboard";
 const NETWORKS = ["Instagram", "Mail", "Whatsapp", "LinkedIn"];
 const FORMATS: ProposalFormat[] = ["Carrusel", "Reel", "Historia", "Post simple"];
 
+// Franjas de 30 min en vez de texto libre — evita horas mal tipeadas que
+// schedule-time.ts (recordatorios de publicación) no pueda parsear.
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const totalMinutes = i * 30;
+  let hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  const meridiem = hour < 12 ? "AM" : "PM";
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+  return `${hour}:${String(minute).padStart(2, "0")} ${meridiem}`;
+});
+
 const inputClass = "w-full rounded border border-line-2 bg-white px-3 py-2 font-sans text-sm";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -135,13 +147,16 @@ function NuevaPropuestaForm() {
             />
           </Field>
           <Field label="Hora">
-            <input
-              type="text"
-              placeholder="6:30 PM"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className={inputClass}
-            />
+            <select value={time} onChange={(e) => setTime(e.target.value)} className={inputClass}>
+              <option value="" disabled>
+                Elegir hora
+              </option>
+              {TIME_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
 
