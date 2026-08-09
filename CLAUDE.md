@@ -33,12 +33,12 @@ Scripts: `npm run dev`, `npm run build` (corre `prisma migrate deploy` primero),
 - Pills de estado: Aprobado = azul sólido; Cambios solicitados = contorno rojo; En revisión = contorno gris.
 
 ## Estado y comentarios
-El estado de una propuesta se deriva automáticamente (no se elige a mano): **Aprobado** cuando las 6 casillas de aprobación por departamento están marcadas y los comentarios (si hay) están resueltos; **Cambios solicitados** cuando hay al menos un comentario; **En revisión** en cualquier otro caso. Ver `computeProposalStatus()` en `src/lib/dashboard/proposals.ts`.
+El estado de una propuesta se deriva automáticamente (no se elige a mano): **Aprobado** cuando la casilla de aprobación ("Jun") está marcada y los comentarios (si hay) están resueltos; **Cambios solicitados** cuando hay al menos un comentario; **En revisión** en cualquier otro caso. Ver `computeProposalStatus()` en `src/lib/dashboard/proposals.ts`.
 
 ## Modelo de datos (referencia)
 ```
 Proposal: { id, date, time, network, format, status, title, caption, hashtags, artN,
-            images[], video, departmentApprovals[6], comments[], aspect, dim }
+            images[], video, departmentApprovals[1], comments[], aspect, dim }
 SiteSettings: { brandName, brandColorPrimary/Dark, brandColorAccent, instagramHandle,
                 senderEmail, commentNotifyTo/Cc, loginBackgroundUrl, loginLogoUrl }
 ```

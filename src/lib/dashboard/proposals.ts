@@ -2,7 +2,7 @@ import type { Proposal, ProposalStatus } from "@/types/dashboard";
 
 /** Cantidad fija de casillas del checklist de aprobación por departamento
  * (ver CaptionPanel). */
-export const DEPARTMENT_CHECK_COUNT = 6;
+export const DEPARTMENT_CHECK_COUNT = 1;
 
 // Los destinatarios de notificación de comentarios ahora vienen de
 // SiteSettings (ver site-settings.ts) — CommentsPanel los lee vía
@@ -24,7 +24,7 @@ export function deriveTitle(caption: string): string {
 
 /** El status ya no se elige a mano — se deriva del checklist de
  * departamentos y del estado de los comentarios:
- * - Aprobado: las 6 casillas marcadas y (si hay comentarios) todos resueltos.
+ * - Aprobado: la casilla marcada y (si hay comentarios) todos resueltos.
  * - Cambios solicitados: hay al menos un comentario y no califica para Aprobado.
  * - En revisión: todavía no hay nada de lo anterior. */
 export function computeProposalStatus(proposal: Proposal): ProposalStatus {

@@ -104,7 +104,7 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {departmentApprovals.map((checked, i) => {
-              const label = `Depto. ${String(i + 1).padStart(2, "0")}`;
+              const label = "Jun";
               return (
                 <button
                   key={i}

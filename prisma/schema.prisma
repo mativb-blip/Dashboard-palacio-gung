@@ -127,9 +127,9 @@ model Proposal {
   video     String?  @db.Text
   aspect    String?
   dim       String?
-  /// Aprobación por departamento (6 casillas fijas, ver CaptionPanel) — el
-  /// insumo real de `computeProposalStatus` en vez del `status` de arriba.
-  departmentApprovals Boolean[] @default([false, false, false, false, false, false])
+  /// Aprobación por departamento (1 casilla fija, "Jun", ver CaptionPanel) —
+  /// el insumo real de `computeProposalStatus` en vez del `status` de arriba.
+  departmentApprovals Boolean[] @default([false])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
