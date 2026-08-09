@@ -125,6 +125,21 @@ export interface UpdateProposalInput {
 
 export async function updateProposal(id: string, patch: UpdateProposalInput): Promise<void> {
   await requireSession();
+
+  // Si se está tocando la aprobación, hay que saber el valor previo para
+  // notificar solo en la transición false→true (no en cada click ni al
+  // desmarcar) — de ahí el select de acá antes del update.
+  let justApproved = false;
+  let title: string | undefined;
+  if (patch.departmentApprovals !== undefined) {
+    const current = await prisma.proposal.findUnique({
+      where: { id },
+      select: { departmentApprovals: true, title: true },
+    });
+    justApproved = !(current?.departmentApprovals?.[0] ?? false) && patch.departmentApprovals[0] === true;
+    title = current?.title;
+  }
+
   await prisma.proposal.update({
     where: { id },
     data: {
@@ -136,6 +151,14 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
       ...(patch.departmentApprovals !== undefined ? { departmentApprovals: patch.departmentApprovals } : {}),
     },
   });
+
+  if (justApproved) {
+    await sendPushToAll({
+      title: "Jun aprobó un post",
+      body: title ? `"${title}" quedó aprobado.` : "Un post quedó aprobado.",
+    });
+  }
+
   revalidatePath("/");
   revalidatePath("/calendario");
 }

@@ -130,6 +130,12 @@ model Proposal {
   /// Aprobación por departamento (1 casilla fija, "Jun", ver CaptionPanel) —
   /// el insumo real de `computeProposalStatus` en vez del `status` de arriba.
   departmentApprovals Boolean[] @default([false])
+  /// Recordatorios de publicación (ver /api/cron/reminders) — evitan mandar
+  /// el mismo push dos veces si el cron corre de nuevo antes de que cambie
+  /// nada. reminderSentT60 = aviso de "falta 1 hora"; reminderSentT0 = aviso
+  /// de "es la hora".
+  reminderSentT60 Boolean @default(false)
+  reminderSentT0  Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

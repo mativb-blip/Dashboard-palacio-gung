@@ -16,10 +16,10 @@ Vista única, responsive, alta fidelidad. Idioma: español (RD).
 - **Prisma ORM v7** (`@prisma/adapter-pg`) + PostgreSQL
 - **Auth.js v5** (email/contraseña — único método de login en este prototipo)
 - **Vercel Blob** para artes/video/capturas — subida directa desde el navegador (`@vercel/blob/client`), sin pasar por el servidor (ver `src/app/api/blob/upload/route.ts`)
-- **Notificaciones de comentarios nuevos**, doble canal, ninguno bloqueante (ver `addComment()` en `proposals-actions.ts`):
-  - Email vía Gmail SMTP (`nodemailer` + contraseña de aplicación, ver `notify-email.ts`) — remitente fijo a `GMAIL_USER`, destinatario sale de `SiteSettings`.
-  - Web Push (PWA, `web-push` + claves VAPID, ver `notify-push.ts` y `NotificationToggle.tsx`) — en iPhone requiere instalar el dashboard a Inicio primero (Safari → Compartir → Agregar a Inicio), Safari sin instalar no recibe push.
-  - Ambos son no-op silencioso si sus variables de entorno no están configuradas (ver `.env.example`).
+- **Notificaciones**, doble canal (email + push), ninguno bloqueante, no-op silencioso si sus variables de entorno no están configuradas (ver `.env.example`):
+  - Email vía Gmail SMTP (`nodemailer` + contraseña de aplicación, ver `notify-email.ts`) — remitente fijo a `GMAIL_USER`, destinatario sale de `SiteSettings`. Se dispara solo en comentarios nuevos (`addComment()` en `proposals-actions.ts`).
+  - Web Push (PWA, `web-push` + claves VAPID, ver `notify-push.ts` y `NotificationToggle.tsx`) — en iPhone requiere instalar el dashboard a Inicio primero (Safari → Compartir → Agregar a Inicio), Safari sin instalar no recibe push. Se dispara en: comentario nuevo, aprobación de "Jun" (`updateProposal()`), y los recordatorios de publicación de `/api/cron/reminders`.
+- **Recordatorios de publicación** (1h antes + a la hora): un GitHub Action (`.github/workflows/reminders.yml`) llama a `/api/cron/reminders` cada 10 min — el cron nativo de Vercel en Hobby solo corre 1 vez por día, no alcanza. Autenticado con `CRON_SECRET` (bearer token), no con sesión — por eso `api/cron` está excluido del gate de login en `src/proxy.ts`. La hora de la propuesta (`Proposal.time`, texto libre tipo "6:30 PM") se parsea asumiendo siempre UTC-4 (`schedule-time.ts` — Santo Domingo no tiene horario de verano). Cada propuesta dispara cada recordatorio una sola vez (`reminderSentT60`/`reminderSentT0`).
 - Alias de import `@/*` → `src/*`
 
 Scripts: `npm run dev`, `npm run build` (corre `prisma migrate deploy` primero), `npm start`, `npm run lint`, `npm run db:migrate`, `npm run db:seed`.
