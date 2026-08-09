@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState, type FormEvent, type ReactNode } from "react";
 import ArtUploadZone, { type UploadedFile } from "@/components/dashboard/ArtUploadZone";
 import InstagramPreview from "@/components/dashboard/InstagramPreview";
+import { useBrand } from "@/lib/dashboard/BrandContext";
 import { createProposal } from "@/lib/dashboard/proposals-actions";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { ProposalFormat } from "@/types/dashboard";
@@ -47,6 +48,7 @@ export default function NuevaPropuestaPage() {
 function NuevaPropuestaForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { contentPillars } = useBrand();
   const captionRef = useRef<HTMLTextAreaElement>(null);
   // Todavía no existe la propuesta cuando el usuario elige los archivos —
   // este id solo organiza la ruta en Blob Storage hasta que se guarde.
@@ -57,6 +59,7 @@ function NuevaPropuestaForm() {
   const [time, setTime] = useState("");
   const [network, setNetwork] = useState(NETWORKS[0]);
   const [format, setFormat] = useState<ProposalFormat>("Carrusel");
+  const [contentPillar, setContentPillar] = useState("");
   const [caption, setCaption] = useState("");
   const [artFiles, setArtFiles] = useState<UploadedFile[]>([]);
   const [coverFiles, setCoverFiles] = useState<UploadedFile[]>([]);
@@ -111,6 +114,7 @@ function NuevaPropuestaForm() {
         format,
         status: "En revisión",
         caption: caption.trim(),
+        contentPillar: contentPillar || undefined,
         hashtags: "",
         artN: isReel ? 1 : Math.max(1, artFiles.length),
         images: isReel ? coverFiles.map((f) => f.url) : artFiles.map((f) => f.url),
@@ -185,6 +189,17 @@ function NuevaPropuestaForm() {
             </select>
           </Field>
         </div>
+
+        <Field label="Pilar de contenido">
+          <select value={contentPillar} onChange={(e) => setContentPillar(e.target.value)} className={inputClass}>
+            <option value="">Sin categorizar</option>
+            {contentPillars.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </Field>
 
         {isReel ? (
           <div className="grid grid-cols-2 gap-3">

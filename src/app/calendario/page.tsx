@@ -14,6 +14,7 @@ import {
   toggleCommentResolved,
   updateProposal,
 } from "@/lib/dashboard/proposals-actions";
+import { applyUpdateResult } from "@/lib/dashboard/proposals";
 import { handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import type { AddCommentInput } from "@/components/dashboard/CommentsPanel";
@@ -33,7 +34,8 @@ export default function CalendarioPage() {
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(() => defaultSelectedDate(now.getFullYear(), now.getMonth()));
   const [previewProposalId, setPreviewProposalId] = useState<string | null>(null);
-  const { brandName } = useBrand();
+  const [pillarFilter, setPillarFilter] = useState<string>("all");
+  const { brandName, contentPillars } = useBrand();
 
   useEffect(() => {
     let cancelled = false;
@@ -75,15 +77,20 @@ export default function CalendarioPage() {
     }
   }
 
-  function handleMoveProposal(id: string, newDate: string) {
+  async function handleMoveProposal(id: string, newDate: string) {
     const proposal = proposals.find((p) => p.id === id);
     if (!proposal || proposal.date === newDate) return;
     setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, date: newDate } : p)));
-    updateProposal(id, { date: newDate }).catch((e) => {
+    try {
+      const result = await updateProposal(id, { date: newDate });
+      // Mover la fecha de un post ya aprobado invalida esa aprobación (ficha
+      // 1) — el patch optimista de arriba no sabía eso.
+      setProposals((prev) => prev.map((p) => (p.id === id ? applyUpdateResult(p, result) : p)));
+    } catch (e) {
       console.error(e);
       // Revertir en caso de error de red/servidor — no dejar la UI mintiendo.
       setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, date: proposal.date } : p)));
-    });
+    }
   }
 
   function handleDeleteProposal(id: string) {
@@ -105,6 +112,8 @@ export default function CalendarioPage() {
 
   const cells = monthGridDays(cursor.year, cursor.month);
   const previewProposal = proposals.find((p) => p.id === previewProposalId) ?? null;
+  const filteredProposals =
+    pillarFilter === "all" ? proposals : proposals.filter((p) => p.contentPillar === pillarFilter);
 
   return (
     <div className="flex min-h-screen flex-col bg-white font-sans text-brand-ink">
@@ -129,25 +138,42 @@ export default function CalendarioPage() {
           <h2 className="text-lg font-bold capitalize">
             {MONTH_FULL[cursor.month]} {cursor.year}
           </h2>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={goPrevMonth}
-              onPointerEnter={handleLiquidPointerEnter}
-              aria-label="Mes anterior"
-              className={iconButtonClass}
-            >
-              <span className="relative">‹</span>
-            </button>
-            <button
-              type="button"
-              onClick={goNextMonth}
-              onPointerEnter={handleLiquidPointerEnter}
-              aria-label="Mes siguiente"
-              className={iconButtonClass}
-            >
-              <span className="relative">›</span>
-            </button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-tx-3">
+              Pilar
+              <select
+                value={pillarFilter}
+                onChange={(e) => setPillarFilter(e.target.value)}
+                className="rounded border border-line-2 bg-white px-2 py-1 text-xs text-brand-ink"
+              >
+                <option value="all">Todos</option>
+                {contentPillars.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={goPrevMonth}
+                onPointerEnter={handleLiquidPointerEnter}
+                aria-label="Mes anterior"
+                className={iconButtonClass}
+              >
+                <span className="relative">‹</span>
+              </button>
+              <button
+                type="button"
+                onClick={goNextMonth}
+                onPointerEnter={handleLiquidPointerEnter}
+                aria-label="Mes siguiente"
+                className={iconButtonClass}
+              >
+                <span className="relative">›</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -157,7 +183,7 @@ export default function CalendarioPage() {
           <>
             <FullCalendarGrid
               cells={cells}
-              proposals={proposals}
+              proposals={filteredProposals}
               selectedDate={selectedDate}
               onSelectDate={setSelectedDate}
               onOpenProposal={setPreviewProposalId}
@@ -166,7 +192,7 @@ export default function CalendarioPage() {
 
             <DayAgenda
               dateIso={selectedDate}
-              proposals={proposals.filter((p) => p.date === selectedDate)}
+              proposals={filteredProposals.filter((p) => p.date === selectedDate)}
               onOpenProposal={setPreviewProposalId}
             />
           </>

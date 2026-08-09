@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import VersionHistoryModal from "./VersionHistoryModal";
+import { useBrand } from "@/lib/dashboard/BrandContext";
 import { dateLong, statusPillStyle } from "@/lib/dashboard/format";
 import { computeProposalStatus, DEPARTMENT_CHECK_COUNT } from "@/lib/dashboard/proposals";
 import { handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
@@ -13,12 +15,27 @@ interface CaptionPanelProps {
 }
 
 export default function CaptionPanel({ proposal, onUpdateProposal, onDeleteProposal }: CaptionPanelProps) {
+  const brand = useBrand();
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(proposal.caption);
+  const [showHistory, setShowHistory] = useState(false);
   const departmentApprovals = proposal.departmentApprovals ?? Array(DEPARTMENT_CHECK_COUNT).fill(false);
+  const criteriaChecked = proposal.approvalCriteriaChecked ?? [];
+  const allCriteriaChecked = brand.approvalCriteria.every((c) => criteriaChecked.includes(c));
+
+  function toggleCriterion(criterion: string) {
+    const next = criteriaChecked.includes(criterion)
+      ? criteriaChecked.filter((c) => c !== criterion)
+      : [...criteriaChecked, criterion];
+    onUpdateProposal(proposal.id, { approvalCriteriaChecked: next });
+  }
 
   function toggleDepartment(index: number) {
+    const current = departmentApprovals[index];
+    // Solo bloquea pasar a aprobado sin el checklist completo (ficha 4) —
+    // desmarcar siempre queda permitido.
+    if (!current && !allCriteriaChecked) return;
     const next = departmentApprovals.map((value, i) => (i === index ? !value : value));
     onUpdateProposal(proposal.id, { departmentApprovals: next });
   }
@@ -92,7 +109,61 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
             {status}
           </span>
           <span className="text-[13px] text-tx-2">Publica {proposal.time}</span>
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className={`text-[11px] font-bold text-brand-blue underline-offset-2 hover:underline ${PRESS_SCALE_CLASS}`}
+          >
+            Ver historial
+          </button>
         </div>
+
+        {proposal.approvalInvalidatedReason && (
+          <div className="mt-2.5 rounded border border-amber-600/40 bg-amber-50 px-2.5 py-2 text-xs leading-[1.4] text-amber-800">
+            {proposal.approvalInvalidatedReason}
+          </div>
+        )}
+
+        <div className="mt-3">
+          <span className="mb-1.5 block text-[10px] font-bold tracking-[0.08em] text-tx-3 uppercase">
+            Pilar de contenido
+          </span>
+          <select
+            value={proposal.contentPillar ?? ""}
+            onChange={(e) => onUpdateProposal(proposal.id, { contentPillar: e.target.value || undefined })}
+            className="w-full rounded border border-line-2 bg-white px-2.5 py-1.5 text-xs text-brand-ink"
+          >
+            <option value="">Sin categorizar</option>
+            {brand.contentPillars.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mt-3">
+          <span className="mb-1.5 block text-[10px] font-bold tracking-[0.08em] text-tx-3 uppercase">
+            Checklist de aprobación
+          </span>
+          <div className="flex flex-col gap-1">
+            {brand.approvalCriteria.map((criterion) => {
+              const checked = criteriaChecked.includes(criterion);
+              return (
+                <label key={criterion} className="flex items-center gap-2 text-[12px] text-brand-ink">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleCriterion(criterion)}
+                    className="h-3.5 w-3.5 accent-brand-blue"
+                  />
+                  {criterion}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="mt-3">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold tracking-[0.08em] text-tx-3 uppercase">
@@ -102,20 +173,33 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
               {departmentApprovals.filter(Boolean).length}/{DEPARTMENT_CHECK_COUNT}
             </span>
           </div>
+          {!allCriteriaChecked && !departmentApprovals[0] && (
+            <p className="mb-1.5 text-[11px] text-tx-3">Completá el checklist para poder aprobar.</p>
+          )}
           <div className="flex flex-wrap items-center gap-1.5">
             {departmentApprovals.map((checked, i) => {
               const label = "Jun";
+              const blocked = !checked && !allCriteriaChecked;
               return (
                 <button
                   key={i}
                   type="button"
                   onClick={() => toggleDepartment(i)}
+                  disabled={blocked}
                   aria-pressed={checked}
-                  title={checked ? `${label} · aprobado` : `${label} · pendiente`}
+                  title={
+                    checked
+                      ? `${label} · aprobado`
+                      : blocked
+                        ? `${label} · completá el checklist primero`
+                        : `${label} · pendiente`
+                  }
                   className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-1 text-[10px] leading-none font-bold tracking-[0.04em] uppercase transition-[color,border-color,background-color] duration-150 ${PRESS_SCALE_CLASS} ${
                     checked
                       ? "border-brand-blue bg-brand-blue/[0.05] text-brand-blue"
-                      : "border-line-2 bg-white text-brand-red hover:border-brand-red/40"
+                      : blocked
+                        ? "cursor-default border-line-2 bg-white text-line-2"
+                        : "border-line-2 bg-white text-brand-red hover:border-brand-red/40"
                   }`}
                 >
                   <span
@@ -201,6 +285,8 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
           </>
         )}
       </div>
+
+      {showHistory && <VersionHistoryModal proposal={proposal} onClose={() => setShowHistory(false)} />}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendPushToAll } from "@/lib/dashboard/notify-push";
+import { APPROVAL_REMINDER_HOURS_BEFORE } from "@/lib/dashboard/proposals";
 import { parseProposalDateTime, todayInSantoDomingo } from "@/lib/dashboard/schedule-time";
 
 // Llamado por un cron externo (GitHub Actions, cada 5-10 min — ver
@@ -9,6 +10,7 @@ import { parseProposalDateTime, todayInSantoDomingo } from "@/lib/dashboard/sche
 // el día. Dispara en el primer tick que cruza cada umbral (no en una
 // ventana angosta) para tolerar el jitter del scheduler de GitHub.
 const HOUR_MS = 60 * 60 * 1000;
+const APPROVAL_REMINDER_MS = APPROVAL_REMINDER_HOURS_BEFORE * HOUR_MS;
 
 function addDaysToDateStr(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T00:00:00Z`);
@@ -24,22 +26,53 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const today = todayInSantoDomingo();
+  // Ventana de 4 días — cubre el umbral de aprobación (hasta 48h antes,
+  // ver APPROVAL_REMINDER_HOURS_BEFORE) además de los recordatorios de
+  // publicación (1h antes/a la hora).
+  const dateWindow = [-1, 0, 1, 2].map((offset) => addDaysToDateStr(today, offset));
   const candidates = await prisma.proposal.findMany({
     where: {
-      date: { in: [addDaysToDateStr(today, -1), today, addDaysToDateStr(today, 1)] },
-      OR: [{ reminderSentT60: false }, { reminderSentT0: false }],
+      date: { in: dateWindow },
+      OR: [{ reminderSentT60: false }, { reminderSentT0: false }, { approvalReminderSent: false }],
     },
-    select: { id: true, title: true, network: true, date: true, time: true, reminderSentT60: true, reminderSentT0: true },
+    select: {
+      id: true,
+      title: true,
+      network: true,
+      date: true,
+      time: true,
+      reminderSentT60: true,
+      reminderSentT0: true,
+      approvalReminderSent: true,
+      departmentApprovals: true,
+    },
   });
 
   const now = Date.now();
   let sentT60 = 0;
   let sentT0 = 0;
+  let sentApproval = 0;
 
   for (const proposal of candidates) {
     const scheduledAt = parseProposalDateTime(proposal.date, proposal.time);
     if (!scheduledAt) continue;
     const diffMs = scheduledAt.getTime() - now;
+    const isApproved = proposal.departmentApprovals?.[0] ?? false;
+
+    // Recordatorio de aprobación pendiente (ficha 3) — solo si todavía no
+    // se aprobó; se detiene solo apenas se aprueba (updateProposal() marca
+    // approvalReminderSent en false de nuevo si se invalida más adelante).
+    // Nota: la app no asocia las suscripciones de push a una persona/rol
+    // puntual, así que el aviso llega a todos los suscriptos, no solo a
+    // quien falta aprobar — ver CLAUDE.md.
+    if (!proposal.approvalReminderSent && !isApproved && diffMs > 0 && diffMs <= APPROVAL_REMINDER_MS) {
+      await prisma.proposal.update({ where: { id: proposal.id }, data: { approvalReminderSent: true } });
+      await sendPushToAll({
+        title: "Aprobación pendiente",
+        body: `"${proposal.title}" (${proposal.network}) se publica el ${proposal.date} ${proposal.time} y todavía no está aprobado.`,
+      });
+      sentApproval++;
+    }
 
     if (!proposal.reminderSentT60 && diffMs > 0 && diffMs <= HOUR_MS) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { reminderSentT60: true } });
@@ -53,12 +86,15 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (!proposal.reminderSentT0 && diffMs <= 0) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { reminderSentT0: true } });
       await sendPushToAll({
-        title: "Es hora de publicar",
-        body: `"${proposal.title}" (${proposal.network}) está programado para ahora.`,
+        // Escalado simple (ficha 3, punto 4): si a la hora de publicar
+        // sigue sin aprobación, el mensaje lo deja explícito en vez de
+        // mandar el aviso genérico de "es la hora".
+        title: isApproved ? "Es hora de publicar" : "Sin aprobar y ya es la hora de publicar",
+        body: `"${proposal.title}" (${proposal.network}) está programado para ahora${isApproved ? "" : " — todavía no tiene la aprobación de Jun"}.`,
       });
       sentT0++;
     }
   }
 
-  return NextResponse.json({ checked: candidates.length, sentT60, sentT0 });
+  return NextResponse.json({ checked: candidates.length, sentT60, sentT0, sentApproval });
 }

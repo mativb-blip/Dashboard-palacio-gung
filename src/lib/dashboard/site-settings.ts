@@ -2,7 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { DEFAULT_BRAND, type ResolvedBrand } from "@/lib/dashboard/brand-defaults";
 
-const SETTINGS_ID = "singleton";
+export const SETTINGS_ID = "singleton";
 
 export { DEFAULT_BRAND, type ResolvedBrand };
 
@@ -26,5 +26,9 @@ export function resolveBrand(
     senderEmail: settings?.senderEmail ?? DEFAULT_BRAND.senderEmail,
     commentNotifyTo: settings?.commentNotifyTo ?? DEFAULT_BRAND.commentNotifyTo,
     commentNotifyCc: settings?.commentNotifyCc ?? DEFAULT_BRAND.commentNotifyCc,
+    contentPillars: settings?.contentPillars.length ? settings.contentPillars : DEFAULT_BRAND.contentPillars,
+    approvalCriteria: settings?.approvalCriteria.length
+      ? settings.approvalCriteria
+      : DEFAULT_BRAND.approvalCriteria,
   };
 }

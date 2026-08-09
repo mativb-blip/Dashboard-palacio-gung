@@ -96,6 +96,14 @@ model SiteSettings {
 
   loginBackgroundUrl String?  @db.Text
   loginLogoUrl       String?  @db.Text
+
+  /// Lista editable de pilares de contenido (ver Proposal.contentPillar) —
+  /// null/vacío usa DEFAULT_BRAND.contentPillars en brand-defaults.ts.
+  contentPillars   String[] @default([])
+  /// Lista editable de criterios que hay que tildar antes de poder aprobar
+  /// (ver Proposal.approvalCriteriaChecked) — mismo fallback que arriba.
+  approvalCriteria String[] @default([])
+
   updatedAt          DateTime @updatedAt
 }
 
@@ -136,12 +144,47 @@ model Proposal {
   /// de "es la hora".
   reminderSentT60 Boolean @default(false)
   reminderSentT0  Boolean @default(false)
+  /// Recordatorio de vencimiento de aprobación (ficha 3) — mismo criterio de
+  /// idempotencia que los de arriba, para no reenviar en cada corrida del cron.
+  approvalReminderSent Boolean @default(false)
+  /// Pilar de contenido (ficha 2) — string libre validado en el server contra
+  /// SiteSettings.contentPillars/DEFAULT_BRAND; null = sin categorizar,
+  /// a propósito, para no forzar una migración retroactiva.
+  contentPillar String?
+  /// Aprobación invalidada por una edición posterior (ficha 1) — texto
+  /// legible ("Aprobación invalidada: ..."), no un booleano, porque
+  /// computeProposalStatus lo usa tanto para decidir el estado como para
+  /// mostrarlo. Se limpia (null) apenas se vuelve a aprobar.
+  approvalInvalidatedReason String? @db.Text
+  /// Qué ítems del checklist de criterios (ficha 4) están tildados en la
+  /// aprobación vigente — se resetea junto con departmentApprovals cuando
+  /// una edición invalida la aprobación.
+  approvalCriteriaChecked   String[] @default([])
+  approvalCriteriaCheckedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   comments ProposalComment[]
+  versions ProposalVersion[]
 
   @@index([date])
+}
+
+/// Snapshot del caption/media *antes* de cada edición sobre una propuesta
+/// (ficha 5) — updateProposal() en proposals-actions.ts crea uno de estos
+/// con el valor viejo antes de sobreescribir, y poda a las últimas
+/// PROPOSAL_VERSION_LIMIT (ver proposals.ts) por propuesta.
+model ProposalVersion {
+  id         String   @id @default(cuid())
+  proposalId String
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  caption    String   @db.Text
+  images     String[] @default([])
+  video      String?  @db.Text
+  editedBy   String
+  createdAt  DateTime @default(now())
+
+  @@index([proposalId])
 }
 
 model ProposalComment {

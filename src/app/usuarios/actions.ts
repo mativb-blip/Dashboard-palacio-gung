@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { SETTINGS_ID } from "@/lib/dashboard/site-settings";
 import type { Role } from "@/generated/prisma/client";
 
 const ROLES: Role[] = ["ADMIN", "EDITOR", "COMMENTER"];
@@ -72,4 +73,40 @@ export async function deleteUser(userId: string) {
   }
   await prisma.user.delete({ where: { id: userId } });
   revalidatePath("/usuarios");
+}
+
+/** Parsea una lista de una por línea, tal como la escribe un Admin en el
+ * textarea — descarta líneas vacías, no fuerza mayúsculas ni nada. */
+function parseListInput(raw: string): string[] {
+  return raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+export async function updateContentPillars(formData: FormData) {
+  await requireAdmin();
+  const pillars = parseListInput(String(formData.get("raw") ?? ""));
+  await prisma.siteSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: { id: SETTINGS_ID, contentPillars: pillars },
+    update: { contentPillars: pillars },
+  });
+  revalidatePath("/usuarios");
+  revalidatePath("/");
+  revalidatePath("/calendario");
+  revalidatePath("/nueva-propuesta");
+}
+
+export async function updateApprovalCriteria(formData: FormData) {
+  await requireAdmin();
+  const criteria = parseListInput(String(formData.get("raw") ?? ""));
+  await prisma.siteSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: { id: SETTINGS_ID, approvalCriteria: criteria },
+    update: { approvalCriteria: criteria },
+  });
+  revalidatePath("/usuarios");
+  revalidatePath("/");
+  revalidatePath("/calendario");
 }

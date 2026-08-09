@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 import AddUserPanel from "./AddUserPanel";
+import BrandListsPanel from "./BrandListsPanel";
 import UsersTable from "./UsersTable";
 
 const ROLE_OPTIONS = [
@@ -32,12 +34,16 @@ export default async function UsuariosPage() {
   }
 
   const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
+  const brand = resolveBrand(await getSiteSettings());
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 bg-white px-4 py-8 font-sans text-brand-ink">
       <AddUserPanel email={session.user.email ?? ""} roleOptions={ROLE_OPTIONS} />
 
       <UsersTable users={users} currentUserId={session.user.id} roleOptions={ROLE_OPTIONS} />
+
+      <div className="h-px bg-line" />
+      <BrandListsPanel contentPillars={brand.contentPillars} approvalCriteria={brand.approvalCriteria} />
     </div>
   );
 }

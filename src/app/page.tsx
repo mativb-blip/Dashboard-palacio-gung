@@ -16,7 +16,7 @@ import {
   toggleCommentResolved,
   updateProposal,
 } from "@/lib/dashboard/proposals-actions";
-import { proposalsInPeriod } from "@/lib/dashboard/proposals";
+import { applyUpdateResult, proposalsInPeriod } from "@/lib/dashboard/proposals";
 import { currentPlanLabel, dateLong, todayIso } from "@/lib/dashboard/format";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import { useBrand } from "@/lib/dashboard/BrandContext";
@@ -40,8 +40,9 @@ function DashboardHome() {
   const [selectedProposalId, setSelectedProposalId] = useState(searchParams.get("proposal"));
   const [artIndex, setArtIndex] = useState(0);
   const [gallery, setGallery] = useState<Gallery>("slider");
+  const [pillarFilter, setPillarFilter] = useState<string>("all");
   const today = todayIso();
-  const { brandName } = useBrand();
+  const { brandName, contentPillars } = useBrand();
 
   // Carga desde la base recién montado el componente (Server Components no
   // mezclan bien con todo el estado de interacción de esta pantalla — ver
@@ -110,15 +111,27 @@ function DashboardHome() {
     }
   }
 
-  function handleUpdateProposal(id: string, patch: Partial<Proposal>) {
+  async function handleUpdateProposal(id: string, patch: Partial<Proposal>) {
     setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-    updateProposal(id, {
-      ...("caption" in patch ? { caption: patch.caption } : {}),
-      ...("images" in patch ? { images: patch.images ?? [] } : {}),
-      ...("video" in patch ? { video: patch.video ?? null } : {}),
-      ...("artN" in patch ? { artN: patch.artN } : {}),
-      ...("departmentApprovals" in patch ? { departmentApprovals: patch.departmentApprovals ?? [] } : {}),
-    }).catch((e) => console.error(e));
+    try {
+      const result = await updateProposal(id, {
+        ...("caption" in patch ? { caption: patch.caption } : {}),
+        ...("images" in patch ? { images: patch.images ?? [] } : {}),
+        ...("video" in patch ? { video: patch.video ?? null } : {}),
+        ...("artN" in patch ? { artN: patch.artN } : {}),
+        ...("departmentApprovals" in patch ? { departmentApprovals: patch.departmentApprovals ?? [] } : {}),
+        ...("contentPillar" in patch ? { contentPillar: patch.contentPillar ?? null } : {}),
+        ...("approvalCriteriaChecked" in patch
+          ? { approvalCriteriaChecked: patch.approvalCriteriaChecked ?? [] }
+          : {}),
+      });
+      // El server puede haber invalidado la aprobación (ficha 1) o limpiado
+      // el aviso al re-aprobar — el patch optimista de arriba no lo sabía.
+      setProposals((prev) => prev.map((p) => (p.id === id ? applyUpdateResult(p, result) : p)));
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : "No se pudo guardar el cambio.");
+    }
   }
 
   function handleDeleteProposal(id: string) {
@@ -146,6 +159,15 @@ function DashboardHome() {
     toggleCommentResolved(commentId).catch((e) => console.error(e));
   }
 
+  const filteredProposals =
+    pillarFilter === "all" ? proposals : proposals.filter((p) => p.contentPillar === pillarFilter);
+  const monthProposals = proposalsInPeriod(proposals, "month");
+  const pillarCounts = contentPillars.map((pillar) => ({
+    pillar,
+    count: monthProposals.filter((p) => p.contentPillar === pillar).length,
+  }));
+  const uncategorizedCount = monthProposals.filter((p) => !p.contentPillar).length;
+
   return (
     <div className="flex min-h-screen flex-col bg-white desktop:h-screen desktop:overflow-hidden">
       <div className="flex h-[3px] w-full shrink-0">
@@ -162,6 +184,37 @@ function DashboardHome() {
           + Cargar propuesta
         </Link>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3 px-4 pb-2 desktop:px-8">
+        <label className="flex items-center gap-1.5 text-xs text-tx-3">
+          Pilar
+          <select
+            value={pillarFilter}
+            onChange={(e) => setPillarFilter(e.target.value)}
+            className="rounded border border-line-2 bg-white px-2 py-1 text-xs text-brand-ink"
+          >
+            <option value="all">Todos</option>
+            {contentPillars.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex flex-wrap gap-1.5 text-[11px] text-tx-3">
+          <span className="rounded-sm border border-line-2 px-1.5 py-0.5">Este mes:</span>
+          {pillarCounts.map(({ pillar, count }) => (
+            <span key={pillar} className="rounded-sm border border-line-2 px-1.5 py-0.5">
+              {pillar}: {count}
+            </span>
+          ))}
+          {uncategorizedCount > 0 && (
+            <span className="rounded-sm border border-line-2 px-1.5 py-0.5">
+              Sin categorizar: {uncategorizedCount}
+            </span>
+          )}
+        </div>
+      </div>
       <div className="h-px shrink-0 bg-line" />
 
       {loading ? (
@@ -170,7 +223,7 @@ function DashboardHome() {
         </div>
       ) : period === "grid" ? (
         <PostsGrid
-          proposals={proposals}
+          proposals={filteredProposals}
           onSelectProposal={handleSelectFromGrid}
           onDeleteProposal={handleDeleteProposal}
         />
@@ -179,7 +232,7 @@ function DashboardHome() {
           <div className="shrink-0 overflow-x-auto px-4 py-[14px] desktop:px-8 desktop:pt-[18px] desktop:pb-[22px]">
             <div className="min-w-[660px] desktop:min-w-0 desktop:w-full">
               <Calendar
-                proposals={proposals}
+                proposals={filteredProposals}
                 selectedProposalId={selectedProposal?.id ?? ""}
                 onSelectProposal={handleSelectProposal}
                 onSelectEmptyDate={handleSelectEmptyDate}

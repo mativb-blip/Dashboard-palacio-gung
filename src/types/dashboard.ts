@@ -4,7 +4,11 @@ export type Gallery = "slider" | "grid";
 
 export type ProposalFormat = "Carrusel" | "Reel" | "Historia" | "Post simple";
 
-export type ProposalStatus = "Aprobado" | "Cambios solicitados" | "En revisión";
+export type ProposalStatus =
+  | "Aprobado"
+  | "Cambios solicitados"
+  | "En revisión"
+  | "Pendiente de re-aprobación";
 
 export interface ProposalComment {
   /** Id real de la fila en la base — antes se identificaba por índice en el
@@ -40,4 +44,25 @@ export interface Proposal {
   dim?: string;
   /** Checklist de aprobación por departamento (ver DEPARTMENT_CHECK_COUNT). */
   departmentApprovals?: boolean[];
+  /** Pilar de contenido — string libre validado server-side, ver
+   * brand.contentPillars. undefined = sin categorizar. */
+  contentPillar?: string;
+  /** Motivo por el que una aprobación previa quedó invalidada (ver
+   * computeProposalStatus) — undefined = nunca se invalidó, o ya se
+   * volvió a aprobar. */
+  approvalInvalidatedReason?: string;
+  /** Qué criterios del checklist (ver brand.approvalCriteria) están
+   * tildados en la aprobación vigente. */
+  approvalCriteriaChecked?: string[];
+}
+
+/** Snapshot de una versión anterior del caption/media de una propuesta —
+ * ver ProposalVersion en el schema y "Ver historial" en CaptionPanel. */
+export interface ProposalVersionEntry {
+  id: string;
+  caption: string;
+  images?: string[];
+  video?: string;
+  editedBy: string;
+  when: string;
 }

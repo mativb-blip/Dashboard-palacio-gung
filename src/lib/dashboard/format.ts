@@ -159,6 +159,8 @@ export function statusPillStyle(status: ProposalStatus): StatusPillStyle {
       return { background: "#163F6B", color: "#fff", borderColor: "#163F6B" };
     case "Cambios solicitados":
       return { background: "#fff", color: "#E81F35", borderColor: "#E81F35" };
+    case "Pendiente de re-aprobación":
+      return { background: "#fff", color: "#B45309", borderColor: "#B45309" };
     case "En revisión":
     default:
       return { background: "#fff", color: "#4A4A52", borderColor: "#E2E2E6" };
