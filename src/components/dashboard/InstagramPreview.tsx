@@ -59,6 +59,30 @@ export default function InstagramPreview({ format, caption, images, onClose }: I
               ▶
             </span>
           )}
+          {images.length > 1 && (
+            <>
+              {activeIndex > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
+                  aria-label="Arte anterior"
+                  className={`absolute top-1/2 left-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-sm leading-none text-brand-ink shadow-sm transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                >
+                  ‹
+                </button>
+              )}
+              {activeIndex < images.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveIndex((i) => Math.min(images.length - 1, i + 1))}
+                  aria-label="Siguiente arte"
+                  className={`absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-sm leading-none text-brand-ink shadow-sm transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                >
+                  ›
+                </button>
+              )}
+            </>
+          )}
         </div>
 
         {images.length > 1 && (
