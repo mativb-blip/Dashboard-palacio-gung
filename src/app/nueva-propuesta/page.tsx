@@ -14,13 +14,13 @@ const FORMATS: ProposalFormat[] = ["Carrusel", "Reel", "Historia", "Post simple"
 
 // Franjas de 30 min en vez de texto libre — evita horas mal tipeadas que
 // schedule-time.ts (recordatorios de publicación) no pueda parsear. Acotado
-// a 7am-12pm, la ventana en la que de verdad se publica contenido.
-const TIME_OPTIONS = Array.from({ length: 11 }, (_, i) => {
+// a 7am-12am, la ventana en la que de verdad se publica contenido.
+const TIME_OPTIONS = Array.from({ length: 35 }, (_, i) => {
   const totalMinutes = 7 * 60 + i * 30;
-  let hour = Math.floor(totalMinutes / 60);
+  const hourOfDay = Math.floor(totalMinutes / 60) % 24;
   const minute = totalMinutes % 60;
-  const meridiem = hour < 12 ? "AM" : "PM";
-  hour = hour % 12;
+  const meridiem = hourOfDay < 12 ? "AM" : "PM";
+  let hour = hourOfDay % 12;
   if (hour === 0) hour = 12;
   return `${hour}:${String(minute).padStart(2, "0")} ${meridiem}`;
 });
