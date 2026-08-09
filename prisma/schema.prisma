@@ -100,9 +100,6 @@ model SiteSettings {
   /// Lista editable de pilares de contenido (ver Proposal.contentPillar) —
   /// null/vacío usa DEFAULT_BRAND.contentPillars en brand-defaults.ts.
   contentPillars   String[] @default([])
-  /// Lista editable de criterios que hay que tildar antes de poder aprobar
-  /// (ver Proposal.approvalCriteriaChecked) — mismo fallback que arriba.
-  approvalCriteria String[] @default([])
 
   updatedAt          DateTime @updatedAt
 }
@@ -156,11 +153,6 @@ model Proposal {
   /// computeProposalStatus lo usa tanto para decidir el estado como para
   /// mostrarlo. Se limpia (null) apenas se vuelve a aprobar.
   approvalInvalidatedReason String? @db.Text
-  /// Qué ítems del checklist de criterios (ficha 4) están tildados en la
-  /// aprobación vigente — se resetea junto con departmentApprovals cuando
-  /// una edición invalida la aprobación.
-  approvalCriteriaChecked   String[] @default([])
-  approvalCriteriaCheckedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -33,14 +33,22 @@ Scripts: `npm run dev`, `npm run build` (corre `prisma migrate deploy` primero),
 - Pills de estado: Aprobado = azul sólido; Cambios solicitados = contorno rojo; En revisión = contorno gris.
 
 ## Estado y comentarios
-El estado de una propuesta se deriva automáticamente (no se elige a mano): **Aprobado** cuando la casilla de aprobación ("Jun") está marcada y los comentarios (si hay) están resueltos; **Cambios solicitados** cuando hay al menos un comentario; **En revisión** en cualquier otro caso. Ver `computeProposalStatus()` en `src/lib/dashboard/proposals.ts`.
+El estado de una propuesta se deriva automáticamente (no se elige a mano): **Pendiente de re-aprobación** cuando se aprobó y después se editó contenido (`approvalInvalidatedReason` seteado, ver más abajo) y todavía no se volvió a aprobar; **Aprobado** cuando la casilla de aprobación ("Jun") está marcada y los comentarios (si hay) están resueltos; **Cambios solicitados** cuando hay al menos un comentario; **En revisión** en cualquier otro caso. Ver `computeProposalStatus()` en `src/lib/dashboard/proposals.ts`.
+
+**Editar una propuesta ya aprobada la invalida**: cambiar `date`/`caption`/`images`/`video` en `updateProposal()` sobre una propuesta con `departmentApprovals[0] === true` la desaprueba sola (vuelve `[false]`) y guarda un motivo legible en `approvalInvalidatedReason` — sin excepciones por tipo de campo. `updateProposal()` devuelve esos dos campos cuando los pisa, y los callers (`page.tsx`/`calendario/page.tsx`) reconcilian el estado optimista con `applyUpdateResult()` en vez de asumir que el patch que mandaron es lo que quedó guardado.
+
+**Historial de versiones**: cada vez que se edita `date`/`caption`/`images`/`video`, `updateProposal()` guarda un snapshot del valor *anterior* en `ProposalVersion` (podado a las últimas `PROPOSAL_VERSION_LIMIT` = 8 por propuesta) — "Ver historial" en `CaptionPanel` abre `VersionHistoryModal` con Antes/Ahora en paralelo.
 
 ## Modelo de datos (referencia)
 ```
 Proposal: { id, date, time, network, format, status, title, caption, hashtags, artN,
-            images[], video, departmentApprovals[1], comments[], aspect, dim }
+            images[], video, departmentApprovals[1], comments[], aspect, dim,
+            contentPillar?, approvalInvalidatedReason?,
+            reminderSentT60/T0, approvalReminderSent }
+ProposalVersion: { id, proposalId, caption, images[], video, editedBy, createdAt }
 SiteSettings: { brandName, brandColorPrimary/Dark, brandColorAccent, instagramHandle,
-                senderEmail, commentNotifyTo/Cc, loginBackgroundUrl, loginLogoUrl }
+                senderEmail, commentNotifyTo/Cc, loginBackgroundUrl, loginLogoUrl,
+                contentPillars[] }
 ```
 
 ## Despliegue

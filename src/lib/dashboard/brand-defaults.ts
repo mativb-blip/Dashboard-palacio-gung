@@ -14,7 +14,6 @@ export interface ResolvedBrand {
   commentNotifyTo: string;
   commentNotifyCc: string;
   contentPillars: string[];
-  approvalCriteria: string[];
 }
 
 /** Valores placeholder, genéricos — se usan como fallback campo por campo
@@ -30,10 +29,4 @@ export const DEFAULT_BRAND: ResolvedBrand = {
   commentNotifyTo: "admin@tu-marca.com",
   commentNotifyCc: "",
   contentPillars: ["Producto", "Marca/cultura", "Testimonios", "Institucional"],
-  approvalCriteria: [
-    "Cumple con la identidad de marca",
-    "Ortografía y gramática revisadas",
-    "Aprobación legal si aplica",
-    "Formato correcto para la red de destino",
-  ],
 };

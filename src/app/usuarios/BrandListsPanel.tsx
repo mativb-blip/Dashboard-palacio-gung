@@ -2,17 +2,15 @@
 
 import { useState } from "react";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
-import { updateApprovalCriteria, updateContentPillars } from "./actions";
+import { updateContentPillars } from "./actions";
 
 interface BrandListsPanelProps {
   contentPillars: string[];
-  approvalCriteria: string[];
 }
 
-/** Dos listas configurables, una por línea — pilares de contenido (ficha 2)
- * y criterios del checklist de aprobación (ficha 4). Sin UI de arrastrar u
- * ordenar: un textarea de una por línea alcanza para lo que es. */
-export default function BrandListsPanel({ contentPillars, approvalCriteria }: BrandListsPanelProps) {
+/** Lista configurable de pilares de contenido (ficha 2), una por línea. Sin
+ * UI de arrastrar u ordenar: un textarea de una por línea alcanza. */
+export default function BrandListsPanel({ contentPillars }: BrandListsPanelProps) {
   return (
     <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
       <ListEditor
@@ -20,12 +18,6 @@ export default function BrandListsPanel({ contentPillars, approvalCriteria }: Br
         hint="Uno por línea — aparecen en Cargar propuesta y en el filtro del panel."
         defaultValue={contentPillars.join("\n")}
         action={updateContentPillars}
-      />
-      <ListEditor
-        title="Checklist de aprobación"
-        hint="Uno por línea — hay que tildarlos todos antes de poder aprobar un post."
-        defaultValue={approvalCriteria.join("\n")}
-        action={updateApprovalCriteria}
       />
     </div>
   );

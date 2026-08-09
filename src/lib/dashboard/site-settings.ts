@@ -27,8 +27,5 @@ export function resolveBrand(
     commentNotifyTo: settings?.commentNotifyTo ?? DEFAULT_BRAND.commentNotifyTo,
     commentNotifyCc: settings?.commentNotifyCc ?? DEFAULT_BRAND.commentNotifyCc,
     contentPillars: settings?.contentPillars.length ? settings.contentPillars : DEFAULT_BRAND.contentPillars,
-    approvalCriteria: settings?.approvalCriteria.length
-      ? settings.approvalCriteria
-      : DEFAULT_BRAND.approvalCriteria,
   };
 }

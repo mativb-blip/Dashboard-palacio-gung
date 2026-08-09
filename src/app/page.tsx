@@ -121,9 +121,6 @@ function DashboardHome() {
         ...("artN" in patch ? { artN: patch.artN } : {}),
         ...("departmentApprovals" in patch ? { departmentApprovals: patch.departmentApprovals ?? [] } : {}),
         ...("contentPillar" in patch ? { contentPillar: patch.contentPillar ?? null } : {}),
-        ...("approvalCriteriaChecked" in patch
-          ? { approvalCriteriaChecked: patch.approvalCriteriaChecked ?? [] }
-          : {}),
       });
       // El server puede haber invalidado la aprobación (ficha 1) o limpiado
       // el aviso al re-aprobar — el patch optimista de arriba no lo sabía.

@@ -17,8 +17,6 @@ export interface Brand {
   commentNotifyCc: string;
   /** Lista editable por un Admin (ver /usuarios) — ficha 2. */
   contentPillars: string[];
-  /** Lista editable por un Admin (ver /usuarios) — ficha 4. */
-  approvalCriteria: string[];
 }
 
 const BrandContext = createContext<Brand>(DEFAULT_BRAND);

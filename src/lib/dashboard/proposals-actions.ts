@@ -52,7 +52,6 @@ function toProposal(row: ProposalRow, now: Date): Proposal {
     dim: row.dim ?? undefined,
     contentPillar: row.contentPillar ?? undefined,
     approvalInvalidatedReason: row.approvalInvalidatedReason ?? undefined,
-    approvalCriteriaChecked: row.approvalCriteriaChecked,
     comments: row.comments.map((c): ProposalComment => ({
       id: c.id,
       scope: c.scope,
@@ -141,7 +140,6 @@ export interface UpdateProposalInput {
   artN?: number;
   departmentApprovals?: boolean[];
   contentPillar?: string | null;
-  approvalCriteriaChecked?: string[];
 }
 
 /** Campos que, si cambian en una propuesta ya aprobada, invalidan esa
@@ -169,7 +167,6 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
       images: true,
       video: true,
       departmentApprovals: true,
-      approvalCriteriaChecked: true,
     },
   });
   if (!current) throw new Error("Propuesta no encontrada.");
@@ -187,14 +184,6 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
 
   if (patch.departmentApprovals !== undefined) {
     const wantsApproved = patch.departmentApprovals[0] === true;
-    if (wantsApproved) {
-      const brand = resolveBrand(await getSiteSettings());
-      const checked = current.approvalCriteriaChecked ?? [];
-      const allCriteriaChecked = brand.approvalCriteria.every((c) => checked.includes(c));
-      if (!allCriteriaChecked) {
-        throw new Error("Faltan criterios del checklist por marcar antes de poder aprobar.");
-      }
-    }
     justApproved = !wasApproved && wantsApproved;
     if (justApproved) invalidatedReason = null;
   } else if (contentTouched && wasApproved) {
@@ -239,9 +228,6 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
       ...(patch.artN !== undefined ? { artN: patch.artN } : {}),
       ...(nextApprovals !== undefined ? { departmentApprovals: nextApprovals } : {}),
       ...(patch.contentPillar !== undefined ? { contentPillar: patch.contentPillar } : {}),
-      ...(patch.approvalCriteriaChecked !== undefined
-        ? { approvalCriteriaChecked: patch.approvalCriteriaChecked, approvalCriteriaCheckedAt: new Date() }
-        : {}),
       ...(invalidatedReason !== undefined ? { approvalInvalidatedReason: invalidatedReason } : {}),
       // Una invalidación (nextApprovals cambió a [false]) o una nueva
       // aprobación cambia si hace falta seguir recordando — rearmar el

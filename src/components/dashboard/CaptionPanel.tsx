@@ -21,21 +21,8 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
   const [draft, setDraft] = useState(proposal.caption);
   const [showHistory, setShowHistory] = useState(false);
   const departmentApprovals = proposal.departmentApprovals ?? Array(DEPARTMENT_CHECK_COUNT).fill(false);
-  const criteriaChecked = proposal.approvalCriteriaChecked ?? [];
-  const allCriteriaChecked = brand.approvalCriteria.every((c) => criteriaChecked.includes(c));
-
-  function toggleCriterion(criterion: string) {
-    const next = criteriaChecked.includes(criterion)
-      ? criteriaChecked.filter((c) => c !== criterion)
-      : [...criteriaChecked, criterion];
-    onUpdateProposal(proposal.id, { approvalCriteriaChecked: next });
-  }
 
   function toggleDepartment(index: number) {
-    const current = departmentApprovals[index];
-    // Solo bloquea pasar a aprobado sin el checklist completo (ficha 4) —
-    // desmarcar siempre queda permitido.
-    if (!current && !allCriteriaChecked) return;
     const next = departmentApprovals.map((value, i) => (i === index ? !value : value));
     onUpdateProposal(proposal.id, { departmentApprovals: next });
   }
@@ -143,28 +130,6 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
         </div>
 
         <div className="mt-3">
-          <span className="mb-1.5 block text-[10px] font-bold tracking-[0.08em] text-tx-3 uppercase">
-            Checklist de aprobación
-          </span>
-          <div className="flex flex-col gap-1">
-            {brand.approvalCriteria.map((criterion) => {
-              const checked = criteriaChecked.includes(criterion);
-              return (
-                <label key={criterion} className="flex items-center gap-2 text-[12px] text-brand-ink">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleCriterion(criterion)}
-                    className="h-3.5 w-3.5 accent-brand-blue"
-                  />
-                  {criterion}
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="mt-3">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold tracking-[0.08em] text-tx-3 uppercase">
               Aprobación por departamento
@@ -173,33 +138,20 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
               {departmentApprovals.filter(Boolean).length}/{DEPARTMENT_CHECK_COUNT}
             </span>
           </div>
-          {!allCriteriaChecked && !departmentApprovals[0] && (
-            <p className="mb-1.5 text-[11px] text-tx-3">Completá el checklist para poder aprobar.</p>
-          )}
           <div className="flex flex-wrap items-center gap-1.5">
             {departmentApprovals.map((checked, i) => {
               const label = "Jun";
-              const blocked = !checked && !allCriteriaChecked;
               return (
                 <button
                   key={i}
                   type="button"
                   onClick={() => toggleDepartment(i)}
-                  disabled={blocked}
                   aria-pressed={checked}
-                  title={
-                    checked
-                      ? `${label} · aprobado`
-                      : blocked
-                        ? `${label} · completá el checklist primero`
-                        : `${label} · pendiente`
-                  }
+                  title={checked ? `${label} · aprobado` : `${label} · pendiente`}
                   className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-1 text-[10px] leading-none font-bold tracking-[0.04em] uppercase transition-[color,border-color,background-color] duration-150 ${PRESS_SCALE_CLASS} ${
                     checked
                       ? "border-brand-blue bg-brand-blue/[0.05] text-brand-blue"
-                      : blocked
-                        ? "cursor-default border-line-2 bg-white text-line-2"
-                        : "border-line-2 bg-white text-brand-red hover:border-brand-red/40"
+                      : "border-line-2 bg-white text-brand-red hover:border-brand-red/40"
                   }`}
                 >
                   <span

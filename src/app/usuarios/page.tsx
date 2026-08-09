@@ -43,7 +43,7 @@ export default async function UsuariosPage() {
       <UsersTable users={users} currentUserId={session.user.id} roleOptions={ROLE_OPTIONS} />
 
       <div className="h-px bg-line" />
-      <BrandListsPanel contentPillars={brand.contentPillars} approvalCriteria={brand.approvalCriteria} />
+      <BrandListsPanel contentPillars={brand.contentPillars} />
     </div>
   );
 }

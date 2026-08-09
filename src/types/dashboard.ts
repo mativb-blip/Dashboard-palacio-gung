@@ -51,9 +51,6 @@ export interface Proposal {
    * computeProposalStatus) — undefined = nunca se invalidó, o ya se
    * volvió a aprobar. */
   approvalInvalidatedReason?: string;
-  /** Qué criterios del checklist (ver brand.approvalCriteria) están
-   * tildados en la aprobación vigente. */
-  approvalCriteriaChecked?: string[];
 }
 
 /** Snapshot de una versión anterior del caption/media de una propuesta —

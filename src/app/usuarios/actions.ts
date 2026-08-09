@@ -97,16 +97,3 @@ export async function updateContentPillars(formData: FormData) {
   revalidatePath("/calendario");
   revalidatePath("/nueva-propuesta");
 }
-
-export async function updateApprovalCriteria(formData: FormData) {
-  await requireAdmin();
-  const criteria = parseListInput(String(formData.get("raw") ?? ""));
-  await prisma.siteSettings.upsert({
-    where: { id: SETTINGS_ID },
-    create: { id: SETTINGS_ID, approvalCriteria: criteria },
-    update: { approvalCriteria: criteria },
-  });
-  revalidatePath("/usuarios");
-  revalidatePath("/");
-  revalidatePath("/calendario");
-}
