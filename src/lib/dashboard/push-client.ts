@@ -1,7 +1,10 @@
 // Helpers de Web Push del lado del navegador — separados de notify-push.ts
 // (server-only, usa `web-push`) para no arrastrar esa dependencia al bundle.
 
-function urlBase64ToUint8Array(base64: string): Uint8Array {
+// Devuelve BufferSource en vez de Uint8Array — TS 5.7+ tipa Uint8Array como
+// genérico sobre ArrayBufferLike (incluye SharedArrayBuffer), que no matchea
+// con lo que pide PushSubscriptionOptionsInit.applicationServerKey.
+function urlBase64ToUint8Array(base64: string): BufferSource {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
   const base64Safe = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(base64Safe);
