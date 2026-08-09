@@ -120,7 +120,6 @@ function DashboardHome() {
         ...("video" in patch ? { video: patch.video ?? null } : {}),
         ...("artN" in patch ? { artN: patch.artN } : {}),
         ...("departmentApprovals" in patch ? { departmentApprovals: patch.departmentApprovals ?? [] } : {}),
-        ...("contentPillar" in patch ? { contentPillar: patch.contentPillar ?? null } : {}),
       });
       // El server puede haber invalidado la aprobación (ficha 1) o limpiado
       // el aviso al re-aprobar — el patch optimista de arriba no lo sabía.

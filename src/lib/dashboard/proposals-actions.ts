@@ -139,7 +139,6 @@ export interface UpdateProposalInput {
   video?: string | null;
   artN?: number;
   departmentApprovals?: boolean[];
-  contentPillar?: string | null;
 }
 
 /** Campos que, si cambian en una propuesta ya aprobada, invalidan esa
@@ -227,7 +226,6 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
       ...(patch.video !== undefined ? { video: patch.video } : {}),
       ...(patch.artN !== undefined ? { artN: patch.artN } : {}),
       ...(nextApprovals !== undefined ? { departmentApprovals: nextApprovals } : {}),
-      ...(patch.contentPillar !== undefined ? { contentPillar: patch.contentPillar } : {}),
       ...(invalidatedReason !== undefined ? { approvalInvalidatedReason: invalidatedReason } : {}),
       // Una invalidación (nextApprovals cambió a [false]) o una nueva
       // aprobación cambia si hace falta seguir recordando — rearmar el

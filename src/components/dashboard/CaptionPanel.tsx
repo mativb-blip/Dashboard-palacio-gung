@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import VersionHistoryModal from "./VersionHistoryModal";
-import { useBrand } from "@/lib/dashboard/BrandContext";
 import { dateLong, statusPillStyle } from "@/lib/dashboard/format";
 import { computeProposalStatus, DEPARTMENT_CHECK_COUNT } from "@/lib/dashboard/proposals";
 import { handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
@@ -15,7 +14,6 @@ interface CaptionPanelProps {
 }
 
 export default function CaptionPanel({ proposal, onUpdateProposal, onDeleteProposal }: CaptionPanelProps) {
-  const brand = useBrand();
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(proposal.caption);
@@ -115,18 +113,7 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
           <span className="mb-1.5 block text-[10px] font-bold tracking-[0.08em] text-tx-3 uppercase">
             Pilar de contenido
           </span>
-          <select
-            value={proposal.contentPillar ?? ""}
-            onChange={(e) => onUpdateProposal(proposal.id, { contentPillar: e.target.value || undefined })}
-            className="w-full rounded border border-line-2 bg-white px-2.5 py-1.5 text-xs text-brand-ink"
-          >
-            <option value="">Sin categorizar</option>
-            {brand.contentPillars.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+          <p className="text-xs text-brand-ink">{proposal.contentPillar || "Sin categorizar"}</p>
         </div>
 
         <div className="mt-3">
