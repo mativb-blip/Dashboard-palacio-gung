@@ -13,9 +13,10 @@ const NETWORKS = ["Instagram", "Mail", "Whatsapp", "LinkedIn"];
 const FORMATS: ProposalFormat[] = ["Carrusel", "Reel", "Historia", "Post simple"];
 
 // Franjas de 30 min en vez de texto libre — evita horas mal tipeadas que
-// schedule-time.ts (recordatorios de publicación) no pueda parsear.
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
-  const totalMinutes = i * 30;
+// schedule-time.ts (recordatorios de publicación) no pueda parsear. Acotado
+// a 7am-12pm, la ventana en la que de verdad se publica contenido.
+const TIME_OPTIONS = Array.from({ length: 11 }, (_, i) => {
+  const totalMinutes = 7 * 60 + i * 30;
   let hour = Math.floor(totalMinutes / 60);
   const minute = totalMinutes % 60;
   const meridiem = hour < 12 ? "AM" : "PM";
