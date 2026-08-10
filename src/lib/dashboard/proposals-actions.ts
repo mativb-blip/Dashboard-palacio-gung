@@ -5,9 +5,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { sendCommentNotification } from "@/lib/dashboard/notify-email";
-import { sendPushToAll } from "@/lib/dashboard/notify-push";
+import { sendPushToEmail } from "@/lib/dashboard/notify-push";
 import { deriveTitle, PROPOSAL_VERSION_LIMIT } from "@/lib/dashboard/proposals";
-import { getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
+import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 import type {
   Proposal,
   ProposalComment,
@@ -237,7 +237,8 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
   });
 
   if (justApproved) {
-    await sendPushToAll({
+    const brand = resolveBrand(await getSiteSettings());
+    await sendPushToEmail(brand.pushNotifyTo, {
       title: "Jun aprobó un post",
       body: current.title ? `"${current.title}" quedó aprobado.` : "Un post quedó aprobado.",
     });
@@ -304,17 +305,22 @@ export async function addComment(proposalId: string, input: AddCommentInput): Pr
   });
   if (proposal) {
     const brand = resolveBrand(await getSiteSettings());
+    // El destino real es el email REGISTRADO del Admin, no un valor de
+    // config duplicado — brand.commentNotifyTo (SiteSettings) manda si un
+    // Admin lo seteó a mano; si no, cae a getAdminEmail().
+    const notifyTo = brand.commentNotifyTo || (await getAdminEmail());
     await Promise.all([
-      sendCommentNotification({
-        proposalTitle: proposal.title,
-        proposalDate: proposal.date,
-        author: row.author,
-        text: row.text,
-        to: brand.commentNotifyTo,
-        cc: brand.commentNotifyCc,
-        senderEmail: brand.senderEmail,
-      }),
-      sendPushToAll({
+      notifyTo &&
+        sendCommentNotification({
+          proposalTitle: proposal.title,
+          proposalDate: proposal.date,
+          author: row.author,
+          text: row.text,
+          to: notifyTo,
+          cc: brand.commentNotifyCc,
+          senderEmail: brand.senderEmail || notifyTo,
+        }),
+      sendPushToEmail(brand.pushNotifyTo, {
         title: `Nuevo comentario en "${proposal.title}"`,
         body: `${row.author}: ${row.text}`,
       }),

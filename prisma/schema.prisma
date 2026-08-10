@@ -32,6 +32,7 @@ model User {
 
   accounts Account[]
   sessions Session[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Account {
@@ -90,9 +91,14 @@ model SiteSettings {
 
   /// Remitente del correo de notificación de comentarios (Gmail SMTP).
   senderEmail        String?  @db.Text
-  /// Destinatario(s) de la notificación de comentarios nuevos.
+  /// Destinatario(s) de la notificación de comentarios nuevos (email).
   commentNotifyTo    String?  @db.Text
   commentNotifyCc    String?  @db.Text
+  /// Email del usuario que debe recibir el push de "comentario nuevo"/
+  /// "post aprobado" (ver sendPushToEmail en notify-push.ts) — a diferencia
+  /// de commentNotifyTo (mail), esto sí depende de que ese usuario exista
+  /// y tenga una PushSubscription (ver User.pushSubscriptions).
+  pushNotifyTo       String?  @db.Text
 
   loginBackgroundUrl String?  @db.Text
   loginLogoUrl       String?  @db.Text
@@ -205,5 +211,13 @@ model PushSubscription {
   endpoint  String   @unique @db.Text
   p256dh    String   @db.Text
   auth      String   @db.Text
+  /// Quién se suscribió (ver src/app/api/push/subscribe/route.ts) — sabido
+  /// desde siempre por la sesión en ese endpoint, pero recién ahora se
+  /// guarda; hace falta para poder mandarle un push a una persona puntual
+  /// (sendPushToEmail) en vez de a todos los suscriptos (sendPushToAll).
+  /// Nullable: suscripciones creadas antes de este campo, o si el usuario
+  /// se borra después (onDelete: SetNull, no se pierde la suscripción en sí).
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 }

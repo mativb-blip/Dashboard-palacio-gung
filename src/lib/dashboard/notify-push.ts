@@ -21,12 +21,11 @@ interface PushPayload {
 /** Nunca tira — mismo criterio que sendCommentNotification (notify-email.ts):
  * un fallo acá no debe romper el guardado del comentario. Suscripciones
  * muertas (404/410, el navegador ya las invalidó) se borran de una. */
-export async function sendPushToAll(payload: PushPayload): Promise<void> {
-  if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) return; // VAPID_* no configurado — no-op silencioso
-
-  const subscriptions = await prisma.pushSubscription.findMany();
+async function sendToSubscriptions(
+  subscriptions: { id: string; endpoint: string; p256dh: string; auth: string }[],
+  payload: PushPayload,
+): Promise<void> {
   const body = JSON.stringify(payload);
-
   await Promise.all(
     subscriptions.map(async (sub) => {
       try {
@@ -44,4 +43,30 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
       }
     }),
   );
+}
+
+/** Broadcast a todo el que tenga notificaciones activadas — usado para los
+ * recordatorios de publicación/aprobación (cron), relevantes para cualquiera
+ * que use la app, no solo para una persona puntual. */
+export async function sendPushToAll(payload: PushPayload): Promise<void> {
+  if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) return; // VAPID_* no configurado — no-op silencioso
+  const subscriptions = await prisma.pushSubscription.findMany();
+  await sendToSubscriptions(subscriptions, payload);
+}
+
+/** Push a las suscripciones de un usuario puntual (por email, no por id —
+ * así el caller no necesita resolverlo primero). Usado por comentario nuevo
+ * y post aprobado (ver proposals-actions.ts): esos dos van a una persona
+ * específica (SiteSettings.pushNotifyTo), no a todos los suscriptos como
+ * sendPushToAll. Si esa persona no tiene ninguna suscripción activa (nunca
+ * activó notificaciones, o su usuario no existe), no-op silencioso. */
+export async function sendPushToEmail(email: string, payload: PushPayload): Promise<void> {
+  if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) return; // VAPID_* no configurado — no-op silencioso
+  if (!email) return;
+
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (!user) return;
+
+  const subscriptions = await prisma.pushSubscription.findMany({ where: { userId: user.id } });
+  await sendToSubscriptions(subscriptions, payload);
 }

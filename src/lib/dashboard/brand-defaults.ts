@@ -13,6 +13,10 @@ export interface ResolvedBrand {
   senderEmail: string;
   commentNotifyTo: string;
   commentNotifyCc: string;
+  /// Email del usuario que recibe el push de "comentario nuevo"/"post
+  /// aprobado" (ver sendPushToEmail en notify-push.ts) — canal separado de
+  /// commentNotifyTo (ese es mail, este es push, y van a personas distintas).
+  pushNotifyTo: string;
   contentPillars: string[];
 }
 
@@ -28,8 +32,15 @@ export const DEFAULT_BRAND: ResolvedBrand = {
   brandColorPrimaryDark: "#5a758a",
   brandColorAccent: "#e81f35",
   instagramHandle: "tu.marca",
-  senderEmail: "contenidos@tu-marca.com",
-  commentNotifyTo: "admin@tu-marca.com",
+  // Mail (comentarios/aprobaciones) → el Admin (Matías), resuelto por email
+  // REGISTRADO en su User (getAdminEmail() en site-settings.ts), no un
+  // string fijo acá — así nunca queda desincronizado si ese email cambia.
+  // "" a propósito: deja pasar esa resolución dinámica (ver proposals-actions.ts);
+  // solo se usaría si por algún motivo no hay ningún User con rol ADMIN.
+  senderEmail: "",
+  commentNotifyTo: "",
   commentNotifyCc: "",
+  // Push (mismos eventos) → Jun, cuenta fija (ver ficha de notificaciones).
+  pushNotifyTo: "jun.un@ahnsdom.com",
   contentPillars: ["Producto", "Marca/cultura", "Testimonios", "Institucional"],
 };

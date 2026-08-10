@@ -20,8 +20,16 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   await prisma.pushSubscription.upsert({
     where: { endpoint: body.endpoint },
-    update: { p256dh: body.keys.p256dh, auth: body.keys.auth },
-    create: { endpoint: body.endpoint, p256dh: body.keys.p256dh, auth: body.keys.auth },
+    // userId también en el update: si este mismo endpoint (navegador/
+    // dispositivo compartido) se resuscribe con otra sesión, la suscripción
+    // pasa a pertenecer a quien está logueado ahora, no a quien la creó.
+    update: { p256dh: body.keys.p256dh, auth: body.keys.auth, userId: session.user.id },
+    create: {
+      endpoint: body.endpoint,
+      p256dh: body.keys.p256dh,
+      auth: body.keys.auth,
+      userId: session.user.id,
+    },
   });
 
   return NextResponse.json({ ok: true });

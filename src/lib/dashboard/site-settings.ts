@@ -13,6 +13,16 @@ export const getSiteSettings = cache(async () => {
   return prisma.siteSettings.findUnique({ where: { id: SETTINGS_ID } });
 });
 
+/** Email realmente registrado del Admin (User.email, no un string
+ * duplicado en config) — usado como destinatario por default de las
+ * notificaciones de comentario/aprobación cuando SiteSettings.commentNotifyTo
+ * no está seteado explícitamente. Si hay más de un ADMIN, toma el primero
+ * (createdAt asc) — este dashboard está pensado para un solo Admin real. */
+export const getAdminEmail = cache(async () => {
+  const admin = await prisma.user.findFirst({ where: { role: "ADMIN" }, orderBy: { createdAt: "asc" } });
+  return admin?.email ?? null;
+});
+
 /** Combina la fila real (si existe) sobre DEFAULT_BRAND, campo por campo. */
 export function resolveBrand(
   settings: Awaited<ReturnType<typeof getSiteSettings>>,
@@ -26,6 +36,7 @@ export function resolveBrand(
     senderEmail: settings?.senderEmail ?? DEFAULT_BRAND.senderEmail,
     commentNotifyTo: settings?.commentNotifyTo ?? DEFAULT_BRAND.commentNotifyTo,
     commentNotifyCc: settings?.commentNotifyCc ?? DEFAULT_BRAND.commentNotifyCc,
+    pushNotifyTo: settings?.pushNotifyTo ?? DEFAULT_BRAND.pushNotifyTo,
     contentPillars: settings?.contentPillars.length ? settings.contentPillars : DEFAULT_BRAND.contentPillars,
   };
 }
