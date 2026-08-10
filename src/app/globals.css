@@ -183,3 +183,43 @@ input[type="text"]:focus {
     animation: none;
   }
 }
+
+/* Menú de hamburguesa mobile (clonado de clevante.cz, ver grabación del
+   2026-08-09): el panel se revela con un "wipe" de arriba hacia abajo
+   (clip-path, no height — no empuja el layout) y el contenido de adentro
+   aparece en cascada. Cerrar es instantáneo (sin reversa del wipe) — así
+   se vio en la referencia real. */
+@keyframes menu-wipe-in {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0% 0);
+  }
+}
+
+.menu-wipe-in {
+  animation: menu-wipe-in 320ms var(--ease-out);
+}
+
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-in {
+  animation: stagger-in 320ms var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-wipe-in,
+  .stagger-in {
+    animation: none;
+  }
+}
