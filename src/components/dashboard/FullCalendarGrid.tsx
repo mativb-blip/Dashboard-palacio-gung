@@ -61,7 +61,7 @@ export default function FullCalendarGrid({
         {WEEKDAY_ABBR.map((label) => (
           <div
             key={label}
-            className="px-1 py-1.5 text-center text-[9px] font-bold tracking-[0.06em] text-tx-3 uppercase desktop:px-3 desktop:py-2 desktop:text-left desktop:text-[11px] desktop:tracking-[0.14em]"
+            className="px-1 py-1.5 text-center text-[9px] font-bold tracking-label text-tx-3 uppercase desktop:px-3 desktop:py-2 desktop:text-left desktop:text-[11px] desktop:tracking-label"
           >
             {label}
           </div>
@@ -86,8 +86,8 @@ export default function FullCalendarGrid({
               }}
               onDragLeave={() => setDragOverIso((cur) => (cur === iso ? null : cur))}
               onDrop={(e) => handleDrop(e, iso)}
-              className={`border-t border-r border-line first:border-l transition-colors duration-150 ${
-                isDropTarget ? "bg-brand-blue/[0.08]" : inMonth ? "bg-white" : "bg-panel-2"
+              className={`border-t border-r border-line first:border-l transition-colors duration-[400ms] ${
+                isDropTarget ? "bg-brand-blue/[0.08]" : inMonth ? "bg-panel-2" : "bg-[var(--bg)]"
               }`}
             >
               <button
@@ -96,7 +96,7 @@ export default function FullCalendarGrid({
                 disabled={!inMonth}
                 aria-pressed={isSelected}
                 aria-label={`${date.getDate()}${dayProposals.length ? `, ${dayProposals.length} propuesta(s)` : ""}`}
-                className={`flex min-h-[56px] w-full flex-col items-center justify-center gap-1 py-1 transition-colors duration-150 desktop:hidden ${PRESS_SCALE_CLASS} ${
+                className={`flex min-h-[56px] w-full flex-col items-center justify-center gap-1 py-1 transition-colors duration-[400ms] desktop:hidden ${PRESS_SCALE_CLASS} ${
                   isSelected ? "bg-brand-blue/[0.08]" : ""
                 } ${!inMonth ? "cursor-default" : ""}`}
               >
@@ -196,7 +196,7 @@ function EventChip({
       }}
       onDragEnd={onDragEnd}
       title={`Arrastrar para reprogramar "${proposal.title}"`}
-      className={`flex shrink-0 cursor-grab items-center gap-1.5 rounded-sm border border-line-2 bg-white px-1.5 py-0.5 text-left transition-[border-color,transform,opacity] duration-150 hover:border-brand-blue active:cursor-grabbing ${PRESS_SCALE_CLASS} ${
+      className={`flex shrink-0 cursor-grab items-center gap-1.5 rounded-sm border border-line-2 bg-panel-2 px-1.5 py-0.5 text-left transition-[border-color,transform,opacity] duration-[400ms] hover:border-brand-blue active:cursor-grabbing ${PRESS_SCALE_CLASS} ${
         isDragging ? "opacity-40" : ""
       }`}
     >
@@ -219,7 +219,7 @@ function NewPostLink({ iso }: { iso: string }) {
       href={`/nueva-propuesta?date=${iso}`}
       title="Cargar contenido para este día"
       aria-label="Cargar contenido para este día"
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-2 text-tx-3 opacity-0 transition-[opacity,border-color,color] duration-150 group-hover:opacity-100 hover:border-brand-blue hover:text-brand-blue focus-visible:opacity-100 ${PRESS_SCALE_CLASS}`}
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-2 text-tx-3 opacity-0 transition-[opacity,border-color,color] duration-[400ms] group-hover:opacity-100 hover:border-brand-blue hover:text-brand-blue focus-visible:opacity-100 ${PRESS_SCALE_CLASS}`}
     >
       <PlusIcon className="h-3 w-3" />
     </Link>

@@ -68,7 +68,7 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
     <div className="flex flex-col gap-5">
       <div>
         <div className="mb-2 flex items-start justify-between gap-2">
-          <div className="text-[11px] tracking-[0.16em] text-tx-3 uppercase">
+          <div className="text-[11px] tracking-label text-tx-3 uppercase">
             {dateLong(proposal.date)}
           </div>
           <button
@@ -84,7 +84,7 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-4">
           <span
-            className="inline-flex items-center rounded-sm border px-2.5 py-1.5 text-[11px] leading-none font-bold tracking-[0.1em] uppercase"
+            className="inline-flex items-center rounded-sm border px-2.5 py-1.5 text-[11px] leading-none font-bold tracking-label uppercase"
             style={{
               background: statusStyle.background,
               color: statusStyle.color,
@@ -104,13 +104,20 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
         </div>
 
         {proposal.approvalInvalidatedReason && (
-          <div className="mt-2.5 rounded border border-amber-600/40 bg-amber-50 px-2.5 py-2 text-xs leading-[1.4] text-amber-800">
+          <div
+            className="mt-2.5 rounded border px-2.5 py-2 text-xs leading-[1.4]"
+            style={{
+              borderColor: "var(--color-amber-border)",
+              background: "var(--color-amber-bg)",
+              color: "var(--color-amber-text)",
+            }}
+          >
             {proposal.approvalInvalidatedReason}
           </div>
         )}
 
         <div className="mt-3">
-          <span className="mb-1.5 block text-[10px] font-bold tracking-[0.08em] text-tx-3 uppercase">
+          <span className="mb-1.5 block text-[10px] font-bold tracking-label text-tx-3 uppercase">
             Pilar de contenido
           </span>
           <p className="text-xs text-brand-ink">{proposal.contentPillar || "Sin categorizar"}</p>
@@ -118,7 +125,7 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
 
         <div className="mt-3">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold tracking-[0.08em] text-tx-3 uppercase">
+            <span className="text-[10px] font-bold tracking-label text-tx-3 uppercase">
               Aprobación por departamento
             </span>
             <span className="text-[10px] font-bold text-tx-3 tabular-nums">
@@ -135,18 +142,18 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
                   onClick={() => toggleDepartment(i)}
                   aria-pressed={checked}
                   title={checked ? `${label} · aprobado` : `${label} · pendiente`}
-                  className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-1 text-[10px] leading-none font-bold tracking-[0.04em] uppercase transition-[color,border-color,background-color] duration-150 ${PRESS_SCALE_CLASS} ${
+                  className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-1 text-[10px] leading-none font-bold tracking-label uppercase transition-[color,border-color,background-color] duration-[400ms] ${PRESS_SCALE_CLASS} ${
                     checked
                       ? "border-brand-blue bg-brand-blue/[0.05] text-brand-blue"
-                      : "border-line-2 bg-white text-brand-red hover:border-brand-red/40"
+                      : "border-line-2 bg-transparent text-[var(--color-brand-red-text)] hover:border-brand-red/40"
                   }`}
                 >
                   <span
-                    className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-150 ${
+                    className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-[400ms] ${
                       checked ? "border-brand-blue bg-brand-blue" : "border-brand-red/50"
                     }`}
                   >
-                    {checked && <CheckIcon className="check-pop-in h-2.5 w-2.5 text-white" />}
+                    {checked && <CheckIcon className="check-pop-in h-2.5 w-2.5 text-[var(--bg)]" />}
                   </span>
                   {label}
                 </button>
@@ -160,21 +167,21 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
 
       <div>
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5">
-          <div className="text-[11px] tracking-[0.16em] text-tx-3 uppercase">Caption propuesto</div>
+          <div className="text-[11px] tracking-label text-tx-3 uppercase">Caption propuesto</div>
           <div className="flex flex-wrap items-center gap-2">
             {editing ? (
               <>
                 <button
                   type="button"
                   onClick={handleCancelEdit}
-                  className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-white px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                  className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveEdit}
-                  className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-white transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                  className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                 >
                   Guardar
                 </button>
@@ -213,7 +220,7 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="min-h-32 w-full resize-y rounded border border-line-2 bg-white px-3 py-2 text-[15px] leading-[1.5] text-brand-ink"
+            className="min-h-32 w-full resize-y rounded border border-line-2 bg-panel-2 px-3 py-2 text-[15px] leading-[1.5] text-brand-ink"
           />
         ) : (
           <>

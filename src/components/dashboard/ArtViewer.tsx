@@ -183,11 +183,13 @@ export default function ArtViewer({
                 onClick={() => onSelectProposal(p.id)}
                 aria-pressed={isActive}
                 title={`${fmtShort(p.format)} · ${p.network} · Publica ${p.time}`}
-                className={`inline-flex items-center rounded-sm border px-2.5 py-1.5 text-[11px] leading-none font-bold tracking-[0.1em] uppercase transition-[color,border-color,background-color] duration-150 ${PRESS_SCALE_CLASS}`}
+                className={`inline-flex items-center rounded-sm border px-2.5 py-1.5 text-[11px] leading-none font-bold tracking-label uppercase transition-[color,border-color,background-color] duration-[400ms] ${PRESS_SCALE_CLASS}`}
                 style={{
                   color: isActive ? chipHex : "var(--color-tx-3)",
                   borderColor: isActive ? chipHex : "var(--color-line-2)",
-                  background: isActive ? "rgba(0,0,0,0.03)" : "transparent",
+                  // rgba(0,0,0,.03) oscurecía sobre blanco — sobre --bg no
+                  // hace nada visible, así que aclara en vez de oscurecer.
+                  background: isActive ? "var(--surface)" : "transparent",
                 }}
               >
                 {fmtShort(p.format)} · {p.time}
@@ -201,14 +203,14 @@ export default function ArtViewer({
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-white px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-150 desktop:min-h-10 desktop:px-4 ${PRESS_SCALE_CLASS}`}
+                className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] desktop:min-h-10 desktop:px-4 ${PRESS_SCALE_CLASS}`}
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleSaveEdit}
-                className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-white transition-transform duration-150 desktop:min-h-10 desktop:px-4 ${PRESS_SCALE_CLASS}`}
+                className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] desktop:min-h-10 desktop:px-4 ${PRESS_SCALE_CLASS}`}
               >
                 Guardar
               </button>
@@ -218,7 +220,7 @@ export default function ArtViewer({
               <button
                 type="button"
                 onClick={handleCancelSelect}
-                className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-white px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-150 desktop:min-h-10 desktop:px-4 ${PRESS_SCALE_CLASS}`}
+                className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] desktop:min-h-10 desktop:px-4 ${PRESS_SCALE_CLASS}`}
               >
                 Cancelar
               </button>
@@ -226,7 +228,7 @@ export default function ArtViewer({
                 type="button"
                 onClick={handleConfirmDownload}
                 disabled={downloading || selectedIndices.size === 0}
-                className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-white transition-transform duration-150 disabled:cursor-default disabled:opacity-60 desktop:min-h-10 desktop:px-4 ${PRESS_SCALE_CLASS}`}
+                className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 desktop:min-h-10 desktop:px-4 ${PRESS_SCALE_CLASS}`}
               >
                 {downloading ? "Descargando…" : `Descargar (${selectedIndices.size})`}
               </button>
@@ -324,7 +326,7 @@ export default function ArtViewer({
               onClick={() => onArtIndexChange(Math.max(0, activeIndex - 1))}
               onPointerEnter={handleLiquidPointerEnter}
               disabled={activeIndex === 0}
-              className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-line-2 bg-white text-lg leading-none text-brand-blue transition-transform duration-150 disabled:cursor-default disabled:text-line-2 desktop:h-11 desktop:w-11 desktop:text-xl ${LIQUID_FILL_CLASS} ${LIQUID_GROW_CLASS} ${PRESS_SCALE_CLASS}`}
+              className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-line-2 bg-panel-2 text-lg leading-none text-brand-blue transition-transform duration-[400ms] disabled:cursor-default disabled:text-line-2 desktop:h-11 desktop:w-11 desktop:text-xl ${LIQUID_FILL_CLASS} ${LIQUID_GROW_CLASS} ${PRESS_SCALE_CLASS}`}
             >
               <span className="relative">‹</span>
             </button>
@@ -343,7 +345,7 @@ export default function ArtViewer({
                   type="button"
                   onClick={() => setLightboxOpen(true)}
                   aria-label="Ver foto en grande"
-                  className={`block h-full w-full cursor-zoom-in transition-transform duration-200 motion-safe:hover:scale-[1.03] ${PRESS_SCALE_CLASS}`}
+                  className={`block h-full w-full cursor-zoom-in transition-transform duration-[400ms] motion-safe:hover:scale-[1.03] ${PRESS_SCALE_CLASS}`}
                 >
                   <ArtSlot art={arts[activeIndex]} total={totalPadded} />
                 </button>
@@ -356,7 +358,7 @@ export default function ArtViewer({
               onClick={() => onArtIndexChange(Math.min(total - 1, activeIndex + 1))}
               onPointerEnter={handleLiquidPointerEnter}
               disabled={activeIndex === total - 1}
-              className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-line-2 bg-white text-lg leading-none text-brand-blue transition-transform duration-150 disabled:cursor-default disabled:text-line-2 desktop:h-11 desktop:w-11 desktop:text-xl ${LIQUID_FILL_CLASS} ${LIQUID_GROW_CLASS} ${PRESS_SCALE_CLASS}`}
+              className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-line-2 bg-panel-2 text-lg leading-none text-brand-blue transition-transform duration-[400ms] disabled:cursor-default disabled:text-line-2 desktop:h-11 desktop:w-11 desktop:text-xl ${LIQUID_FILL_CLASS} ${LIQUID_GROW_CLASS} ${PRESS_SCALE_CLASS}`}
             >
               <span className="relative">›</span>
             </button>
@@ -367,7 +369,7 @@ export default function ArtViewer({
                 key={art.index}
                 type="button"
                 onClick={() => onArtIndexChange(art.index)}
-                className={`h-2.5 rounded-full transition-[width,background-color,transform] duration-[180ms] ${PRESS_SCALE_CLASS} ${
+                className={`h-2.5 rounded-full transition-[width,background-color,transform] duration-[400ms] ${PRESS_SCALE_CLASS} ${
                   art.index === activeIndex ? "w-[22px] bg-brand-blue" : "w-2.5 bg-line-2"
                 }`}
               />
@@ -391,7 +393,7 @@ export default function ArtViewer({
                 type="button"
                 onClick={() => (selecting ? toggleSelected(art.index) : onArtIndexChange(art.index))}
                 aria-pressed={selecting ? isSelected : undefined}
-                className={`relative overflow-hidden rounded transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                className={`relative overflow-hidden rounded transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                 style={{
                   aspectRatio: cssAspectRatio,
                   outline:
@@ -404,11 +406,11 @@ export default function ArtViewer({
                 <ArtSlot art={art} total={totalPadded} />
                 {selecting && (
                   <span
-                    className={`absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-[4px] border-2 shadow-sm transition-colors duration-150 ${
-                      isSelected ? "border-brand-blue bg-brand-blue" : "border-brand-red/70 bg-white/90"
+                    className={`absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-[4px] border-2 shadow-sm transition-colors duration-[400ms] ${
+                      isSelected ? "border-brand-blue bg-brand-blue" : "border-brand-red/70 bg-panel-2/90"
                     }`}
                   >
-                    {isSelected && <CheckIcon className="check-pop-in h-3.5 w-3.5 text-white" />}
+                    {isSelected && <CheckIcon className="check-pop-in h-3.5 w-3.5 text-[var(--bg)]" />}
                   </span>
                 )}
               </button>

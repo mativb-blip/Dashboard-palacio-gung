@@ -25,12 +25,15 @@ export default function InstagramPreview({ format, caption, images, onClose }: I
       onClick={onClose}
     >
       <div
-        className="preview-card-in w-full max-w-[400px] rounded-lg border border-line-2 bg-white font-sans text-brand-ink shadow-lg"
+        // Simula la UI real de Instagram (siempre clara, sea cual sea el
+        // tema del dashboard) — border-line-2 ahora es blanco translúcido,
+        // invisible sobre esta tarjeta blanca, por eso va un borde fijo.
+        className="preview-card-in w-full max-w-[400px] rounded-lg border border-black/10 bg-white font-sans text-[var(--bg)] shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-3 py-2.5">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-blue text-xs font-bold text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-blue text-xs font-bold text-[var(--bg)]">
               {instagramHandle.slice(0, 2).toUpperCase()}
             </span>
             <span className="text-sm font-bold">{instagramHandle}</span>
@@ -39,13 +42,13 @@ export default function InstagramPreview({ format, caption, images, onClose }: I
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className={`text-lg leading-none text-tx-3 transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+            className={`text-lg leading-none text-tx-3 transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
           >
             ×
           </button>
         </div>
 
-        <div className="relative w-full overflow-hidden bg-panel-2" style={{ aspectRatio: aspect }}>
+        <div className="relative w-full overflow-hidden bg-[#f6f6f7]" style={{ aspectRatio: aspect }}>
           {hasImages ? (
             // eslint-disable-next-line @next/next/no-img-element -- preview local, no un asset del sitio
             <img src={images[activeIndex]} alt="" className="h-full w-full object-contain" />
@@ -66,7 +69,7 @@ export default function InstagramPreview({ format, caption, images, onClose }: I
                   type="button"
                   onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
                   aria-label="Arte anterior"
-                  className={`absolute top-1/2 left-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-sm leading-none text-brand-ink shadow-sm transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                  className={`absolute top-1/2 left-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-sm leading-none text-[var(--bg)] shadow-sm transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                 >
                   ‹
                 </button>
@@ -76,7 +79,7 @@ export default function InstagramPreview({ format, caption, images, onClose }: I
                   type="button"
                   onClick={() => setActiveIndex((i) => Math.min(images.length - 1, i + 1))}
                   aria-label="Siguiente arte"
-                  className={`absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-sm leading-none text-brand-ink shadow-sm transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                  className={`absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-sm leading-none text-[var(--bg)] shadow-sm transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                 >
                   ›
                 </button>
@@ -93,15 +96,15 @@ export default function InstagramPreview({ format, caption, images, onClose }: I
                 type="button"
                 onClick={() => setActiveIndex(i)}
                 aria-label={`Ver arte ${i + 1}`}
-                className={`h-1.5 rounded-full transition-all duration-150 ${PRESS_SCALE_CLASS} ${
-                  i === activeIndex ? "w-4 bg-brand-blue" : "w-1.5 bg-line-2"
+                className={`h-1.5 rounded-full transition-all duration-[400ms] ${PRESS_SCALE_CLASS} ${
+                  i === activeIndex ? "w-4 bg-brand-blue" : "w-1.5 bg-black/15"
                 }`}
               />
             ))}
           </div>
         )}
 
-        <div className="flex items-center gap-3 px-3 py-2 text-brand-ink">
+        <div className="flex items-center gap-3 px-3 py-2 text-[var(--bg)]">
           <HeartIcon />
           <CommentIcon />
           <SendIcon />

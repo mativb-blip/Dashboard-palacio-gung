@@ -28,7 +28,7 @@ export default function PhotoLightbox({ src, alt, onClose }: PhotoLightboxProps)
         type="button"
         onClick={onClose}
         aria-label="Cerrar"
-        className={`absolute top-5 right-5 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-2xl leading-none text-white transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+        className={`absolute top-5 right-5 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-2xl leading-none text-white transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
       >
         ×
       </button>

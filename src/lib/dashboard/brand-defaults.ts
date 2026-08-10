@@ -20,9 +20,12 @@ export interface ResolvedBrand {
  * cuando la fila de SiteSettings todavía no los tiene cargados, para que un
  * deployment nuevo (otra cuenta) solo tenga que cargar los suyos. */
 export const DEFAULT_BRAND: ResolvedBrand = {
-  brandName: "Mi Marca",
-  brandColorPrimary: "#163f6b",
-  brandColorPrimaryDark: "#102e4e",
+  brandName: "Palacio Gung",
+  // Tema oscuro (clevante.cz) — brandColorPrimary/-Dark pasan a ser el
+  // acento único #7da3c0 (antes navy #163f6b). brandColorAccent (rojo)
+  // NO se toca: es semántico ("cambios solicitados"), no decorativo.
+  brandColorPrimary: "#7da3c0",
+  brandColorPrimaryDark: "#5a758a",
   brandColorAccent: "#e81f35",
   instagramHandle: "tu.marca",
   senderEmail: "contenidos@tu-marca.com",

@@ -17,7 +17,7 @@ import {
   updateProposal,
 } from "@/lib/dashboard/proposals-actions";
 import { applyUpdateResult, proposalsInPeriod } from "@/lib/dashboard/proposals";
-import { currentPlanLabel, dateLong, todayIso } from "@/lib/dashboard/format";
+import { dateLong, todayIso } from "@/lib/dashboard/format";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import type { Gallery, Period, Proposal } from "@/types/dashboard";
@@ -40,9 +40,8 @@ function DashboardHome() {
   const [selectedProposalId, setSelectedProposalId] = useState(searchParams.get("proposal"));
   const [artIndex, setArtIndex] = useState(0);
   const [gallery, setGallery] = useState<Gallery>("slider");
-  const [pillarFilter, setPillarFilter] = useState<string>("all");
   const today = todayIso();
-  const { brandName, contentPillars } = useBrand();
+  const { brandName } = useBrand();
 
   // Carga desde la base recién montado el componente (Server Components no
   // mezclan bien con todo el estado de interacción de esta pantalla — ver
@@ -155,62 +154,23 @@ function DashboardHome() {
     toggleCommentResolved(commentId).catch((e) => console.error(e));
   }
 
-  const filteredProposals =
-    pillarFilter === "all" ? proposals : proposals.filter((p) => p.contentPillar === pillarFilter);
-  const monthProposals = proposalsInPeriod(proposals, "month");
-  const pillarCounts = contentPillars.map((pillar) => ({
-    pillar,
-    count: monthProposals.filter((p) => p.contentPillar === pillar).length,
-  }));
-  const uncategorizedCount = monthProposals.filter((p) => !p.contentPillar).length;
-
   return (
-    <div className="flex min-h-screen flex-col bg-white desktop:h-screen desktop:overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-[var(--bg)] desktop:h-screen desktop:overflow-hidden">
       <div className="flex h-[3px] w-full shrink-0">
         <span className="w-16 bg-brand-red" />
         <span className="flex-1 bg-brand-blue" />
       </div>
 
-      <Topbar view={period} onPeriodChange={handlePeriodChange} planLabel={currentPlanLabel(brandName)} />
+      <Topbar view={period} onPeriodChange={handlePeriodChange} planLabel={brandName} />
       <div className="flex justify-end px-4 pb-2 desktop:px-8">
         <Link
           href="/nueva-propuesta"
-          className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+          className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
         >
           + Cargar propuesta
         </Link>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 px-4 pb-2 desktop:px-8">
-        <label className="flex items-center gap-1.5 text-xs text-tx-3">
-          Pilar
-          <select
-            value={pillarFilter}
-            onChange={(e) => setPillarFilter(e.target.value)}
-            className="rounded border border-line-2 bg-white px-2 py-1 text-xs text-brand-ink"
-          >
-            <option value="all">Todos</option>
-            {contentPillars.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex flex-wrap gap-1.5 text-[11px] text-tx-3">
-          <span className="rounded-sm border border-line-2 px-1.5 py-0.5">Este mes:</span>
-          {pillarCounts.map(({ pillar, count }) => (
-            <span key={pillar} className="rounded-sm border border-line-2 px-1.5 py-0.5">
-              {pillar}: {count}
-            </span>
-          ))}
-          {uncategorizedCount > 0 && (
-            <span className="rounded-sm border border-line-2 px-1.5 py-0.5">
-              Sin categorizar: {uncategorizedCount}
-            </span>
-          )}
-        </div>
-      </div>
       <div className="h-px shrink-0 bg-line" />
 
       {loading ? (
@@ -219,7 +179,7 @@ function DashboardHome() {
         </div>
       ) : period === "grid" ? (
         <PostsGrid
-          proposals={filteredProposals}
+          proposals={proposals}
           onSelectProposal={handleSelectFromGrid}
           onDeleteProposal={handleDeleteProposal}
         />
@@ -228,7 +188,7 @@ function DashboardHome() {
           <div className="shrink-0 overflow-x-auto px-4 py-[14px] desktop:px-8 desktop:pt-[18px] desktop:pb-[22px]">
             <div className="min-w-[660px] desktop:min-w-0 desktop:w-full">
               <Calendar
-                proposals={filteredProposals}
+                proposals={proposals}
                 selectedProposalId={selectedProposal?.id ?? ""}
                 onSelectProposal={handleSelectProposal}
                 onSelectEmptyDate={handleSelectEmptyDate}
@@ -241,11 +201,11 @@ function DashboardHome() {
 
           {!selectedProposal ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
-              <p className="text-[11px] tracking-[0.16em] text-tx-3 uppercase">{dateLong(today)}</p>
+              <p className="text-[11px] tracking-label text-tx-3 uppercase">{dateLong(today)}</p>
               <p className="text-sm text-tx-3">No hay contenido programado para hoy.</p>
               <Link
                 href={`/nueva-propuesta?date=${today}`}
-                className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
               >
                 + Cargar propuesta para hoy
               </Link>
@@ -266,7 +226,7 @@ function DashboardHome() {
                 />
               </div>
 
-              <aside className="flex flex-col gap-[18px] bg-white px-4 pt-[18px] pb-7 desktop:gap-5 desktop:overflow-y-auto desktop:px-8 desktop:py-[26px]">
+              <aside className="flex flex-col gap-[18px] bg-[var(--bg)] px-4 pt-[18px] pb-7 desktop:gap-5 desktop:overflow-y-auto desktop:px-8 desktop:py-[26px]">
                 <CaptionPanel
                   key={`caption-${selectedProposal.id}`}
                   proposal={selectedProposal}

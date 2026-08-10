@@ -108,7 +108,7 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1420] px-4 py-8 font-sans">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--bg)] px-4 py-8 font-sans">
       {/* Fondo con degradé + acentos de marca (o imagen subida por un Admin) —
           excepción deliberada al "fondo siempre blanco" del design system,
           acotada solo a esta pantalla. */}
@@ -120,9 +120,20 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
         </>
       ) : (
         <>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#163f6b_0%,_#0b1420_55%,_#0b1420_100%)]" />
-          <div className="pointer-events-none absolute -top-24 -left-24 h-80 w-80 rounded-full bg-brand-blue/40 blur-[100px]" />
-          <div className="pointer-events-none absolute -right-24 -bottom-24 h-80 w-80 rounded-full bg-brand-red/25 blur-[100px]" />
+          {/* Antes: gradiente + un blob azul y uno rojo compitiendo por atención.
+              Ahora: humo neutro (blancos muy tenues) + un solo acento azul de
+              marca, más grano — deja el azul como único acento, sin rojo. */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--color-brand-blue)_0%,_var(--bg)_55%,_var(--bg)_100%)] opacity-70" />
+          <div className="pointer-events-none absolute -top-[10%] -left-[8%] h-[55%] w-[55%] rounded-full bg-white/[0.05] blur-[100px]" />
+          <div className="pointer-events-none absolute -right-[10%] -bottom-[15%] h-[60%] w-[60%] rounded-full bg-brand-blue/25 blur-[100px]" />
+          <div className="pointer-events-none absolute top-[35%] right-[5%] h-[38%] w-[38%] rounded-full bg-white/[0.04] blur-[100px]" />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay"
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")",
+            }}
+          />
         </>
       )}
 
@@ -131,15 +142,15 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
           <button
             type="button"
             onClick={() => setPanelOpen((v) => !v)}
-            className={`flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur transition-colors duration-150 hover:bg-white/20 ${PRESS_SCALE_CLASS}`}
+            className={`flex items-center gap-1.5 rounded-full border border-white/15 bg-transparent px-3 py-1.5 text-[10px] font-semibold tracking-label text-white/75 uppercase transition-colors duration-[400ms] hover:border-white/40 hover:text-white ${PRESS_SCALE_CLASS}`}
           >
             <GearIcon />
             Personalizar
           </button>
 
           {panelOpen && (
-            <div className="art-fade-in absolute top-full right-0 mt-2 w-72 rounded-xl border border-white/15 bg-[#0b1420]/95 p-4 shadow-2xl backdrop-blur-xl">
-              <div className="mb-3 text-xs font-bold tracking-[0.1em] text-white/70 uppercase">
+            <div className="art-fade-in absolute top-full right-0 mt-2 w-72 rounded-xl border border-white/15 bg-[var(--bg)]/95 p-4 shadow-2xl backdrop-blur-xl">
+              <div className="mb-3 text-xs font-bold tracking-label text-white/70 uppercase">
                 Apariencia del login
               </div>
 
@@ -147,7 +158,7 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
                 <span className="text-xs text-white/60">Fondo</span>
                 <div className="flex items-center gap-2">
                   <label
-                    className={`flex-1 cursor-pointer rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-center text-xs font-bold text-white transition-colors duration-150 hover:bg-white/10 ${PRESS_SCALE_CLASS}`}
+                    className={`flex-1 cursor-pointer rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-center text-xs font-bold text-white transition-colors duration-[400ms] hover:bg-white/10 ${PRESS_SCALE_CLASS}`}
                   >
                     Subir imagen
                     <input
@@ -161,7 +172,7 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
                     <button
                       type="button"
                       onClick={() => handleAppearanceReset("background")}
-                      className={`rounded-lg border border-white/20 px-2.5 py-2 text-xs text-white/60 transition-colors duration-150 hover:text-white ${PRESS_SCALE_CLASS}`}
+                      className={`rounded-lg border border-white/20 px-2.5 py-2 text-xs text-white/60 transition-colors duration-[400ms] hover:text-white ${PRESS_SCALE_CLASS}`}
                     >
                       Quitar
                     </button>
@@ -173,7 +184,7 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
                 <span className="text-xs text-white/60">Logo superior</span>
                 <div className="flex items-center gap-2">
                   <label
-                    className={`flex-1 cursor-pointer rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-center text-xs font-bold text-white transition-colors duration-150 hover:bg-white/10 ${PRESS_SCALE_CLASS}`}
+                    className={`flex-1 cursor-pointer rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-center text-xs font-bold text-white transition-colors duration-[400ms] hover:bg-white/10 ${PRESS_SCALE_CLASS}`}
                   >
                     Subir imagen
                     <input
@@ -187,7 +198,7 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
                     <button
                       type="button"
                       onClick={() => handleAppearanceReset("logo")}
-                      className={`rounded-lg border border-white/20 px-2.5 py-2 text-xs text-white/60 transition-colors duration-150 hover:text-white ${PRESS_SCALE_CLASS}`}
+                      className={`rounded-lg border border-white/20 px-2.5 py-2 text-xs text-white/60 transition-colors duration-[400ms] hover:text-white ${PRESS_SCALE_CLASS}`}
                     >
                       Quitar
                     </button>
@@ -212,13 +223,24 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
               {initials(brandName) || brandName.slice(0, 1).toUpperCase() || "?"}
             </span>
           )}
-          <h1 className="text-2xl font-bold text-white">Bienvenido de nuevo</h1>
-          <p className="mt-1.5 text-sm text-white/60">
+          <div className="mb-3 flex w-full items-center gap-2.5">
+            <span className="h-px flex-1 bg-white/15" />
+            <span className="text-[10px] font-semibold tracking-label text-[var(--color-login-accent)] uppercase">
+              Acceso
+            </span>
+            <span className="h-px flex-1 bg-white/15" />
+          </div>
+          <h1 className="font-thin text-[32px] leading-[1.15] font-light text-balance text-white">
+            Bienvenido de nuevo
+          </h1>
+          <p className="mt-2 text-sm text-white/55">
             Iniciá sesión para revisar y aprobar el contenido de {brandName}
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="mt-7 flex flex-col gap-3.5">
+        <div className="mt-6 h-px w-full bg-white/10" />
+
+        <form onSubmit={handleLogin} className="mt-6 flex flex-col gap-3.5">
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-xs text-white/70">Email</span>
             <input
@@ -227,7 +249,7 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="tu@empresa.com"
-              className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/40 transition-colors duration-150 outline-none focus:border-white/50"
+              className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/40 transition-colors duration-[400ms] outline-none focus:border-white/50"
             />
           </label>
           <label className="flex flex-col gap-1.5 text-sm">
@@ -239,13 +261,13 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 pr-11 text-sm text-white placeholder-white/40 transition-colors duration-150 outline-none focus:border-white/50"
+                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 pr-11 text-sm text-white placeholder-white/40 transition-colors duration-[400ms] outline-none focus:border-white/50"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                className={`absolute top-1/2 right-3 -translate-y-1/2 text-white/50 transition-colors duration-150 hover:text-white/80 ${PRESS_SCALE_CLASS}`}
+                className={`absolute top-1/2 right-3 -translate-y-1/2 text-white/50 transition-colors duration-[400ms] hover:text-white/80 ${PRESS_SCALE_CLASS}`}
               >
                 {showPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
@@ -257,7 +279,7 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
           <button
             type="submit"
             disabled={loading}
-            className={`mt-2 min-h-12 rounded-full bg-white text-sm font-bold text-brand-ink transition-[transform,opacity] duration-150 disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+            className={`mt-2 min-h-12 rounded-full bg-white text-sm font-bold text-[var(--bg)] transition-[transform,opacity] duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
           >
             {loading ? "Entrando…" : "Entrar"}
           </button>

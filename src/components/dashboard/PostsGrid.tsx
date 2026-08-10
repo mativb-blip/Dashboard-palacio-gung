@@ -38,7 +38,7 @@ export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposa
                 <button
                   type="button"
                   onClick={() => onSelectProposal(proposal.id)}
-                  className={`absolute inset-0 h-full w-full transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                  className={`absolute inset-0 h-full w-full transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                 >
                   {proposal.images?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element -- miniatura de contenido cargado por el usuario
@@ -66,7 +66,7 @@ export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposa
                   onClick={() => handleDelete(proposal)}
                   title="Borrar propuesta"
                   aria-label="Borrar propuesta"
-                  className={`absolute top-1.5 left-1.5 flex h-7 w-7 items-center justify-center rounded bg-black/45 text-white backdrop-blur-sm transition-transform duration-150 hover:bg-brand-red ${PRESS_SCALE_CLASS}`}
+                  className={`absolute top-1.5 left-1.5 flex h-7 w-7 items-center justify-center rounded bg-black/45 text-white backdrop-blur-sm transition-transform duration-[400ms] hover:bg-brand-red ${PRESS_SCALE_CLASS}`}
                 >
                   <TrashIcon />
                 </button>

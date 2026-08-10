@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit, Sora } from "next/font/google";
+import { Montserrat } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth";
 import { BrandProvider } from "@/lib/dashboard/BrandContext";
@@ -8,24 +8,18 @@ import PushRegister from "@/components/dashboard/PushRegister";
 import "./globals.css";
 
 export const viewport: Viewport = {
-  themeColor: "#163f6b",
+  themeColor: "#08090b",
 };
 
-// Sustitutos gratuitos de Scansky (fuente de pago del cliente, no incluida
-// en este repo — ver Desing/README.md). Outfit es la principal por venir
-// etiquetada como "Geometric" en Google Fonts, igual que Scansky; Sora queda
-// de fallback en --font-thin (globals.css) si Outfit no estuviera disponible.
-const outfit = Outfit({
+// Tema oscuro (clevante.cz, plan del 2026-08-09): Montserrat Variable
+// reemplaza tanto Arial (--font-sans) como el par Outfit/Sora que hacía de
+// --font-thin — clevante usa una sola fuente variable para todo, el peso
+// hace el trabajo que antes hacían dos familias. self-hosted vía
+// next/font/google, igual patrón que ya usaba el proyecto con Outfit/Sora.
+const montserrat = Montserrat({
   subsets: ["latin"],
   weight: "variable",
-  variable: "--font-outfit",
-  display: "swap",
-});
-
-const sora = Sora({
-  subsets: ["latin"],
-  weight: "variable",
-  variable: "--font-sora",
+  variable: "--font-montserrat",
   display: "swap",
 });
 
@@ -56,7 +50,7 @@ export default async function RootLayout({
   } as React.CSSProperties;
 
   return (
-    <html lang="es" className={`antialiased ${outfit.variable} ${sora.variable}`} style={brandStyle}>
+    <html lang="es" className={`antialiased ${montserrat.variable}`} style={brandStyle}>
       <body>
         <BrandProvider brand={brand}>
           <SessionProvider session={session}>

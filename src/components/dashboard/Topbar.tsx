@@ -3,7 +3,6 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { handleLiquidPointerEnter, iconButtonClass } from "@/lib/dashboard/ui";
-import Logo from "./Logo";
 import NotificationToggle from "./NotificationToggle";
 import SegmentedGroup from "./SegmentedGroup";
 import SignOutButton from "./SignOutButton";
@@ -22,10 +21,8 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
   return (
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-3 desktop:flex-nowrap desktop:px-8 desktop:py-4">
       <div className="flex min-w-0 items-center gap-3.5">
-        <Logo className="h-6 w-auto shrink-0" />
-        <div className="hidden h-[26px] w-px shrink-0 bg-line desktop:block" />
         <div className="min-w-0">
-          <div className="text-[11px] tracking-[0.16em] text-tx-3 uppercase">
+          <div className="text-[11px] tracking-label text-tx-3 uppercase">
             Plan de contenido
           </div>
           <div className="text-[15px] font-bold whitespace-nowrap">{planLabel}</div>

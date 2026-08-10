@@ -94,7 +94,7 @@ export default function CommentsPanel({
 
   return (
     <div className="border-l-[3px] border-brand-blue bg-panel-2 p-[18px]">
-      <div className="mb-3 text-[13px] font-bold tracking-[0.06em] uppercase">Comentarios</div>
+      <div className="mb-3 text-[13px] font-bold tracking-label uppercase">Comentarios</div>
 
       <div className="mb-3.5 flex flex-col gap-3">
         {proposal.comments.length > 0 ? (
@@ -114,10 +114,10 @@ export default function CommentsPanel({
                   <button
                     type="button"
                     onClick={() => onToggleCommentResolved(comment.id)}
-                    className={`shrink-0 rounded-sm border px-2 py-0.5 text-[10px] leading-none font-bold tracking-[0.08em] uppercase transition-[background-color,border-color,color,transform] duration-150 ${PRESS_SCALE_CLASS} ${
+                    className={`shrink-0 rounded-sm border px-2 py-0.5 text-[10px] leading-none font-bold tracking-label uppercase transition-[background-color,border-color,color,transform] duration-[400ms] ${PRESS_SCALE_CLASS} ${
                       comment.resolved
-                        ? "border-brand-blue bg-brand-blue text-white"
-                        : "border-brand-red bg-white text-brand-red"
+                        ? "border-brand-blue bg-brand-blue text-[var(--bg)]"
+                        : "border-brand-red bg-transparent text-[var(--color-brand-red-text)]"
                     }`}
                   >
                     {comment.resolved ? "Resuelto" : "Pendiente"}
@@ -132,7 +132,7 @@ export default function CommentsPanel({
                         type="button"
                         onClick={() => setLightboxSrc(src)}
                         aria-label="Ver captura en grande"
-                        className={`h-14 w-14 cursor-zoom-in overflow-hidden rounded border border-line-2 transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                        className={`h-14 w-14 cursor-zoom-in overflow-hidden rounded border border-line-2 transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element -- captura adjunta por el usuario en el comentario */}
                         <img src={src} alt="" className="h-full w-full object-cover" />
@@ -157,7 +157,7 @@ export default function CommentsPanel({
         onPaste={handlePaste}
         placeholder="Escribe un comentario… (pegá una captura con ⌘V)"
         aria-label="Comentario"
-        className="min-h-16 w-full resize-y rounded border border-line-2 bg-white px-3 py-[11px] font-sans text-sm"
+        className="min-h-16 w-full resize-y rounded border border-line-2 bg-panel-2 px-3 py-[11px] font-sans text-sm text-brand-ink"
       />
 
       {uploadingImages && <p className="mt-2 text-xs text-tx-3">Subiendo captura…</p>}
@@ -166,14 +166,14 @@ export default function CommentsPanel({
       {draftImages.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {draftImages.map((img) => (
-            <div key={img.id} className="relative h-14 w-14 shrink-0 overflow-hidden rounded border border-line-2 bg-white">
+            <div key={img.id} className="relative h-14 w-14 shrink-0 overflow-hidden rounded border border-line-2 bg-panel-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- preview local de la captura recién adjuntada */}
               <img src={img.url} alt="" className="h-full w-full object-cover" />
               <button
                 type="button"
                 onClick={() => removeDraftImage(img.id)}
                 aria-label="Quitar captura"
-                className={`absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-ink/80 text-[10px] leading-none text-white transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                className={`absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-ink/80 text-[10px] leading-none text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
               >
                 ×
               </button>
@@ -196,7 +196,7 @@ export default function CommentsPanel({
             onClick={() => fileInputRef.current?.click()}
             title="Adjuntar captura"
             aria-label="Adjuntar captura"
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border border-line-2 bg-white text-tx-2 transition-[border-color,color,transform] duration-150 hover:border-brand-blue hover:text-brand-blue ${PRESS_SCALE_CLASS}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border border-line-2 bg-panel-2 text-tx-2 transition-[border-color,color,transform] duration-[400ms] hover:border-brand-blue hover:text-brand-blue ${PRESS_SCALE_CLASS}`}
           >
             <ImageIcon />
           </button>
@@ -214,7 +214,7 @@ export default function CommentsPanel({
           <button
             type="button"
             onClick={handleSubmit}
-            className={`min-h-9 shrink-0 rounded bg-brand-ink px-3.5 text-[13px] font-bold whitespace-nowrap text-white transition-transform duration-150 desktop:min-h-11 desktop:px-[18px] ${PRESS_SCALE_CLASS}`}
+            className={`min-h-9 shrink-0 rounded bg-brand-ink px-3.5 text-[13px] font-bold whitespace-nowrap text-[var(--bg)] transition-transform duration-[400ms] desktop:min-h-11 desktop:px-[18px] ${PRESS_SCALE_CLASS}`}
           >
             Enviar comentario
           </button>

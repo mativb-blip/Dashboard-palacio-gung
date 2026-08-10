@@ -6,7 +6,7 @@ import DayAgenda from "@/components/dashboard/DayAgenda";
 import FullCalendarGrid from "@/components/dashboard/FullCalendarGrid";
 import PostPreviewModal from "@/components/dashboard/PostPreviewModal";
 import Topbar from "@/components/dashboard/Topbar";
-import { currentPlanLabel, isoFromDate, MONTH_FULL, monthGridDays, todayIso } from "@/lib/dashboard/format";
+import { isoFromDate, MONTH_FULL, monthGridDays, todayIso } from "@/lib/dashboard/format";
 import {
   addComment,
   deleteProposal,
@@ -116,17 +116,17 @@ export default function CalendarioPage() {
     pillarFilter === "all" ? proposals : proposals.filter((p) => p.contentPillar === pillarFilter);
 
   return (
-    <div className="flex min-h-screen flex-col bg-white font-sans text-brand-ink">
+    <div className="flex min-h-screen flex-col bg-[var(--bg)] font-sans text-brand-ink">
       <div className="flex h-[3px] w-full shrink-0">
         <span className="w-16 bg-brand-red" />
         <span className="flex-1 bg-brand-blue" />
       </div>
 
-      <Topbar view="calendario" planLabel={currentPlanLabel(brandName)} />
+      <Topbar view="calendario" planLabel={brandName} />
       <div className="flex justify-start px-4 pb-2 desktop:px-8">
         <Link
           href="/"
-          className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+          className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
         >
           ‹ Volver al panel
         </Link>
@@ -144,7 +144,7 @@ export default function CalendarioPage() {
               <select
                 value={pillarFilter}
                 onChange={(e) => setPillarFilter(e.target.value)}
-                className="rounded border border-line-2 bg-white px-2 py-1 text-xs text-brand-ink"
+                className="rounded border border-line-2 bg-panel-2 px-2 py-1 text-xs text-brand-ink"
               >
                 <option value="all">Todos</option>
                 {contentPillars.map((p) => (

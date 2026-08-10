@@ -17,7 +17,7 @@ interface SegmentedGroupProps {
 }
 
 const segmentClass =
-  "relative z-10 flex cursor-pointer items-center px-4 py-3 text-xs leading-none font-bold tracking-[0.06em] uppercase transition-colors duration-150 desktop:px-[18px] desktop:py-[9px]";
+  "relative z-10 flex cursor-pointer items-center px-4 py-3 text-xs leading-none font-bold tracking-label uppercase transition-colors duration-[400ms] desktop:px-[18px] desktop:py-[9px]";
 
 interface Rect {
   left: number;
@@ -143,7 +143,8 @@ export default function SegmentedGroup({ items }: SegmentedGroupProps) {
       <span ref={indicatorRef} aria-hidden className="absolute inset-y-0 left-0 z-0 hidden bg-brand-blue" />
       {items.map((item) => {
         const className = `${segmentClass} ${PRESS_SCALE_CLASS} ${
-          item.active ? "text-white" : `text-tx-2 hover:bg-panel-2 ${LIQUID_FILL_CLASS} ${LIQUID_GROW_CLASS}`
+          // --accent es claro (#7da3c0) — texto blanco encima no pasa AA.
+          item.active ? "text-[var(--bg)]" : `text-tx-2 hover:bg-panel-2 ${LIQUID_FILL_CLASS} ${LIQUID_GROW_CLASS}`
         }`;
         const setRef = (el: HTMLElement | null) => {
           itemRefs.current[item.key] = el;

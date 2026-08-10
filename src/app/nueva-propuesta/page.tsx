@@ -26,12 +26,12 @@ const TIME_OPTIONS = Array.from({ length: 35 }, (_, i) => {
   return `${hour}:${String(minute).padStart(2, "0")} ${meridiem}`;
 });
 
-const inputClass = "w-full rounded border border-line-2 bg-white px-3 py-2 font-sans text-sm";
+const inputClass = "w-full rounded border border-line-2 bg-panel-2 px-3 py-2 font-sans text-sm";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="text-[11px] tracking-[0.1em] text-tx-3 uppercase">{label}</span>
+      <span className="text-[11px] tracking-label text-tx-3 uppercase">{label}</span>
       {children}
     </label>
   );
@@ -129,15 +129,15 @@ function NuevaPropuestaForm() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 bg-white px-4 py-8 font-sans text-brand-ink">
+    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 bg-[var(--bg)] px-4 py-8 font-sans text-brand-ink">
       <div>
         <Link
           href="/"
-          className={`inline-block text-xs text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+          className={`inline-block text-xs text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
         >
           ‹ Volver al calendario
         </Link>
-        <div className="mt-3 text-[11px] tracking-[0.16em] text-tx-3 uppercase">Plan de contenido</div>
+        <div className="mt-3 text-[11px] tracking-label text-tx-3 uppercase">Plan de contenido</div>
         <h1 className="text-2xl font-bold">Cargar propuesta</h1>
       </div>
 
@@ -233,12 +233,12 @@ function NuevaPropuestaForm() {
 
         <div>
           <div className="mb-1 flex items-center justify-between gap-2">
-            <span className="text-[11px] tracking-[0.1em] text-tx-3 uppercase">Caption</span>
+            <span className="text-[11px] tracking-label text-tx-3 uppercase">Caption</span>
             <button
               type="button"
               onClick={handlePasteCaption}
               title="Pegar en el caption"
-              className={`flex h-7 w-7 items-center justify-center rounded border border-line-2 bg-white text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+              className={`flex h-7 w-7 items-center justify-center rounded border border-line-2 bg-panel-2 text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
             >
               <ClipboardIcon />
             </button>
@@ -255,7 +255,7 @@ function NuevaPropuestaForm() {
         <button
           type="button"
           onClick={() => setShowPreview(true)}
-          className={`min-h-11 rounded border border-brand-blue px-5 text-sm font-bold text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+          className={`min-h-11 rounded border border-brand-blue px-5 text-sm font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
         >
           Previsualizar
         </button>
@@ -265,7 +265,7 @@ function NuevaPropuestaForm() {
         <button
           type="submit"
           disabled={submitting}
-          className={`min-h-11 rounded bg-brand-ink px-5 text-sm font-bold text-white transition-transform duration-150 disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+          className={`min-h-11 rounded bg-brand-ink px-5 text-sm font-bold text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
         >
           {submitting ? "Guardando…" : "Guardar y ver en el calendario"}
         </button>

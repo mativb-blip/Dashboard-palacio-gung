@@ -20,7 +20,7 @@ export default function ArtTile({ n, total, label, dimension }: ArtTileProps) {
       </div>
       <div className="relative z-[2] flex items-start justify-between">
         <span className="text-[13px] font-bold tracking-[0.24em] text-brand-blue">{brandName.toUpperCase()}</span>
-        <span className="text-[10px] tracking-[0.14em] text-tx-3 uppercase">
+        <span className="text-[10px] tracking-label text-tx-3 uppercase">
           {n} / {total}
         </span>
       </div>

@@ -19,7 +19,7 @@ interface UsersTableProps {
 export default function UsersTable({ users, currentUserId, roleOptions }: UsersTableProps) {
   return (
     <div className="overflow-hidden rounded border border-line-2">
-      <div className="grid grid-cols-[1.5fr_1fr_1fr_auto] gap-2 border-b border-line-2 bg-panel-2 px-4 py-2 text-[11px] font-bold tracking-[0.1em] text-tx-3 uppercase">
+      <div className="grid grid-cols-[1.5fr_1fr_1fr_auto] gap-2 border-b border-line-2 bg-panel-2 px-4 py-2 text-[11px] font-bold tracking-label text-tx-3 uppercase">
         <span>Email</span>
         <span>Nombre</span>
         <span>Rol</span>
@@ -96,7 +96,7 @@ function UserRow({
           value={user.role}
           disabled={pending}
           onChange={(e) => handleRoleChange(e.target.value)}
-          className="w-full rounded border border-line-2 bg-white px-2 py-1 text-xs disabled:opacity-60"
+          className="w-full rounded border border-line-2 bg-panel-2 px-2 py-1 text-xs disabled:opacity-60"
         >
           {roleOptions.map((r) => (
             <option key={r.value} value={r.value}>
@@ -109,7 +109,7 @@ function UserRow({
           onClick={handleDelete}
           disabled={pending || isSelf}
           title={isSelf ? "No podés eliminar tu propio usuario" : "Eliminar usuario"}
-          className={`min-h-8 rounded border border-line-2 px-3 text-xs font-bold text-brand-red transition-transform duration-150 disabled:cursor-default disabled:text-line-2 ${PRESS_SCALE_CLASS}`}
+          className={`min-h-8 rounded border border-line-2 px-3 text-xs font-bold text-brand-red transition-transform duration-[400ms] disabled:cursor-default disabled:text-line-2 ${PRESS_SCALE_CLASS}`}
         >
           Eliminar
         </button>
@@ -126,7 +126,7 @@ function UserRow({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Nueva contraseña (mín. 8)"
                 minLength={8}
-                className="rounded border border-line-2 bg-white py-1 pr-7 pl-2 text-xs"
+                className="rounded border border-line-2 bg-panel-2 py-1 pr-7 pl-2 text-xs"
               />
               <button
                 type="button"

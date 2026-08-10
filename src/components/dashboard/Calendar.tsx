@@ -31,8 +31,8 @@ export default function Calendar({
             key={label}
             type="button"
             onClick={() => onSelectedMonthChange(i)}
-            className={`flex-1 rounded-sm text-[8px] leading-none font-bold tracking-[0.05em] uppercase transition-[background-color,color,transform] duration-150 ${PRESS_SCALE_CLASS} ${
-              i === selectedMonth ? "bg-brand-blue text-white" : "bg-panel-2 text-tx-3"
+            className={`flex-1 rounded-sm text-[8px] leading-none font-bold tracking-label uppercase transition-[background-color,color,transform] duration-[400ms] ${PRESS_SCALE_CLASS} ${
+              i === selectedMonth ? "bg-brand-blue text-[var(--bg)]" : "bg-panel-2 text-tx-3"
             }`}
           >
             {label}
@@ -71,15 +71,19 @@ export default function Calendar({
                 // basta con `relative` en esos spans (ver stacking order de CSS 2.1 §E:
                 // los descendientes posicionados con z-index:auto se pintan en orden de
                 // documento, y el pseudo-elemento siempre es el primero de ese grupo).
-                `relative flex w-9 shrink-0 cursor-pointer flex-col items-start gap-0.5 overflow-hidden rounded border px-[5px] py-1.5 text-left font-sans transition-[background-color,border-color,transform] duration-150 motion-safe:hover:scale-[1.02] before:pointer-events-none before:absolute before:inset-0 before:content-[''] before:bg-brand-blue/15 before:[clip-path:circle(0%_at_var(--hx,50%)_var(--hy,50%))] before:transition-[clip-path] before:duration-100 before:ease-out motion-safe:hover:before:[clip-path:circle(150%_at_var(--hx,50%)_var(--hy,50%))] desktop:w-auto desktop:min-w-0 desktop:flex-1 ${PRESS_SCALE_CLASS}`,
+                `relative flex w-9 shrink-0 cursor-pointer flex-col items-start gap-0.5 overflow-hidden rounded border px-[5px] py-1.5 text-left font-sans transition-[background-color,border-color,transform] duration-[400ms] motion-safe:hover:scale-[1.02] before:pointer-events-none before:absolute before:inset-0 before:content-[''] before:bg-brand-blue/15 before:[clip-path:circle(0%_at_var(--hx,50%)_var(--hy,50%))] before:transition-[clip-path] before:duration-[400ms] before:ease-out motion-safe:hover:before:[clip-path:circle(150%_at_var(--hx,50%)_var(--hy,50%))] desktop:w-auto desktop:min-w-0 desktop:flex-1 ${PRESS_SCALE_CLASS}`,
+                // Antes: vacío = gris, con contenido = blanco ("pop"). Con
+                // el tema oscuro el mismo criterio se invierte: vacío se
+                // funde con --bg, con contenido "aparece" en --surface —
+                // si ambos usaran bg-panel-2 se perdería la jerarquía.
                 active
                   ? "border-brand-blue bg-brand-blue/[0.06]"
                   : dayProposals.length
-                    ? "border-line bg-white"
-                    : "border-line bg-panel-2 hover:border-brand-blue",
+                    ? "border-line bg-panel-2"
+                    : "border-line bg-[var(--bg)] hover:border-brand-blue",
               ].join(" ")}
             >
-              <span className="relative text-[9px] tracking-[0.05em] text-tx-3 uppercase">
+              <span className="relative text-[9px] tracking-label text-tx-3 uppercase">
                 {weekdayAbbr(iso)}
               </span>
               <span

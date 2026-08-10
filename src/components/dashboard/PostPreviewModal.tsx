@@ -58,12 +58,12 @@ export default function PostPreviewModal({
       onClick={onClose}
     >
       <div
-        className="modal-card-in relative flex max-h-[90vh] w-full max-w-[420px] flex-col overflow-hidden rounded-lg border border-line-2 bg-white font-sans text-brand-ink shadow-lg"
+        className="modal-card-in relative flex max-h-[90vh] w-full max-w-[420px] flex-col overflow-hidden rounded-lg border border-line-2 bg-panel-2 font-sans text-brand-ink shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
           <div className="min-w-0">
-            <div className="text-[10px] tracking-[0.14em] text-tx-3 uppercase">{dateLong(proposal.date)}</div>
+            <div className="text-[10px] tracking-label text-tx-3 uppercase">{dateLong(proposal.date)}</div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <button
@@ -71,7 +71,7 @@ export default function PostPreviewModal({
               onClick={handleDelete}
               title="Borrar propuesta"
               aria-label="Borrar propuesta"
-              className={`text-tx-3 transition-transform duration-150 hover:text-brand-red ${PRESS_SCALE_CLASS}`}
+              className={`text-tx-3 transition-transform duration-[400ms] hover:text-brand-red ${PRESS_SCALE_CLASS}`}
             >
               <TrashIcon />
             </button>
@@ -79,7 +79,7 @@ export default function PostPreviewModal({
               type="button"
               onClick={onClose}
               aria-label="Cerrar"
-              className={`text-lg leading-none text-tx-3 transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+              className={`text-lg leading-none text-tx-3 transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
             >
               ×
             </button>
@@ -104,7 +104,7 @@ export default function PostPreviewModal({
 
           <div className="flex flex-wrap items-center gap-2.5 px-3 py-2.5">
             <span
-              className="inline-flex items-center rounded-sm border px-2 py-1 text-[10px] leading-none font-bold tracking-[0.08em] uppercase"
+              className="inline-flex items-center rounded-sm border px-2 py-1 text-[10px] leading-none font-bold tracking-label uppercase"
               style={{
                 background: statusStyle.background,
                 color: statusStyle.color,
@@ -134,7 +134,7 @@ export default function PostPreviewModal({
         <button
           type="button"
           onClick={handleToggleComments}
-          className={`absolute right-4 bottom-4 flex h-11 items-center gap-2 rounded-full bg-brand-blue px-4 text-xs font-bold whitespace-nowrap text-white shadow-lg transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+          className={`absolute right-4 bottom-4 flex h-11 items-center gap-2 rounded-full bg-brand-blue px-4 text-xs font-bold whitespace-nowrap text-[var(--bg)] shadow-lg transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
         >
           <CommentIcon />
           {proposal.comments.length > 0 ? `Comentar (${proposal.comments.length})` : "Comentar"}

@@ -7,7 +7,7 @@ import type { PointerEvent } from "react";
  * por encima — un descendiente posicionado con z-index:auto se pinta según
  * el orden del árbol (CSS 2.1 §E), y el pseudo-elemento es siempre el primero. */
 export const LIQUID_FILL_CLASS =
-  "before:pointer-events-none before:absolute before:inset-0 before:content-[''] before:bg-brand-blue/15 before:[clip-path:circle(0%_at_var(--hx,50%)_var(--hy,50%))] before:transition-[clip-path] before:duration-100 before:ease-out motion-safe:hover:before:[clip-path:circle(150%_at_var(--hx,50%)_var(--hy,50%))] disabled:before:opacity-0";
+  "before:pointer-events-none before:absolute before:inset-0 before:content-[''] before:bg-brand-blue/15 before:[clip-path:circle(0%_at_var(--hx,50%)_var(--hy,50%))] before:transition-[clip-path] before:duration-[400ms] before:ease-out motion-safe:hover:before:[clip-path:circle(150%_at_var(--hx,50%)_var(--hy,50%))] disabled:before:opacity-0";
 
 /** Crecimiento sutil (2%) que acompaña al líquido — mismo criterio que el
  * calendario: gateado por motion-safe, nunca en foco por teclado. */
@@ -36,4 +36,4 @@ export function handleLiquidPointerEnter(e: PointerEvent<HTMLElement>) {
  * Más chico en mobile (vista Post pide botones compactos) — el ícono interno
  * ya viene a 16px, así que a 32px sigue con margen cómodo. Desktop no cambia. */
 export const iconButtonClass =
-  `relative flex h-8 w-8 items-center justify-center overflow-hidden rounded border border-line-2 bg-white text-tx-2 transition-[background-color,border-color,color,transform] duration-150 hover:border-brand-blue hover:text-brand-blue disabled:cursor-default disabled:opacity-60 disabled:hover:border-line-2 disabled:hover:text-tx-2 desktop:h-9 desktop:w-9 ${LIQUID_FILL_CLASS} ${LIQUID_GROW_CLASS} ${PRESS_SCALE_CLASS}`;
+  `relative flex h-8 w-8 items-center justify-center overflow-hidden rounded border border-line-2 bg-panel-2 text-tx-2 transition-[background-color,border-color,color,transform] duration-[400ms] hover:border-brand-blue hover:text-brand-blue disabled:cursor-default disabled:opacity-60 disabled:hover:border-line-2 disabled:hover:text-tx-2 desktop:h-9 desktop:w-9 ${LIQUID_FILL_CLASS} ${LIQUID_GROW_CLASS} ${PRESS_SCALE_CLASS}`;

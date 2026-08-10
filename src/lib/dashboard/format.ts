@@ -96,14 +96,6 @@ export function dateLong(iso: string): string {
   return `${WEEKDAY_FULL[date.getDay()]} ${date.getDate()} de ${MONTH_FULL[date.getMonth()]}`;
 }
 
-/** "{marca} · mes año" del Topbar — mes/año reales, no un string fijo. */
-export function currentPlanLabel(brandName: string): string {
-  const now = new Date();
-  const month = MONTH_FULL[now.getMonth()];
-  const capitalized = month.charAt(0).toUpperCase() + month.slice(1);
-  return `${brandName} · ${capitalized} ${now.getFullYear()}`;
-}
-
 /** Iniciales para el avatar de un comentario, p. ej. "María Guzmán" → "MG". */
 export function initials(name: string): string {
   const words = name.replace(/[()]/g, "").trim().split(/\s+/);
@@ -128,8 +120,11 @@ export function formatCommentWhen(createdAt: Date, now: Date): string {
   return `${createdAt.toLocaleDateString("es-DO", { day: "numeric", month: "short" })} ${time}`;
 }
 
+/** Antes devolvía hex literal (#E81F35/#163F6B) — ignoraba tanto el
+ * white-label como el tema oscuro. Referencia los tokens en vez del valor
+ * fijo, para que siga el mismo mecanismo que el resto del dashboard. */
 export function toneHex(format: ProposalFormat): string {
-  return format === "Historia" || format === "Reel" ? "#E81F35" : "#163F6B";
+  return format === "Historia" || format === "Reel" ? "var(--color-brand-red)" : "var(--color-brand-blue)";
 }
 
 export function fmtShort(format: ProposalFormat): string {
@@ -153,16 +148,22 @@ interface StatusPillStyle {
   borderColor: string;
 }
 
+/** Tema oscuro: "Aprobado" ya no puede ser fondo de acento sólido + texto
+ * blanco — el acento nuevo (#7da3c0) es claro, blanco encima no pasa AA.
+ * Pasa a fondo tenue + texto/borde de acento (mismo criterio que el resto
+ * de los estados, que ya eran "contorno" en vez de relleno). El resto de
+ * los fondos blancos se vuelven transparentes (heredan el fondo real del
+ * panel en vez de un blanco que ya no corresponde). */
 export function statusPillStyle(status: ProposalStatus): StatusPillStyle {
   switch (status) {
     case "Aprobado":
-      return { background: "#163F6B", color: "#fff", borderColor: "#163F6B" };
+      return { background: "var(--accent-dim)", color: "var(--color-brand-blue)", borderColor: "var(--color-brand-blue)" };
     case "Cambios solicitados":
-      return { background: "#fff", color: "#E81F35", borderColor: "#E81F35" };
+      return { background: "transparent", color: "var(--color-brand-red-text)", borderColor: "var(--color-brand-red-text)" };
     case "Pendiente de re-aprobación":
-      return { background: "#fff", color: "#B45309", borderColor: "#B45309" };
+      return { background: "var(--color-amber-bg)", color: "var(--color-amber-text)", borderColor: "var(--color-amber-border)" };
     case "En revisión":
     default:
-      return { background: "#fff", color: "#4A4A52", borderColor: "#E2E2E6" };
+      return { background: "transparent", color: "var(--color-tx-3)", borderColor: "var(--color-line-2)" };
   }
 }

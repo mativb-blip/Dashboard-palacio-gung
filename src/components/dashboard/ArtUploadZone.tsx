@@ -249,7 +249,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[11px] tracking-[0.1em] text-tx-3 uppercase">{label}</span>
+      <span className="text-[11px] tracking-label text-tx-3 uppercase">{label}</span>
       <div
         tabIndex={0}
         onPaste={handleNativePaste}
@@ -259,7 +259,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed px-4 py-6 text-center transition-colors duration-150 ${
+        className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed px-4 py-6 text-center transition-colors duration-[400ms] ${
           dragOver ? "border-brand-blue bg-brand-blue/[0.06]" : "border-line-2 bg-panel-2"
         }`}
       >
@@ -268,7 +268,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
             type="button"
             onClick={handlePasteClick}
             title="Pegar"
-            className={`flex h-9 w-9 items-center justify-center rounded border border-line-2 bg-white text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+            className={`flex h-9 w-9 items-center justify-center rounded border border-line-2 bg-panel-2 text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
           >
             <ClipboardIcon />
           </button>
@@ -276,7 +276,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
             type="button"
             onClick={() => inputRef.current?.click()}
             title="Buscar en Finder"
-            className={`flex h-9 w-9 items-center justify-center rounded border border-line-2 bg-white text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+            className={`flex h-9 w-9 items-center justify-center rounded border border-line-2 bg-panel-2 text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
           >
             <UploadIcon />
           </button>
@@ -308,7 +308,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
                     type="button"
                     onClick={() => dismissStatus(s.id)}
                     aria-label={`Descartar aviso de ${s.name}`}
-                    className={`shrink-0 leading-none transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                    className={`shrink-0 leading-none transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                   >
                     ×
                   </button>
@@ -333,7 +333,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
           {files.map((f) => (
             <div
               key={f.id}
-              className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-line-2 bg-white"
+              className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-line-2 bg-panel-2"
             >
               {isImage ? (
                 // eslint-disable-next-line @next/next/no-img-element -- preview local del arte cargado, no un asset del sitio
@@ -348,7 +348,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
                 type="button"
                 onClick={() => removeFile(f.id)}
                 aria-label={`Quitar ${f.name}`}
-                className={`absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-ink/80 text-[10px] leading-none text-white transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                className={`absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-ink/80 text-[10px] leading-none text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
               >
                 ×
               </button>

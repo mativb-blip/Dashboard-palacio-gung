@@ -23,7 +23,7 @@ export default function DayAgenda({ dateIso, proposals, onOpenProposal }: DayAge
         <h3 className="text-sm font-bold capitalize">{dateLong(dateIso)}</h3>
         <Link
           href={`/nueva-propuesta?date=${dateIso}`}
-          className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-brand-ink px-4 text-xs font-bold whitespace-nowrap text-white transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+          className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-brand-ink px-4 text-xs font-bold whitespace-nowrap text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
         >
           <PlusIcon />
           Cargar
@@ -43,18 +43,18 @@ export default function DayAgenda({ dateIso, proposals, onOpenProposal }: DayAge
                 key={proposal.id}
                 type="button"
                 onClick={() => onOpenProposal(proposal.id)}
-                className={`flex flex-col gap-1.5 rounded border border-line-2 bg-white px-3 py-2.5 text-left transition-[border-color,transform] duration-150 hover:border-brand-blue ${PRESS_SCALE_CLASS}`}
+                className={`flex flex-col gap-1.5 rounded border border-line-2 bg-panel-2 px-3 py-2.5 text-left transition-[border-color,transform] duration-[400ms] hover:border-brand-blue ${PRESS_SCALE_CLASS}`}
               >
                 <span className="flex min-w-0 items-start gap-2">
                   <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: hex }} />
                   <span className="text-sm leading-[1.3] font-bold text-brand-ink">{proposal.title}</span>
                 </span>
                 <div className="flex flex-wrap items-center gap-1.5 pl-4">
-                  <span className="text-[10px] font-bold tracking-[0.1em] text-tx-3 uppercase">
+                  <span className="text-[10px] font-bold tracking-label text-tx-3 uppercase">
                     {fmtShort(proposal.format)} · {proposal.time}
                   </span>
                   <span
-                    className="inline-flex items-center rounded-sm border px-1.5 py-0.5 text-[9px] leading-none font-bold tracking-[0.04em] uppercase"
+                    className="inline-flex items-center rounded-sm border px-1.5 py-0.5 text-[9px] leading-none font-bold tracking-label uppercase"
                     style={{
                       background: statusStyle.background,
                       color: statusStyle.color,

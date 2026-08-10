@@ -1,39 +1,86 @@
 @import "tailwindcss";
 
 /*
- * Design System del dashboard — ver Desing/README.md § Design Tokens.
- * --brand-blue, --brand-red y --brand-ink vienen dados por el handoff; --panel-2
- * y --line-2 coinciden con el fill/border del placeholder de arte
- * (Desing/ArtTile.dc.html: #F6F6F7 / #E2E2E6). --line y --tx-2/--tx-3 no
- * traen valor hex exacto en el handoff (solo su rol de uso) y quedan
- * aproximados aquí — ajustar si el design system real los expone.
+ * Design System del dashboard — tema oscuro tomado de clevante.cz (ver
+ * plan del 2026-08-09). --bg/--surface/--fg/--muted/--accent-dim/--line/
+ * --line-soft son los tokens NUEVOS, con los valores exactos del sitio de
+ * referencia. Los tokens de siempre (--color-brand-ink, --color-panel-2,
+ * --color-tx-2/-3, --color-line/-2) NO se eliminan — se re-apuntan a los
+ * nuevos, igual mecanismo que ya usaba este archivo (--color-login-accent
+ * ya derivaba de --color-brand-blue vía color-mix). --color-brand-red NO
+ * se re-apunta: es semántico ("cambios solicitados"), no decorativo — el
+ * plan no toca el sistema de color de estado, solo el acento y los
+ * neutros. --color-brand-blue/-700 siguen siendo white-label (ver
+ * brand-defaults.ts) — ahora su valor de fábrica ES el acento de clevante.
  */
 @theme {
-  --color-brand-blue: #163f6b;
-  --color-brand-blue-700: #102e4e;
+  --color-brand-blue: #7da3c0;
+  --color-brand-blue-700: #5a758a;
   --color-brand-red: #e81f35;
-  --color-brand-ink: #1a1a1a;
-  --color-panel-2: #f6f6f7;
-  --color-tx-2: #4a4a52;
-  --color-tx-3: #98989f;
-  --color-line: #e7e7ea;
-  --color-line-2: #e2e2e6;
+  --color-brand-ink: var(--fg);
+  --color-panel-2: var(--surface);
+  --color-tx-2: #b7bac1;
+  --color-tx-3: var(--muted);
+  --color-line: var(--line);
+  --color-line-2: rgba(255, 255, 255, 0.14);
 
-  --font-sans: Arial, Helvetica, sans-serif;
-  /* Scansky es una fuente de pago del cliente, no incluida en este repo y
-     no disponible en Google Fonts. Mientras no se compre la licencia, se usa
-     Outfit (Google Fonts, misma categoría "Geometric") vía next/font/google
-     en src/app/layout.tsx, con Sora de fallback si Outfit no cargara. Cuando
-     se disponga del archivo real de Scansky, cargarlo con next/font/local y
-     anteponerlo acá. */
-  --font-thin: var(--font-outfit), var(--font-sora), Arial, sans-serif;
+  /* Montserrat Variable (next/font/google, ver layout.tsx) reemplaza Arial
+     y también a Outfit/Sora en --font-thin — clevante usa UNA sola fuente
+     variable para todo (el peso hace el trabajo que antes hacían dos
+     familias), así que no hace falta seguir cargando dos. */
+  --font-sans: var(--font-montserrat), -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
+  --font-thin: var(--font-sans);
 
   /* Breakpoint del dashboard: desktop ≥861px (Desing/README.md § Layout) */
   --breakpoint-desktop: 861px;
+
+  /* Tracking y motion — valores exactos de clevante.cz. --ease-out/
+     --tracking-tight SOBRESCRIBEN los defaults de Tailwind (mismo nombre,
+     valor nuevo) — no hay que tocar cada className que ya los usa. */
+  --tracking-tight: -0.02em;
+  --tracking-label: 0.18em;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Timing function de cualquier transition-* sin curva explícita (la
+     mayoría del proyecto: "transition-colors duration-[400ms]" sin ease-*) —
+     así el cambio de curva llega a los hovers de tabs/botones sin
+     reescribir cada className uno por uno. */
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
-  --background: #ffffff;
+  --bg: #08090b;
+  --surface: #101216;
+  --fg: #f4f5f7;
+  --muted: #888d96;
+  --accent-dim: rgba(125, 163, 192, 0.16);
+  --line: rgba(255, 255, 255, 0.09);
+  --line-soft: rgba(255, 255, 255, 0.05);
+  --background: var(--bg);
+  /* Tinte claro del acento para texto sobre el fondo oscuro del login — ya
+     no hace falta aclarar tanto como antes (el acento ya es claro, no un
+     navy oscuro), así que el mix es menos agresivo (70/30 vs. el 55/45
+     original). Deriva del token dinámico, no de un hex fijo — no rompe el
+     white-label. */
+  --color-login-accent: color-mix(in srgb, var(--color-brand-blue) 70%, white 30%);
+  /* Pista nativa para selects/checkboxes/scrollbars — sin esto, controles
+     que no pintamos por CSS pueden heredar chrome claro del navegador. */
+  color-scheme: dark;
+
+  /* Verificación de contraste (Paso 5 del plan): el rojo de marca literal
+     (#e81f35) como TEXTO sobre --bg/--surface da 4.44:1 / 4.18:1 — por
+     debajo de AA (4.5:1), aunque casi imperceptible. Un aclarado de ~10%
+     lo deja en 4.84/4.56:1. Se usa SOLO donde el rojo es texto (pill
+     "Cambios solicitados", fecha de días con contenido) — la franja
+     decorativa y el punto del calendario siguen con el rojo literal, ahí
+     el contraste no aplica. */
+  --color-brand-red-text: #ea3549;
+  /* "Pendiente de re-aprobación" usaba ámbar para fondo claro (#fff/#B45309)
+     — no sirve sobre --bg. Variante oscura estándar: fondo ámbar muy
+     tenue, texto ámbar claro. */
+  --color-amber-bg: rgba(217, 119, 6, 0.12);
+  --color-amber-text: #f2b84b;
+  --color-amber-border: rgba(217, 119, 6, 0.5);
 }
 
 body {
@@ -51,7 +98,7 @@ textarea:focus,
 input[type="text"]:focus {
   outline: none;
   border-color: var(--color-brand-blue) !important;
-  box-shadow: 0 0 0 3px rgba(22, 63, 107, 0.1);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
 @keyframes art-fade-in {
@@ -97,11 +144,11 @@ input[type="text"]:focus {
 }
 
 .modal-backdrop-in {
-  animation: modal-backdrop-in 180ms ease-out;
+  animation: modal-backdrop-in 700ms var(--ease-in-out);
 }
 
 .modal-card-in {
-  animation: modal-card-in 180ms ease-out;
+  animation: modal-card-in 700ms var(--ease-in-out);
 }
 
 @media (prefers-reduced-motion: reduce) {

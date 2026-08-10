@@ -44,17 +44,17 @@ function ListEditor({
 
   return (
     <form action={handleAction} className="flex flex-col gap-2 rounded border border-line-2 p-4">
-      <div className="text-[11px] tracking-[0.16em] text-tx-3 uppercase">{title}</div>
+      <div className="text-[11px] tracking-label text-tx-3 uppercase">{title}</div>
       <p className="text-xs text-tx-3">{hint}</p>
       <textarea
         name="raw"
         defaultValue={defaultValue}
         rows={5}
-        className="w-full resize-y rounded border border-line-2 bg-white px-3 py-2 font-sans text-sm"
+        className="w-full resize-y rounded border border-line-2 bg-panel-2 px-3 py-2 font-sans text-sm"
       />
       <button
         type="submit"
-        className={`self-start rounded bg-brand-ink px-4 py-2 text-xs font-bold whitespace-nowrap text-white transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+        className={`self-start rounded bg-brand-ink px-4 py-2 text-xs font-bold whitespace-nowrap text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
       >
         {saved ? "Guardado ✓" : "Guardar"}
       </button>

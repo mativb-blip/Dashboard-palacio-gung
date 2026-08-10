@@ -34,7 +34,7 @@ export default function VersionHistoryModal({ proposal, onClose }: VersionHistor
   return (
     <div className="modal-backdrop-in fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="modal-card-in flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-line-2 bg-white font-sans text-brand-ink shadow-lg"
+        className="modal-card-in flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-line-2 bg-panel-2 font-sans text-brand-ink shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
@@ -43,7 +43,7 @@ export default function VersionHistoryModal({ proposal, onClose }: VersionHistor
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className={`text-lg leading-none text-tx-3 transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+            className={`text-lg leading-none text-tx-3 transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
           >
             ×
           </button>
@@ -61,7 +61,7 @@ export default function VersionHistoryModal({ proposal, onClose }: VersionHistor
                   key={v.id}
                   type="button"
                   onClick={() => setSelectedId(v.id)}
-                  className={`shrink-0 rounded px-2.5 py-2 text-left text-xs transition-colors duration-150 ${
+                  className={`shrink-0 rounded px-2.5 py-2 text-left text-xs transition-colors duration-[400ms] ${
                     v.id === selectedId ? "bg-panel-2 font-bold text-brand-blue" : "text-tx-2 hover:bg-panel-2"
                   }`}
                 >
@@ -93,7 +93,7 @@ function VersionColumn({
 }) {
   return (
     <div className="flex flex-col gap-2 rounded border border-line-2 p-3">
-      <div className="text-[10px] font-bold tracking-[0.1em] text-tx-3 uppercase">{label}</div>
+      <div className="text-[10px] font-bold tracking-label text-tx-3 uppercase">{label}</div>
       {entry.images?.[0] || entry.video ? (
         <div className="relative aspect-square w-full overflow-hidden rounded bg-panel-2">
           {entry.video ? (

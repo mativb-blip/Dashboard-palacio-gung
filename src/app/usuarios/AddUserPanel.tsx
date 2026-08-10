@@ -30,11 +30,11 @@ export default function AddUserPanel({ email, roleOptions }: AddUserPanelProps) 
         <div>
           <Link
             href="/"
-            className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+            className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
           >
             ‹ Volver al panel
           </Link>
-          <div className="mt-3 text-[11px] tracking-[0.16em] text-tx-3 uppercase">Plan de contenido</div>
+          <div className="mt-3 text-[11px] tracking-label text-tx-3 uppercase">Plan de contenido</div>
           <h1 className="text-2xl font-bold">Usuarios</h1>
           <p className="mt-1 text-sm text-tx-2">
             Sesión: <span className="font-bold">{email}</span> · Administrador
@@ -58,7 +58,7 @@ export default function AddUserPanel({ email, roleOptions }: AddUserPanelProps) 
 
       {open && (
         <div className="rounded border border-line-2 p-4">
-          <div className="mb-3 text-[11px] tracking-[0.16em] text-tx-3 uppercase">Cargar usuario</div>
+          <div className="mb-3 text-[11px] tracking-label text-tx-3 uppercase">Cargar usuario</div>
           <form action={createUser} className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 desktop:grid-cols-2">
               <input
@@ -66,17 +66,17 @@ export default function AddUserPanel({ email, roleOptions }: AddUserPanelProps) 
                 name="email"
                 required
                 placeholder="email@empresa.com"
-                className="w-full rounded border border-line-2 bg-white px-3 py-2 text-sm"
+                className="w-full rounded border border-line-2 bg-panel-2 px-3 py-2 text-sm"
               />
               <input
                 type="text"
                 name="name"
                 placeholder="Nombre (opcional)"
-                className="w-full rounded border border-line-2 bg-white px-3 py-2 text-sm"
+                className="w-full rounded border border-line-2 bg-panel-2 px-3 py-2 text-sm"
               />
             </div>
             <div className="grid grid-cols-1 gap-3 desktop:grid-cols-[1fr_1fr_auto]">
-              <select name="role" defaultValue="COMMENTER" className="w-full rounded border border-line-2 bg-white px-3 py-2 text-sm">
+              <select name="role" defaultValue="COMMENTER" className="w-full rounded border border-line-2 bg-panel-2 px-3 py-2 text-sm">
                 {roleOptions.map((r) => (
                   <option key={r.value} value={r.value}>
                     {r.label}
@@ -89,7 +89,7 @@ export default function AddUserPanel({ email, roleOptions }: AddUserPanelProps) 
                   name="password"
                   placeholder="Contraseña (opcional)"
                   minLength={8}
-                  className="w-full rounded border border-line-2 bg-white py-2 pr-9 pl-3 text-sm"
+                  className="w-full rounded border border-line-2 bg-panel-2 py-2 pr-9 pl-3 text-sm"
                 />
                 <button
                   type="button"
@@ -102,7 +102,7 @@ export default function AddUserPanel({ email, roleOptions }: AddUserPanelProps) 
               </div>
               <button
                 type="submit"
-                className={`min-h-9 rounded bg-brand-ink px-4 text-xs font-bold whitespace-nowrap text-white transition-transform duration-150 ${PRESS_SCALE_CLASS}`}
+                className={`min-h-9 rounded bg-brand-ink px-4 text-xs font-bold whitespace-nowrap text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
               >
                 + Agregar
               </button>

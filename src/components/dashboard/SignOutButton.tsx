@@ -29,7 +29,7 @@ export default function SignOutButton({ iconOnly = false }: SignOutButtonProps) 
     <button
       type="button"
       onClick={() => signOut({ callbackUrl: "/login" })}
-      className={`rounded border border-line-2 px-2.5 py-1.5 text-xs font-bold whitespace-nowrap text-tx-2 transition-[border-color,color,transform] duration-150 hover:border-brand-blue hover:text-brand-blue ${PRESS_SCALE_CLASS}`}
+      className={`rounded border border-line-2 px-2.5 py-1.5 text-xs font-bold whitespace-nowrap text-tx-2 transition-[border-color,color,transform] duration-[400ms] hover:border-brand-blue hover:text-brand-blue ${PRESS_SCALE_CLASS}`}
     >
       Salir
     </button>
