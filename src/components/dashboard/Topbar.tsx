@@ -17,8 +17,10 @@ import SignOutButton from "./SignOutButton";
 const COMPACT_NAV_QUERY = "(min-width: 640px)";
 
 /** "calendario" cuando el Topbar se muestra en /calendario — ahí Post/Grilla
- * navegan de vuelta al panel (`/?period=...`) en lugar de alternar in-place. */
-type TopbarView = "month" | "grid" | "calendario";
+ * navegan de vuelta al panel (`/?period=...`) en lugar de alternar in-place.
+ * "moodboard" cuando se muestra en /moodboard, página propia sin relación
+ * con proposals/período. */
+type TopbarView = "month" | "grid" | "calendario" | "moodboard";
 
 interface TopbarProps {
   view: TopbarView;
@@ -58,18 +60,33 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
   // Misma fuente de datos para el SegmentedGroup de desktop y la lista
   // apilada de mobile — se calcula una sola vez, no se duplica la lógica de
   // ruteo (href vs. onClick) en dos lugares distintos.
+  const moodboardItem: SegmentedItem = {
+    key: "moodboard",
+    label: "Moodboard",
+    active: view === "moodboard",
+    href: view === "moodboard" ? undefined : "/moodboard",
+  };
   const items: SegmentedItem[] =
     view === "calendario"
       ? [
+          moodboardItem,
           { key: "calendario", label: "Calendario", active: true },
           { key: "month", label: "Post", active: false, href: "/?period=month" },
           { key: "grid", label: "Grilla", active: false, href: "/?period=grid" },
         ]
-      : [
-          { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
-          { key: "month", label: "Post", active: view === "month", onClick: () => onPeriodChange?.("month") },
-          { key: "grid", label: "Grilla", active: view === "grid", onClick: () => onPeriodChange?.("grid") },
-        ];
+      : view === "moodboard"
+        ? [
+            moodboardItem,
+            { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
+            { key: "month", label: "Post", active: false, href: "/?period=month" },
+            { key: "grid", label: "Grilla", active: false, href: "/?period=grid" },
+          ]
+        : [
+            moodboardItem,
+            { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
+            { key: "month", label: "Post", active: view === "month", onClick: () => onPeriodChange?.("month") },
+            { key: "grid", label: "Grilla", active: view === "grid", onClick: () => onPeriodChange?.("grid") },
+          ];
 
   return (
     <header className="relative flex shrink-0 items-center justify-between gap-3 px-4 py-3 desktop:px-8 desktop:py-4">
@@ -260,6 +277,8 @@ function CompactNav({ items }: { items: SegmentedItem[] }) {
 
 function NavIcon({ itemKey, className }: { itemKey: string; className?: string }) {
   switch (itemKey) {
+    case "moodboard":
+      return <MoodboardIcon className={className} />;
     case "calendario":
       return <CalendarIcon className={className} />;
     case "grid":
@@ -267,6 +286,27 @@ function NavIcon({ itemKey, className }: { itemKey: string; className?: string }
     default:
       return <PostIcon className={className} />;
   }
+}
+
+function MoodboardIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="3" y="3" width="10" height="8" rx="1.5" />
+      <rect x="15" y="3" width="6" height="6" rx="1.5" />
+      <rect x="15" y="11" width="6" height="10" rx="1.5" />
+      <rect x="3" y="13" width="10" height="8" rx="1.5" />
+    </svg>
+  );
 }
 
 function CalendarIcon({ className }: { className?: string }) {
