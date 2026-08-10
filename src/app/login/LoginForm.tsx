@@ -4,12 +4,15 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { useBrand } from "@/lib/dashboard/BrandContext";
-import { initials } from "@/lib/dashboard/format";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import { updateLoginAppearance } from "./actions";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const DEFAULT_REDIRECT = "/calendario";
+// Logo de esta deployment (Palacio Gung) — se usa mientras un Admin no suba
+// otro desde "Personalizar"; ese logo subido (logoUrl, dato de SiteSettings)
+// sigue teniendo prioridad.
+const DEFAULT_LOGO_URL = "/login-logo.png";
 
 interface LoginFormProps {
   isAdmin: boolean;
@@ -215,14 +218,12 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
 
       <div className="art-fade-in relative w-full max-w-sm rounded-2xl border border-white/15 bg-white/10 p-8 shadow-2xl backdrop-blur-xl">
         <div className="flex flex-col items-center text-center">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- imagen subida por un Administrador, servida como data URL
-            <img src={logoUrl} alt={brandName} className="mb-4 h-10 w-auto object-contain" />
-          ) : (
-            <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-bold tracking-[0.04em] text-white">
-              {initials(brandName) || brandName.slice(0, 1).toUpperCase() || "?"}
-            </span>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element -- logoUrl puede ser una data URL subida por un Administrador */}
+          <img
+            src={logoUrl ?? DEFAULT_LOGO_URL}
+            alt={brandName}
+            className="mb-4 h-14 w-14 rounded-full object-cover"
+          />
           <div className="mb-3 flex w-full items-center gap-2.5">
             <span className="h-px flex-1 bg-white/15" />
             <span className="text-[10px] font-semibold tracking-label text-[var(--color-login-accent)] uppercase">
