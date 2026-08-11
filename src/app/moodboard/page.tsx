@@ -29,6 +29,51 @@ function toEmbedSrc(url: string): string {
   return `https://www.instagram.com/p/${shortcode}/embed`;
 }
 
+const OCCASIONS = [
+  {
+    title: "Almuerzo corporativo",
+    body: "La selección de platos responde a un criterio: mesa compartida. Piezas de alto valor visual que se sirven al centro, donde cada comensal toma su porción sin que nadie tenga que decidir por separado. La experiencia es participativa sin ser informal. El servicio anticipa, no interrumpe — banchan completo desde el inicio, reposición sin necesidad de pedirla. Bebida premium disponible desde el arranque. El tiempo de la reunión manda; la cocina se adapta a ese ritmo, no al revés.",
+  },
+  {
+    title: "Noche de mujeres",
+    body: "Platos de porción controlada, presentación limpia, sin protagonismo de la grasa. La propuesta permite probar varios sabores sin comprometerse con un solo plato de alto volumen. Variedad sin saturación. El formato de la mesa invita a compartir, no a comer en paralelo. El miércoles con identidad propia es una ocasión construida, no una salida de relleno entre semana.",
+  },
+  {
+    title: "Cena familiar",
+    body: "La mesa tiene que funcionar para dos velocidades distintas. Para los niños: texturas fáciles, formatos que se comen con las manos, algo que pase por actividad antes que por comida. Para los padres: profundidad de sabor, platos que reconfortan. El momento de cocinar en la mesa es el centro — convierte la cena en algo que se recuerda, no solo en algo que se consume.",
+  },
+];
+
+const PUBLICATION_PLAN = [
+  {
+    title: "Contenido semanal",
+    body: "Dos publicaciones por semana. Un reel y un carrusel o post simple, alternados según el momento del mes y el objetivo de cada pieza. El reel trabaja siempre hacia awareness y proceso. El carrusel o post simple profundiza — un plato, una ocasión, una propuesta gastronómica específica.",
+  },
+  {
+    title: "Historias",
+    body: "Tres historias semanales pautadas, dirigidas a la audiencia personalizada construida durante el mes. No son contenido orgánico de relleno — cada historia responde a uno de los tres escenarios de activación y tiene un CTA directo.",
+  },
+  {
+    title: "Ads",
+    body: "Creación, configuración, lanzamiento y evaluación de campañas en Meta. Cuando el rendimiento de una pieza lo justifica, se produce material nuevo. La pauta no se sostiene sobre creativos agotados — si una pieza dejó de convertir, se reemplaza, no se sube el presupuesto.",
+  },
+];
+
+const METRICS = [
+  {
+    label: "Costo por interacción",
+    body: "Mide si el reel de awareness está llegando a la audiencia correcta al precio correcto. Si este número es alto, el problema está en el creativo o en la segmentación, no en el presupuesto.",
+  },
+  {
+    label: "Costo por clic",
+    body: "Mide si el carrusel de consideración está generando intención real. Un clic hacia el perfil o hacia un CTA de reserva vale más que diez reproducciones pasivas.",
+  },
+  {
+    label: "Contactos o reservas generadas",
+    body: "Mide si la etapa de activación está convirtiendo ocasión en visita. Este es el único número que el cliente puede conectar directamente con ingreso.",
+  },
+];
+
 const LEVELS = [
   {
     number: "01",
@@ -94,11 +139,26 @@ export default function MoodboardPage() {
             <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
               Captación de público frío.
             </h2>
-            <p className="mb-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mb-16">
-              Reels con narrativa y voz en off, que utilizaremos para promocionar el restaurant a nuevas
-              audiencias que aún no los conocen, zonas específicas de la ciudad, con el objetivo de generar
-              interacciones.
-            </p>
+            <div className="mb-12 flex max-w-3xl flex-col gap-4 desktop:mb-16">
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                La pauta de esta etapa llega solo a personas que nunca han visto la marca. Excluimos a
+                quienes ya siguen la cuenta o interactuaron con ella, para que cada peso invertido trabaje
+                hacia adentro, no hacia quien ya sabe que Palacio Gung existe.
+              </p>
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                El creativo es un reel de proceso. No el plato terminado — el proceso. Manos, texturas, el
+                momento antes del emplatado. Eso es lo que diferencia a Palacio Gung de cualquier
+                restaurante que publica foto de producto y llama a eso contenido.
+              </p>
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                La segmentación se concentra en zonas de Santo Domingo con perfil medio-alto. No por
+                alcance, sino por afinidad con la propuesta.
+              </p>
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                El objetivo de esta etapa no es reserva ni pedido. Es interacción. Cada reacción,
+                comentario o guardado construye la audiencia que activa la siguiente fase.
+              </p>
+            </div>
 
             {/* iframe directo a /embed en vez del widget embed.js: ese
                 widget mide el ancho del contenedor una sola vez al cargar y
@@ -111,7 +171,10 @@ export default function MoodboardPage() {
                 re-tematizar, vive en un documento cross-origin. */}
             <div className="grid gap-6 desktop:grid-cols-3">
               {COLD_AUDIENCE_REELS.map((url) => (
-                <div key={url} className="aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2">
+                <div
+                  key={url}
+                  className="mx-[10%] aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2 desktop:mx-0"
+                >
                   <iframe
                     src={toEmbedSrc(url)}
                     className="h-full w-full"
@@ -128,12 +191,15 @@ export default function MoodboardPage() {
 
           <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
             <h2 className="mb-12 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:mb-16 desktop:text-[36px]">
-              Reels visuales ASMR, con narrativa visual
+              Reels visuales ASMR, con narrativa.
             </h2>
 
             <div className="grid gap-6 desktop:grid-cols-3">
               {ASMR_REELS.map((url) => (
-                <div key={url} className="aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2">
+                <div
+                  key={url}
+                  className="mx-[10%] aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2 desktop:mx-0"
+                >
                   <iframe
                     src={toEmbedSrc(url)}
                     className="h-full w-full"
@@ -150,19 +216,39 @@ export default function MoodboardPage() {
 
           <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
             <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
-              Propuesta gastronómica específica
+              Activación por perfil de cliente
             </h2>
-            <p className="mb-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mb-16">
-              Carruseles que proponen un menú con pasos establecidos, para degustación, enfocado en públicos
-              específicos.
-            </p>
+            <div className="mb-12 flex max-w-3xl flex-col gap-4 desktop:mb-16">
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                Quien llega aquí ya sabe que Palacio Gung existe. No hay que presentar el restaurante ni
+                explicar qué es la comida coreana. Esta etapa hace otra cosa: toma ese conocimiento y lo
+                ancla a un momento concreto.
+              </p>
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                La cocina coreana tradicional no se improvisa. Tiene proceso, tiene técnica, tiene una
+                cultura detrás que no se puede fingir. Eso es exactamente lo que convierte cada ocasión en
+                un argumento — no una promesa de marketing, sino algo que quien ya vio el contenido puede
+                reconocer como real.
+              </p>
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                La pauta llega a dos grupos: quienes ya interactuaron con la cuenta, y audiencias similares
+                construidas desde ese comportamiento. Historias. Mensaje directo. Sin introducción, porque
+                la audiencia no la necesita.
+              </p>
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                Tres ocasiones distintas. Una sola cocina que las sostiene a todas.
+              </p>
+            </div>
 
             {/* Solo dos ítems — se limita el ancho de la grilla (en vez de
                 estirarla a max-w-6xl) para que las tarjetas mantengan el
                 mismo tamaño que las de 3 columnas de arriba, no el doble. */}
             <div className="grid max-w-[760px] gap-6 desktop:grid-cols-2">
               {GASTRONOMIC_PROPOSAL_CAROUSELS.map((url) => (
-                <div key={url} className="aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2">
+                <div
+                  key={url}
+                  className="mx-[10%] aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2 desktop:mx-0"
+                >
                   <iframe
                     src={toEmbedSrc(url)}
                     className="h-full w-full"
@@ -172,6 +258,79 @@ export default function MoodboardPage() {
                     scrolling="no"
                     title="Carrusel de Instagram"
                   />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-12 grid gap-10 desktop:mt-16 desktop:grid-cols-3">
+              {OCCASIONS.map((occasion) => (
+                <div key={occasion.title} className="border-t border-line pt-6">
+                  <h3 className="mb-4 text-2xl font-bold text-brand-ink">{occasion.title}</h3>
+                  <p className="text-[15px] leading-relaxed text-tx-2">{occasion.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
+            <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
+              Cierre del embudo
+            </h2>
+            <div className="flex max-w-3xl flex-col gap-4">
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                Un embudo no termina en la conversión. Termina cuando la persona que fue a comer vuelve a
+                ser una oportunidad.
+              </p>
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                Quien llegó por un reel, reservó por una historia y vivió la experiencia, ahora tiene un
+                criterio formado sobre Palacio Gung. Sabe lo que hay detrás de cada plato. Conoce la
+                cocina. Esa persona no necesita ser convencida de nuevo — necesita una razón distinta para
+                volver. Y esa razón la genera el siguiente ciclo del embudo.
+              </p>
+              <p className="text-[15px] leading-relaxed text-tx-2">
+                El contenido que se produce cada mes no acumula solo seguidores. Acumula contexto. Cada
+                pieza nueva llega a una audiencia que ya tiene una capa de conocimiento sobre la marca, y
+                eso hace que cada conversión siguiente sea más barata y más rápida que la anterior. Así
+                funciona un embudo bien ejecutado: no como campaña, sino como sistema.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
+            <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
+              Métricas de revisión a 60 días
+            </h2>
+            <p className="mb-12 text-[15px] leading-relaxed text-tx-2 desktop:mb-16">Tres números. No más.</p>
+
+            <div className="grid gap-10 desktop:grid-cols-3">
+              {METRICS.map((metric) => (
+                <div key={metric.label} className="border-t border-line pt-6">
+                  <h3 className="mb-4 text-2xl font-bold text-brand-ink">{metric.label}</h3>
+                  <p className="text-[15px] leading-relaxed text-tx-2">{metric.body}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mt-16">
+              Estos tres números son la base de la reunión de los 60 días. No para justificar el trabajo —
+              para decidir qué ajustar y en qué dirección.
+            </p>
+          </div>
+
+          <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
+            <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
+              Planificación de publicaciones
+            </h2>
+            <p className="mb-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mb-16">
+              La cadencia mensual está diseñada para sostener el embudo sin saturar la cuenta. Cada
+              formato tiene un rol definido — no se publica por volumen, se publica por intención.
+            </p>
+
+            <div className="grid gap-10 desktop:grid-cols-3">
+              {PUBLICATION_PLAN.map((item) => (
+                <div key={item.title} className="border-t border-line pt-6">
+                  <h3 className="mb-4 text-2xl font-bold text-brand-ink">{item.title}</h3>
+                  <p className="text-[15px] leading-relaxed text-tx-2">{item.body}</p>
                 </div>
               ))}
             </div>

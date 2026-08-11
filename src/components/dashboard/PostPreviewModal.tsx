@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CommentsPanel, { type AddCommentInput } from "./CommentsPanel";
 import { dateLong, isVerticalFormat, statusPillStyle } from "@/lib/dashboard/format";
 import { computeProposalStatus } from "@/lib/dashboard/proposals";
@@ -33,6 +33,14 @@ export default function PostPreviewModal({
   const status = computeProposalStatus(proposal);
   const statusStyle = statusPillStyle(status);
   const hasImage = Boolean(proposal.images?.[0]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   function handleToggleComments() {
     const opening = !showComments;

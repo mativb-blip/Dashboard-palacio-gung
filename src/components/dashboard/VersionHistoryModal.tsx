@@ -18,6 +18,14 @@ export default function VersionHistoryModal({ proposal, onClose }: VersionHistor
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     let cancelled = false;
     getProposalVersions(proposal.id).then((data) => {
       if (cancelled) return;

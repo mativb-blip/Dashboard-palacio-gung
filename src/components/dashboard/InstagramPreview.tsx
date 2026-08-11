@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { ProposalFormat } from "@/types/dashboard";
@@ -15,6 +15,14 @@ interface InstagramPreviewProps {
 export default function InstagramPreview({ format, caption, images, onClose }: InstagramPreviewProps) {
   const { instagramHandle } = useBrand();
   const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
   const vertical = format === "Historia" || format === "Reel";
   const aspect = vertical ? "9 / 16" : format === "Carrusel" ? "4 / 5" : "1 / 1";
   const hasImages = images.length > 0;
