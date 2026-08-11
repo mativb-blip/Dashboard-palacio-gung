@@ -100,15 +100,14 @@ function SplitReveal({
         ease: "none",
         scrollTrigger: {
           trigger: el,
-          start: "top 90%",
-          // Distancia fija de scroll en vez de "top 55%": ese end relativo
-          // al viewport nunca se cumple para los últimos bloques de la
-          // página — el documento se queda sin scroll antes de que el
-          // elemento suba tanto, y el texto quedaba desenfocado para
-          // siempre. Con "+=300" (300px de scroll desde el start) alcanza
-          // con que haya ese margen debajo, no con llegar a una posición
-          // absoluta del viewport.
-          end: "+=300",
+          // Arranca casi al borde de abajo y termina en apenas 130px de
+          // scroll — con la ventana vieja (90%→+300px) alcanzaba con
+          // pausar el scroll un momento (leyendo el párrafo) para que
+          // quedara atrapado a mitad de desenfoque; acortar la distancia
+          // hace que ya esté resuelto bastante antes de que el texto llegue
+          // a una posición cómoda para leer.
+          start: "top 95%",
+          end: "+=130",
           scrub: true,
         },
       });
