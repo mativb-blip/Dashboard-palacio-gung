@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatCommentWhen } from "@/lib/dashboard/format";
-import { sendCommentNotification } from "@/lib/dashboard/notify-email";
-import { sendPushToEmail } from "@/lib/dashboard/notify-push";
+import { sendAlertEmail, sendCommentNotification } from "@/lib/dashboard/notify-email";
 import { computeProposalStatus, deriveTitle, PROPOSAL_VERSION_LIMIT } from "@/lib/dashboard/proposals";
 import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 import type {
@@ -248,11 +247,14 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
   });
 
   if (justApproved) {
-    const brand = resolveBrand(await getSiteSettings());
-    await sendPushToEmail(brand.pushNotifyTo, {
-      title: "Jun aprobó un post",
-      body: current.title ? `"${current.title}" quedó aprobado.` : "Un post quedó aprobado.",
-    });
+    const to = await getAdminEmail();
+    if (to) {
+      await sendAlertEmail({
+        to,
+        title: "Jun aprobó un post",
+        body: current.title ? `"${current.title}" quedó aprobado.` : "Un post quedó aprobado.",
+      });
+    }
   }
 
   revalidatePath("/");
@@ -321,22 +323,17 @@ export async function addComment(proposalId: string, input: AddCommentInput): Pr
     // (SiteSettings) manda si un Admin lo seteó a mano; si no, cae a
     // getAdminEmail().
     const notifyTo = brand.commentNotifyTo || (await getAdminEmail());
-    await Promise.all([
-      notifyTo &&
-        sendCommentNotification({
-          proposalTitle: proposal.title,
-          proposalDate: proposal.date,
-          author: row.author,
-          text: row.text,
-          to: notifyTo,
-          cc: brand.commentNotifyCc,
-          senderEmail: brand.senderEmail || notifyTo,
-        }),
-      sendPushToEmail(brand.pushNotifyTo, {
-        title: `Nuevo comentario en "${proposal.title}"`,
-        body: `${row.author}: ${row.text}`,
-      }),
-    ]);
+    if (notifyTo) {
+      await sendCommentNotification({
+        proposalTitle: proposal.title,
+        proposalDate: proposal.date,
+        author: row.author,
+        text: row.text,
+        to: notifyTo,
+        cc: brand.commentNotifyCc,
+        senderEmail: brand.senderEmail || notifyTo,
+      });
+    }
   }
 
   revalidatePath("/");
@@ -380,13 +377,16 @@ export async function toggleCommentResolved(commentId: string): Promise<boolean>
       comments: before.comments.map((c) => (c.id === commentId ? { ...c, resolved: updated.resolved } : c)),
     };
     if (computeProposalStatus(after) === "Aprobado") {
-      const brand = resolveBrand(await getSiteSettings());
-      await sendPushToEmail(brand.pushNotifyTo, {
-        title: "Post aprobado",
-        body: before.title
-          ? `"${before.title}" quedó aprobado — se resolvieron los cambios solicitados.`
-          : "Un post quedó aprobado al resolverse los cambios solicitados.",
-      });
+      const to = await getAdminEmail();
+      if (to) {
+        await sendAlertEmail({
+          to,
+          title: "Post aprobado",
+          body: before.title
+            ? `"${before.title}" quedó aprobado — se resolvieron los cambios solicitados.`
+            : "Un post quedó aprobado al resolverse los cambios solicitados.",
+        });
+      }
     }
   }
 

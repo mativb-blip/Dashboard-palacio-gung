@@ -4,7 +4,6 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
-import NotificationToggle from "./NotificationToggle";
 import SegmentedGroup, { type SegmentedItem } from "./SegmentedGroup";
 import SignOutButton from "./SignOutButton";
 
@@ -212,18 +211,7 @@ function MobileMenu({
             </Link>
           )}
 
-          <div
-            className={`stagger-in ${mobileRowClass} justify-between hover:bg-transparent hover:text-tx-2`}
-            style={{ animationDelay: delayOf(items.length + (isAdmin ? 3 : 2)) }}
-          >
-            <span className="flex items-center gap-2.5">
-              <BellIcon className="h-4 w-4" />
-              Notificaciones
-            </span>
-            <NotificationToggle />
-          </div>
-
-          <div className="stagger-in mt-1 px-3" style={{ animationDelay: delayOf(items.length + (isAdmin ? 4 : 3)) }}>
+          <div className="stagger-in mt-1 px-3" style={{ animationDelay: delayOf(items.length + (isAdmin ? 3 : 2)) }}>
             <SignOutButton />
           </div>
         </>
@@ -397,7 +385,6 @@ function UserMenu() {
           <PencilIcon className="relative" />
         </Link>
       )}
-      <NotificationToggle />
       <SignOutButton iconOnly />
     </div>
   );
@@ -440,21 +427,3 @@ function PencilIcon({ className }: { className?: string }) {
   );
 }
 
-function BellIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M18 8a6 6 0 1 0-12 0c0 3.5-1 5.5-2 7h16c-1-1.5-2-3.5-2-7Z" />
-      <path d="M10 20a2 2 0 0 0 4 0" />
-    </svg>
-  );
-}

@@ -13,9 +13,10 @@ export interface ResolvedBrand {
   senderEmail: string;
   commentNotifyTo: string;
   commentNotifyCc: string;
-  /// Email del usuario que recibe el push de "comentario nuevo"/"post
-  /// aprobado" (ver sendPushToEmail en notify-push.ts) — canal separado de
-  /// commentNotifyTo (ese es mail, este es push, y van a personas distintas).
+  /// Email del usuario que recibiría el push de "comentario nuevo"/"post
+  /// aprobado" (ver notify-push.ts) — infraestructura restaurada pero sin
+  /// wiring activo por ahora (ver ficha de notificaciones: todo pasó a mail
+  /// mientras se prueba, push vuelve más adelante).
   pushNotifyTo: string;
   contentPillars: string[];
 }
@@ -40,7 +41,9 @@ export const DEFAULT_BRAND: ResolvedBrand = {
   senderEmail: "",
   commentNotifyTo: "",
   commentNotifyCc: "",
-  // Push (mismos eventos) → Jun, cuenta fija (ver ficha de notificaciones).
-  pushNotifyTo: "jun.un@ahnsdom.com",
+  // "" (no "jun.un@ahnsdom.com" como antes) — sin default fijo a una
+  // persona puntual; cuando se reactive el push, esto se resuelve a mano
+  // o dinámicamente, no queda hardcodeado.
+  pushNotifyTo: "",
   contentPillars: ["Producto", "Marca/cultura", "Testimonios", "Institucional"],
 };

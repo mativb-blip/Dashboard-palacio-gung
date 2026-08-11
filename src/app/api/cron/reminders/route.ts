@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { sendPushToAdmins, sendPushToAll } from "@/lib/dashboard/notify-push";
+import { sendAlertEmail } from "@/lib/dashboard/notify-email";
 import { APPROVAL_REMINDER_HOURS_BEFORE } from "@/lib/dashboard/proposals";
 import { parseProposalDateTime, todayInSantoDomingo } from "@/lib/dashboard/schedule-time";
+import { getAdminEmail } from "@/lib/dashboard/site-settings";
 
 // Llamado por un cron externo (GitHub Actions, cada 5-10 min — ver
 // .github/workflows/reminders.yml) en vez de Vercel Cron: el plan Hobby de
@@ -48,6 +49,11 @@ export async function GET(request: Request): Promise<NextResponse> {
     },
   });
 
+  // Todos los recordatorios van al mail del Admin — un solo destinatario
+  // fijo, sin depender de que nadie haya activado nada en su navegador (ver
+  // ficha de notificaciones: se sacó el opt-in de push).
+  const adminEmail = await getAdminEmail();
+
   const now = Date.now();
   let sentT60 = 0;
   let sentT0 = 0;
@@ -62,39 +68,43 @@ export async function GET(request: Request): Promise<NextResponse> {
     // Recordatorio de aprobación pendiente (ficha 3) — solo si todavía no
     // se aprobó; se detiene solo apenas se aprueba (updateProposal() marca
     // approvalReminderSent en false de nuevo si se invalida más adelante).
-    // Nota: la app no asocia las suscripciones de push a una persona/rol
-    // puntual, así que el aviso llega a todos los suscriptos, no solo a
-    // quien falta aprobar — ver CLAUDE.md.
     if (!proposal.approvalReminderSent && !isApproved && diffMs > 0 && diffMs <= APPROVAL_REMINDER_MS) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { approvalReminderSent: true } });
-      await sendPushToAll({
-        title: "Aprobación pendiente",
-        body: `"${proposal.title}" (${proposal.network}) se publica el ${proposal.date} ${proposal.time} y todavía no está aprobado.`,
-      });
+      if (adminEmail) {
+        await sendAlertEmail({
+          to: adminEmail,
+          title: "Aprobación pendiente",
+          body: `"${proposal.title}" (${proposal.network}) se publica el ${proposal.date} ${proposal.time} y todavía no está aprobado.`,
+        });
+      }
       sentApproval++;
     }
 
-    // Recordatorios de publicación (1h antes/a la hora) — solo a los
-    // Administradores, no a todo el que tenga notificaciones activadas
-    // (a diferencia del de aprobación pendiente, arriba, que sí es broadcast).
+    // Recordatorios de publicación (1h antes/a la hora).
     if (!proposal.reminderSentT60 && diffMs > 0 && diffMs <= HOUR_MS) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { reminderSentT60: true } });
-      await sendPushToAdmins({
-        title: "Falta 1 hora para publicar",
-        body: `"${proposal.title}" (${proposal.network}) se publica a las ${proposal.time}.`,
-      });
+      if (adminEmail) {
+        await sendAlertEmail({
+          to: adminEmail,
+          title: "Falta 1 hora para publicar",
+          body: `"${proposal.title}" (${proposal.network}) se publica a las ${proposal.time}.`,
+        });
+      }
       sentT60++;
     }
 
     if (!proposal.reminderSentT0 && diffMs <= 0) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { reminderSentT0: true } });
-      await sendPushToAdmins({
-        // Escalado simple (ficha 3, punto 4): si a la hora de publicar
-        // sigue sin aprobación, el mensaje lo deja explícito en vez de
-        // mandar el aviso genérico de "es la hora".
-        title: isApproved ? "Es hora de publicar" : "Sin aprobar y ya es la hora de publicar",
-        body: `"${proposal.title}" (${proposal.network}) está programado para ahora${isApproved ? "" : " — todavía no tiene la aprobación de Jun"}.`,
-      });
+      if (adminEmail) {
+        await sendAlertEmail({
+          to: adminEmail,
+          // Escalado simple (ficha 3, punto 4): si a la hora de publicar
+          // sigue sin aprobación, el mensaje lo deja explícito en vez de
+          // mandar el aviso genérico de "es la hora".
+          title: isApproved ? "Es hora de publicar" : "Sin aprobar y ya es la hora de publicar",
+          body: `"${proposal.title}" (${proposal.network}) está programado para ahora${isApproved ? "" : " — todavía no tiene la aprobación de Jun"}.`,
+        });
+      }
       sentT0++;
     }
   }

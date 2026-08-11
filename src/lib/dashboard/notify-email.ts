@@ -1,8 +1,9 @@
-// Solo se importa desde proposals-actions.ts (ya "use server"), así que
-// nunca termina en el bundle del cliente sin necesidad de un guard aparte.
+// Solo se importa desde proposals-actions.ts/route.ts (ambos server-only),
+// así que nunca termina en el bundle del cliente sin necesidad de un guard
+// aparte.
 //
-// Notificación por correo cuando se agrega un comentario — vía Gmail SMTP
-// (Nodemailer + contraseña de aplicación de una cuenta de Gmail dedicada a
+// Único canal de notificación del dashboard — vía Gmail SMTP (Nodemailer +
+// contraseña de aplicación de una cuenta de Gmail dedicada a
 // notificaciones). Opcional: si GMAIL_USER/GMAIL_APP_PASSWORD no están en
 // .env, no hace nada. A diferencia de Microsoft Graph, el remitente queda
 // fijo a esa cuenta — no varía por SiteSettings.senderEmail; ese campo se
@@ -51,6 +52,34 @@ export async function sendCommentNotification(input: SendCommentNotificationInpu
       replyTo: input.senderEmail,
       subject: `Nuevo comentario en "${input.proposalTitle}"`,
       html: `<p><strong>${escapeHtml(input.author)}</strong> comentó en <strong>${escapeHtml(input.proposalTitle)}</strong> (${escapeHtml(input.proposalDate)}):</p><p>${escapeHtml(input.text).replace(/\n/g, "<br>")}</p>`,
+    });
+  } catch (e) {
+    console.error("[notify-email] error enviando notificación:", e);
+  }
+}
+
+interface SendAlertEmailInput {
+  to: string;
+  title: string;
+  body: string;
+}
+
+/** Reemplaza lo que antes era un push (mismo par título/cuerpo) para el
+ * resto de los avisos del dashboard — aprobación (por checkbox o por
+ * resolver comentarios) y los recordatorios de publicación/aprobación
+ * pendiente del cron. Un solo canal (mail), sin opt-in: no depende de que
+ * alguien haya activado nada en su navegador. Nunca tira, mismo criterio
+ * que sendCommentNotification. */
+export async function sendAlertEmail(input: SendAlertEmailInput): Promise<void> {
+  try {
+    const transporter = getTransporter();
+    if (!transporter) return; // GMAIL_* no configurado todavía — no-op silencioso
+
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: input.to,
+      subject: input.title,
+      html: `<p>${escapeHtml(input.body)}</p>`,
     });
   } catch (e) {
     console.error("[notify-email] error enviando notificación:", e);
