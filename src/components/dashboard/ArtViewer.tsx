@@ -142,7 +142,7 @@ export default function ArtViewer({
   }
 
   /** Con más de un arte (carrusel), el botón no descarga directo: pasa a
-   * Grilla y abre selección, para elegir cuáles bajar antes de confirmar. */
+   * Feed y abre selección, para elegir cuáles bajar antes de confirmar. */
   function handleDownloadClick() {
     if (total > 1) {
       onGalleryChange("grid");
@@ -279,7 +279,7 @@ export default function ArtViewer({
               <SegmentedGroup
                 items={[
                   { key: "slider", label: "Slider", active: gallery === "slider", onClick: () => onGalleryChange("slider") },
-                  { key: "grid", label: "Grilla", active: gallery === "grid", onClick: () => onGalleryChange("grid") },
+                  { key: "grid", label: "Feed", active: gallery === "grid", onClick: () => onGalleryChange("grid") },
                 ]}
               />
             </>

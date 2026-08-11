@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { User } from "@/generated/prisma/client";
-import { deleteUser, setUserPassword, updateUserRole } from "./actions";
+import { deleteUser, setUserPassword, updateUserNotifyEmail, updateUserRole } from "./actions";
 
 interface RoleOption {
   value: string;
@@ -51,6 +51,8 @@ function UserRow({
   const [changingPassword, setChangingPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [changingNotifyEmail, setChangingNotifyEmail] = useState(false);
+  const [notifyEmail, setNotifyEmail] = useState(user.notifyEmail);
 
   function handleRoleChange(role: string) {
     setError("");
@@ -83,6 +85,18 @@ function UserRow({
         setChangingPassword(false);
       } catch (e) {
         setError(e instanceof Error ? e.message : "No se pudo guardar la contraseña.");
+      }
+    });
+  }
+
+  function handleSaveNotifyEmail() {
+    setError("");
+    startTransition(async () => {
+      try {
+        await updateUserNotifyEmail(user.id, notifyEmail);
+        setChangingNotifyEmail(false);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo guardar el mail de notificación.");
       }
     });
   }
@@ -164,6 +178,49 @@ function UserRow({
             className={`font-bold text-brand-blue underline-offset-2 hover:underline ${PRESS_SCALE_CLASS}`}
           >
             {user.password ? "Cambiar" : "Configurar"}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-tx-3">
+        <span>
+          Notificaciones: <span className="text-tx-2">{user.notifyEmail}</span>
+        </span>
+        {changingNotifyEmail ? (
+          <>
+            <input
+              type="email"
+              value={notifyEmail}
+              onChange={(e) => setNotifyEmail(e.target.value)}
+              placeholder="mail@empresa.com"
+              className="rounded border border-line-2 bg-panel-2 px-2 py-1 text-xs"
+            />
+            <button
+              type="button"
+              onClick={handleSaveNotifyEmail}
+              disabled={pending || !notifyEmail.trim()}
+              className={`rounded border border-brand-blue px-2 py-1 text-xs font-bold text-brand-blue disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+            >
+              Guardar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setChangingNotifyEmail(false);
+                setNotifyEmail(user.notifyEmail);
+              }}
+              className={`rounded border border-line-2 px-2 py-1 text-xs font-bold text-brand-ink ${PRESS_SCALE_CLASS}`}
+            >
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setChangingNotifyEmail(true)}
+            className={`font-bold text-brand-blue underline-offset-2 hover:underline ${PRESS_SCALE_CLASS}`}
+          >
+            Cambiar
           </button>
         )}
       </div>

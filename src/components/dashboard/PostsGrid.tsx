@@ -12,7 +12,7 @@ interface PostsGridProps {
   onDeleteProposal: (id: string) => void;
 }
 
-/** Grilla estilo Instagram: 3 columnas, todos los posts sin importar el mes,
+/** Feed estilo Instagram: 3 columnas, todos los posts sin importar el mes,
  * más recientes arriba. */
 export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposal }: PostsGridProps) {
   const { data: session } = useSession();

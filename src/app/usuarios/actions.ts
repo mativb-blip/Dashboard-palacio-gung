@@ -23,12 +23,14 @@ export async function createUser(formData: FormData) {
   await requireAdmin();
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const notifyEmail = String(formData.get("notifyEmail") ?? "").trim().toLowerCase();
   const name = String(formData.get("name") ?? "").trim();
   const roleInput = String(formData.get("role") ?? "COMMENTER");
   const role = ROLES.includes(roleInput as Role) ? (roleInput as Role) : "COMMENTER";
   const password = String(formData.get("password") ?? "");
 
   if (!email) throw new Error("El email es obligatorio.");
+  if (!notifyEmail) throw new Error("El mail de notificación es obligatorio.");
   if (password && password.length < MIN_PASSWORD_LENGTH) {
     throw new Error(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`);
   }
@@ -36,6 +38,7 @@ export async function createUser(formData: FormData) {
   await prisma.user.create({
     data: {
       email,
+      notifyEmail,
       name: name || null,
       role,
       // Opcional al crear: sin contraseña, esta persona todavía no puede
@@ -44,6 +47,15 @@ export async function createUser(formData: FormData) {
     },
   });
 
+  revalidatePath("/usuarios");
+}
+
+export async function updateUserNotifyEmail(userId: string, notifyEmailInput: string) {
+  await requireAdmin();
+  const notifyEmail = notifyEmailInput.trim().toLowerCase();
+  if (!notifyEmail) throw new Error("El mail de notificación es obligatorio.");
+
+  await prisma.user.update({ where: { id: userId }, data: { notifyEmail } });
   revalidatePath("/usuarios");
 }
 

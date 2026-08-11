@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { sendCommentNotification } from "@/lib/dashboard/notify-email";
 import { sendPushToEmail } from "@/lib/dashboard/notify-push";
-import { deriveTitle, PROPOSAL_VERSION_LIMIT } from "@/lib/dashboard/proposals";
+import { computeProposalStatus, deriveTitle, PROPOSAL_VERSION_LIMIT } from "@/lib/dashboard/proposals";
 import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 import type {
   Proposal,
@@ -316,9 +316,10 @@ export async function addComment(proposalId: string, input: AddCommentInput): Pr
   });
   if (proposal) {
     const brand = resolveBrand(await getSiteSettings());
-    // El destino real es el email REGISTRADO del Admin, no un valor de
-    // config duplicado — brand.commentNotifyTo (SiteSettings) manda si un
-    // Admin lo seteó a mano; si no, cae a getAdminEmail().
+    // El destino real es el mail de notificación del Admin (panel de
+    // Usuarios), no un valor de config duplicado — brand.commentNotifyTo
+    // (SiteSettings) manda si un Admin lo seteó a mano; si no, cae a
+    // getAdminEmail().
     const notifyTo = brand.commentNotifyTo || (await getAdminEmail());
     await Promise.all([
       notifyTo &&
@@ -355,10 +356,40 @@ export async function addComment(proposalId: string, input: AddCommentInput): Pr
 export async function toggleCommentResolved(commentId: string): Promise<boolean> {
   await requireSession();
   const current = await prisma.proposalComment.findUniqueOrThrow({ where: { id: commentId } });
+
+  // Estado ANTES del toggle — necesario para saber si esta acción puntual es
+  // la que hace que el status derivado (computeProposalStatus) pase de
+  // "Cambios solicitados" a "Aprobado" (ficha de notificaciones): a
+  // diferencia de la aprobación por checkbox (ver justApproved en
+  // updateProposal), acá lo que cambia es un comentario, no la aprobación.
+  const proposalRow = await prisma.proposal.findUnique({
+    where: { id: current.proposalId },
+    include: { comments: true },
+  });
+  const before = proposalRow ? toProposal(proposalRow, new Date()) : null;
+  const statusBefore = before ? computeProposalStatus(before) : null;
+
   const updated = await prisma.proposalComment.update({
     where: { id: commentId },
     data: { resolved: !current.resolved },
   });
+
+  if (before && statusBefore === "Cambios solicitados") {
+    const after: Proposal = {
+      ...before,
+      comments: before.comments.map((c) => (c.id === commentId ? { ...c, resolved: updated.resolved } : c)),
+    };
+    if (computeProposalStatus(after) === "Aprobado") {
+      const brand = resolveBrand(await getSiteSettings());
+      await sendPushToEmail(brand.pushNotifyTo, {
+        title: "Post aprobado",
+        body: before.title
+          ? `"${before.title}" quedó aprobado — se resolvieron los cambios solicitados.`
+          : "Un post quedó aprobado al resolverse los cambios solicitados.",
+      });
+    }
+  }
+
   revalidatePath("/");
   revalidatePath("/calendario");
   return updated.resolved;

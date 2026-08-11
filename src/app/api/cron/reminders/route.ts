@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { sendPushToAll } from "@/lib/dashboard/notify-push";
+import { sendPushToAdmins, sendPushToAll } from "@/lib/dashboard/notify-push";
 import { APPROVAL_REMINDER_HOURS_BEFORE } from "@/lib/dashboard/proposals";
 import { parseProposalDateTime, todayInSantoDomingo } from "@/lib/dashboard/schedule-time";
 
@@ -74,9 +74,12 @@ export async function GET(request: Request): Promise<NextResponse> {
       sentApproval++;
     }
 
+    // Recordatorios de publicación (1h antes/a la hora) — solo a los
+    // Administradores, no a todo el que tenga notificaciones activadas
+    // (a diferencia del de aprobación pendiente, arriba, que sí es broadcast).
     if (!proposal.reminderSentT60 && diffMs > 0 && diffMs <= HOUR_MS) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { reminderSentT60: true } });
-      await sendPushToAll({
+      await sendPushToAdmins({
         title: "Falta 1 hora para publicar",
         body: `"${proposal.title}" (${proposal.network}) se publica a las ${proposal.time}.`,
       });
@@ -85,7 +88,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     if (!proposal.reminderSentT0 && diffMs <= 0) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { reminderSentT0: true } });
-      await sendPushToAll({
+      await sendPushToAdmins({
         // Escalado simple (ficha 3, punto 4): si a la hora de publicar
         // sigue sin aprobación, el mensaje lo deja explícito en vez de
         // mandar el aviso genérico de "es la hora".

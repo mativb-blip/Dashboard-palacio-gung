@@ -41,14 +41,14 @@ function pushLegKeyframes(keyframes: Keyframe[], a: Rect, b: Rect, legStart: num
   keyframes.push({ left: `${b.left}px`, width: `${b.width}px`, transform: "scaleY(1)", offset: legEnd });
 }
 
-/** Grupo de segmentos (Slider/Grilla, Calendario/Post/Grilla) con un único
+/** Grupo de segmentos (Slider/Feed, Calendario/Post/Feed) con un único
  * indicador azul que se desliza entre ellos al cambiar la selección.
  *
  * En vez de una transición lineal de left/width, cada salto entre dos
  * segmentos ESTIRA el indicador hasta la unión de ambos (como una gota de
  * líquido que se alarga) y recién ahí se contrae — vía Web Animations API,
  * porque un `transition` de CSS no puede expresar un punto intermedio
- * dinámico. Si el destino no es adyacente (ej. Calendario→Grilla saltando
+ * dinámico. Si el destino no es adyacente (ej. Calendario→Feed saltando
  * Post), el indicador pasa físicamente por cada parada intermedia en vez de
  * estirarse directo de punta a punta — un salto por cada segmento del medio.
  * Maneja interrupciones: si se hace click de nuevo a mitad de camino, mide

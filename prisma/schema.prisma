@@ -24,6 +24,11 @@ model User {
   emailVerified DateTime?
   image         String?
   role          Role      @default(COMMENTER)
+  /// Mail de destino donde esta persona recibe notificaciones (comentario
+  /// nuevo, aprobación) — obligatorio para usuarios nuevos (ver createUser en
+  /// usuarios/actions.ts). Separado de `email` (el de acceso/login) a
+  /// propósito: no siempre coinciden, ver getAdminEmail() en site-settings.ts.
+  notifyEmail   String
   /// Hash bcrypt — nunca la contraseña en texto plano. Opcional a nivel de
   /// fila: un Admin puede crear el usuario y cargarle la contraseña después.
   password      String?

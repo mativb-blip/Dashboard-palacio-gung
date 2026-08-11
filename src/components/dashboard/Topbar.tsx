@@ -16,7 +16,7 @@ import SignOutButton from "./SignOutButton";
  * resto del dashboard. */
 const COMPACT_NAV_QUERY = "(min-width: 640px)";
 
-/** "calendario" cuando el Topbar se muestra en /calendario — ahí Post/Grilla
+/** "calendario" cuando el Topbar se muestra en /calendario — ahí Post/Feed
  * navegan de vuelta al panel (`/?period=...`) en lugar de alternar in-place.
  * "moodboard" cuando se muestra en /moodboard, página propia sin relación
  * con proposals/período. */
@@ -33,7 +33,7 @@ interface TopbarProps {
  * grabación del 2026-08-09. Activo: solo cambia de color, sin relleno —
  * la referencia no rellena sus links, mantiene esa misma sobriedad. */
 const mobileNavClass =
-  // text-left: "Post"/"Grilla" son <button> (onClick, no href) — un <button>
+  // text-left: "Post"/"Feed" son <button> (onClick, no href) — un <button>
   // centra su texto por default del navegador; "Calendario" es <a> y por
   // eso no se notaba ahí. Sin esto quedan desalineados entre sí.
   `w-full rounded px-3 py-1.5 text-left font-thin text-[28px] leading-tight font-light transition-colors duration-[400ms] ${PRESS_SCALE_CLASS}`;
@@ -72,20 +72,20 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
           moodboardItem,
           { key: "calendario", label: "Calendario", active: true },
           { key: "month", label: "Post", active: false, href: "/?period=month" },
-          { key: "grid", label: "Grilla", active: false, href: "/?period=grid" },
+          { key: "grid", label: "Feed", active: false, href: "/?period=grid" },
         ]
       : view === "moodboard"
         ? [
             moodboardItem,
             { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
             { key: "month", label: "Post", active: false, href: "/?period=month" },
-            { key: "grid", label: "Grilla", active: false, href: "/?period=grid" },
+            { key: "grid", label: "Feed", active: false, href: "/?period=grid" },
           ]
         : [
             moodboardItem,
             { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
             { key: "month", label: "Post", active: view === "month", onClick: () => onPeriodChange?.("month") },
-            { key: "grid", label: "Grilla", active: view === "grid", onClick: () => onPeriodChange?.("grid") },
+            { key: "grid", label: "Feed", active: view === "grid", onClick: () => onPeriodChange?.("grid") },
           ];
 
   return (

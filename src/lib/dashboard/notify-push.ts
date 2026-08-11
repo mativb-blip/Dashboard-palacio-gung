@@ -54,6 +54,17 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
   await sendToSubscriptions(subscriptions, payload);
 }
 
+/** Push a las suscripciones de todos los usuarios con rol ADMIN — usado por
+ * los recordatorios de publicación (1h antes/a la hora, ver
+ * /api/cron/reminders): a diferencia de sendPushToAll, no debe llegarle a
+ * un Comentarista, y a diferencia de sendPushToEmail, no depende de una
+ * sola persona fija (cualquier Admin que exista, no solo "Jun"/el primero). */
+export async function sendPushToAdmins(payload: PushPayload): Promise<void> {
+  if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) return; // VAPID_* no configurado — no-op silencioso
+  const subscriptions = await prisma.pushSubscription.findMany({ where: { user: { role: "ADMIN" } } });
+  await sendToSubscriptions(subscriptions, payload);
+}
+
 /** Push a las suscripciones de un usuario puntual (por email, no por id —
  * así el caller no necesita resolverlo primero). Usado por comentario nuevo
  * y post aprobado (ver proposals-actions.ts): esos dos van a una persona

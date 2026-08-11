@@ -20,6 +20,7 @@ async function main() {
       email: ADMIN_EMAIL,
       name: ADMIN_NAME,
       role: "ADMIN",
+      notifyEmail: ADMIN_EMAIL,
     },
   });
 

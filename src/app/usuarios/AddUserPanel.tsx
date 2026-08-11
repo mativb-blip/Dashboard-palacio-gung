@@ -23,6 +23,11 @@ interface AddUserPanelProps {
 export default function AddUserPanel({ email, roleOptions }: AddUserPanelProps) {
   const [open, setOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Por default el mail de notificación es el mismo que el de acceso (caso
+  // común) pero queda editable — si la persona ya lo tocó a mano, no lo
+  // pisamos al seguir escribiendo el email de acceso.
+  const [notifyEmail, setNotifyEmail] = useState("");
+  const [notifyEmailTouched, setNotifyEmailTouched] = useState(false);
 
   return (
     <>
@@ -61,20 +66,44 @@ export default function AddUserPanel({ email, roleOptions }: AddUserPanelProps) 
           <div className="mb-3 text-[11px] tracking-label text-tx-3 uppercase">Cargar usuario</div>
           <form action={createUser} className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 desktop:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] tracking-label text-tx-3 uppercase">Email de acceso</span>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  placeholder="email@empresa.com"
+                  onChange={(e) => {
+                    if (!notifyEmailTouched) setNotifyEmail(e.target.value);
+                  }}
+                  className="w-full rounded border border-line-2 bg-panel-2 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] tracking-label text-tx-3 uppercase">Nombre</span>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Nombre (opcional)"
+                  className="w-full rounded border border-line-2 bg-panel-2 px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] tracking-label text-tx-3 uppercase">Mail de notificación</span>
               <input
                 type="email"
-                name="email"
+                name="notifyEmail"
                 required
-                placeholder="email@empresa.com"
+                value={notifyEmail}
+                onChange={(e) => {
+                  setNotifyEmail(e.target.value);
+                  setNotifyEmailTouched(true);
+                }}
+                placeholder="A dónde le llegan los avisos de comentarios/aprobaciones"
                 className="w-full rounded border border-line-2 bg-panel-2 px-3 py-2 text-sm"
               />
-              <input
-                type="text"
-                name="name"
-                placeholder="Nombre (opcional)"
-                className="w-full rounded border border-line-2 bg-panel-2 px-3 py-2 text-sm"
-              />
-            </div>
+            </label>
             <div className="grid grid-cols-1 gap-3 desktop:grid-cols-[1fr_1fr_auto]">
               <select name="role" defaultValue="COMMENTER" className="w-full rounded border border-line-2 bg-panel-2 px-3 py-2 text-sm">
                 {roleOptions.map((r) => (
