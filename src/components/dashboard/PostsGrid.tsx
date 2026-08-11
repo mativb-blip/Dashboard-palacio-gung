@@ -1,6 +1,7 @@
 "use client";
 
-import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import { useSession } from "next-auth/react";
+import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { Proposal } from "@/types/dashboard";
 import ArtTile from "./ArtTile";
 import FormatIcon from "./FormatIcon";
@@ -14,6 +15,8 @@ interface PostsGridProps {
 /** Grilla estilo Instagram: 3 columnas, todos los posts sin importar el mes,
  * más recientes arriba. */
 export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposal }: PostsGridProps) {
+  const { data: session } = useSession();
+  const canEdit = canEditContent(session?.user.role);
   const sorted = [...proposals].sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
 
   function handleDelete(proposal: Proposal) {
@@ -61,15 +64,17 @@ export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposa
                     </span>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(proposal)}
-                  title="Borrar propuesta"
-                  aria-label="Borrar propuesta"
-                  className={`absolute top-1.5 left-1.5 flex h-7 w-7 items-center justify-center rounded bg-black/45 text-white backdrop-blur-sm transition-transform duration-[400ms] hover:bg-brand-red ${PRESS_SCALE_CLASS}`}
-                >
-                  <TrashIcon />
-                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(proposal)}
+                    title="Borrar propuesta"
+                    aria-label="Borrar propuesta"
+                    className={`absolute top-1.5 left-1.5 flex h-7 w-7 items-center justify-center rounded bg-black/45 text-white backdrop-blur-sm transition-transform duration-[400ms] hover:bg-brand-red ${PRESS_SCALE_CLASS}`}
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
               </div>
             );
           })}

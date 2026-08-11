@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import DayAgenda from "@/components/dashboard/DayAgenda";
@@ -15,7 +16,7 @@ import {
   updateProposal,
 } from "@/lib/dashboard/proposals-actions";
 import { applyUpdateResult } from "@/lib/dashboard/proposals";
-import { handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import type { AddCommentInput } from "@/components/dashboard/CommentsPanel";
 import type { Proposal } from "@/types/dashboard";
@@ -36,6 +37,8 @@ export default function CalendarioPage() {
   const [previewProposalId, setPreviewProposalId] = useState<string | null>(null);
   const [pillarFilter, setPillarFilter] = useState<string>("all");
   const { brandName, contentPillars } = useBrand();
+  const { data: session } = useSession();
+  const canEdit = canEditContent(session?.user.role);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +81,7 @@ export default function CalendarioPage() {
   }
 
   async function handleMoveProposal(id: string, newDate: string) {
+    if (!canEdit) return;
     const proposal = proposals.find((p) => p.id === id);
     if (!proposal || proposal.date === newDate) return;
     setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, date: newDate } : p)));
@@ -188,12 +192,14 @@ export default function CalendarioPage() {
               onSelectDate={setSelectedDate}
               onOpenProposal={setPreviewProposalId}
               onMoveProposal={handleMoveProposal}
+              canEdit={canEdit}
             />
 
             <DayAgenda
               dateIso={selectedDate}
               proposals={filteredProposals.filter((p) => p.date === selectedDate)}
               onOpenProposal={setPreviewProposalId}
+              canEdit={canEdit}
             />
           </>
         )}

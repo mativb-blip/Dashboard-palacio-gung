@@ -1,10 +1,11 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import CommentsPanel, { type AddCommentInput } from "./CommentsPanel";
 import { dateLong, isVerticalFormat, statusPillStyle } from "@/lib/dashboard/format";
 import { computeProposalStatus } from "@/lib/dashboard/proposals";
-import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { Proposal } from "@/types/dashboard";
 
 interface PostPreviewModalProps {
@@ -26,6 +27,8 @@ export default function PostPreviewModal({
   onToggleCommentResolved,
   onDeleteProposal,
 }: PostPreviewModalProps) {
+  const { data: session } = useSession();
+  const canEdit = canEditContent(session?.user.role);
   const [showComments, setShowComments] = useState(false);
   const commentsRef = useRef<HTMLDivElement>(null);
   const vertical = isVerticalFormat(proposal.format);
@@ -74,15 +77,17 @@ export default function PostPreviewModal({
             <div className="text-[10px] tracking-label text-tx-3 uppercase">{dateLong(proposal.date)}</div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={handleDelete}
-              title="Borrar propuesta"
-              aria-label="Borrar propuesta"
-              className={`text-tx-3 transition-transform duration-[400ms] hover:text-brand-red ${PRESS_SCALE_CLASS}`}
-            >
-              <TrashIcon />
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                title="Borrar propuesta"
+                aria-label="Borrar propuesta"
+                className={`text-tx-3 transition-transform duration-[400ms] hover:text-brand-red ${PRESS_SCALE_CLASS}`}
+              >
+                <TrashIcon />
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -129,7 +134,12 @@ export default function PostPreviewModal({
           <p className="px-3 pb-4 text-sm leading-[1.5] whitespace-pre-line">{proposal.caption}</p>
 
           {showComments && (
-            <div ref={commentsRef} className="border-t border-line">
+            // pb-16 (no en CommentsPanel, que también se usa sin el botón
+            // flotante) — el "Comentar" de abajo es `absolute` sobre esta
+            // misma tarjeta y no scrollea con el contenido, así que sin este
+            // colchón el scrollIntoView("end") deja el botón "Enviar
+            // comentario" tapado justo detrás de él.
+            <div ref={commentsRef} className="border-t border-line pb-16">
               <CommentsPanel
                 proposal={proposal}
                 onAddComment={onAddComment}

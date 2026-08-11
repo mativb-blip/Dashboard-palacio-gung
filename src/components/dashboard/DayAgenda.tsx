@@ -10,24 +10,27 @@ interface DayAgendaProps {
   dateIso: string;
   proposals: Proposal[];
   onOpenProposal: (id: string) => void;
+  canEdit: boolean;
 }
 
 /** Detalle del día seleccionado en la grilla mensual — solo mobile
  * (`desktop:hidden`; en desktop cada casillero ya muestra su propia
  * tarjeta). Reemplaza los ~30 botones "+" de 20px repartidos por la
  * grilla por un único CTA de 44px, atado al día que se está mirando. */
-export default function DayAgenda({ dateIso, proposals, onOpenProposal }: DayAgendaProps) {
+export default function DayAgenda({ dateIso, proposals, onOpenProposal, canEdit }: DayAgendaProps) {
   return (
     <div className="desktop:hidden">
       <div className="flex items-center justify-between gap-3 border-b border-line pb-3">
         <h3 className="text-sm font-bold capitalize">{dateLong(dateIso)}</h3>
-        <Link
-          href={`/nueva-propuesta?date=${dateIso}`}
-          className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-brand-ink px-4 text-xs font-bold whitespace-nowrap text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
-        >
-          <PlusIcon />
-          Cargar
-        </Link>
+        {canEdit && (
+          <Link
+            href={`/nueva-propuesta?date=${dateIso}`}
+            className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-brand-ink px-4 text-xs font-bold whitespace-nowrap text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+          >
+            <PlusIcon />
+            Cargar
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 pt-3">

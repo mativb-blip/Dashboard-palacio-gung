@@ -12,6 +12,7 @@ interface CalendarProps {
   onSelectEmptyDate: (iso: string) => void;
   selectedMonth: number;
   onSelectedMonthChange: (month: number) => void;
+  canEdit: boolean;
 }
 
 export default function Calendar({
@@ -21,6 +22,7 @@ export default function Calendar({
   onSelectEmptyDate,
   selectedMonth,
   onSelectedMonthChange,
+  canEdit,
 }: CalendarProps) {
   const monthDays = daysOfMonth(YEAR, selectedMonth);
   return (
@@ -44,18 +46,20 @@ export default function Calendar({
           const iso = isoFromDate(date);
           const dayProposals = proposals.filter((p) => p.date === iso);
           const active = dayProposals.some((p) => p.id === selectedProposalId);
+          const isEmptyAndLocked = dayProposals.length === 0 && !canEdit;
           return (
             <button
               key={iso}
               type="button"
-              onClick={() =>
-                dayProposals.length ? onSelectProposal(dayProposals[0].id) : onSelectEmptyDate(iso)
-              }
+              onClick={() => {
+                if (dayProposals.length) onSelectProposal(dayProposals[0].id);
+                else if (canEdit) onSelectEmptyDate(iso);
+              }}
               onPointerEnter={handleLiquidPointerEnter}
               title={
                 dayProposals.length > 1
                   ? `${dayProposals.length} posts este día`
-                  : dayProposals.length === 0
+                  : dayProposals.length === 0 && canEdit
                     ? "Cargar contenido para este día"
                     : undefined
               }
@@ -71,7 +75,11 @@ export default function Calendar({
                 // basta con `relative` en esos spans (ver stacking order de CSS 2.1 §E:
                 // los descendientes posicionados con z-index:auto se pintan en orden de
                 // documento, y el pseudo-elemento siempre es el primero de ese grupo).
-                `relative flex w-9 shrink-0 cursor-pointer flex-col items-start gap-0.5 overflow-hidden rounded border px-[5px] py-1.5 text-left font-sans transition-[background-color,border-color,transform] duration-[400ms] motion-safe:hover:scale-[1.02] before:pointer-events-none before:absolute before:inset-0 before:content-[''] before:bg-brand-blue/15 before:[clip-path:circle(0%_at_var(--hx,50%)_var(--hy,50%))] before:transition-[clip-path] before:duration-[400ms] before:ease-out motion-safe:hover:before:[clip-path:circle(150%_at_var(--hx,50%)_var(--hy,50%))] desktop:w-auto desktop:min-w-0 desktop:flex-1 ${PRESS_SCALE_CLASS}`,
+                `relative flex w-9 shrink-0 flex-col items-start gap-0.5 overflow-hidden rounded border px-[5px] py-1.5 text-left font-sans transition-[background-color,border-color,transform] duration-[400ms] before:pointer-events-none before:absolute before:inset-0 before:content-[''] before:bg-brand-blue/15 before:[clip-path:circle(0%_at_var(--hx,50%)_var(--hy,50%))] before:transition-[clip-path] before:duration-[400ms] before:ease-out desktop:w-auto desktop:min-w-0 desktop:flex-1 ${
+                  isEmptyAndLocked
+                    ? "cursor-default"
+                    : `cursor-pointer motion-safe:hover:scale-[1.02] motion-safe:hover:before:[clip-path:circle(150%_at_var(--hx,50%)_var(--hy,50%))] ${PRESS_SCALE_CLASS}`
+                }`,
                 // Antes: vacío = gris, con contenido = blanco ("pop"). Con
                 // el tema oscuro el mismo criterio se invierte: vacío se
                 // funde con --bg, con contenido "aparece" en --surface —
@@ -93,7 +101,7 @@ export default function Calendar({
               </span>
               <span className="relative flex w-full flex-1 items-center justify-center gap-[2px] overflow-hidden">
                 {dayProposals.length === 0 ? (
-                  <PlusIcon className="h-3.5 w-3.5 text-tx-3" />
+                  canEdit && <PlusIcon className="h-3.5 w-3.5 text-tx-3" />
                 ) : dayProposals.length === 1 ? (
                   <FormatIcon
                     format={dayProposals[0].format}

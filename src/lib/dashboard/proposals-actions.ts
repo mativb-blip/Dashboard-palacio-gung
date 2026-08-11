@@ -19,13 +19,24 @@ import type {
 const FORMATS: ProposalFormat[] = ["Carrusel", "Reel", "Historia", "Post simple"];
 const STATUSES: ProposalStatus[] = ["Aprobado", "Cambios solicitados", "En revisión"];
 
-// Cualquier usuario con sesión puede leer/cargar/comentar propuestas — misma
+// Cualquier usuario con sesión puede leer/comentar propuestas — misma
 // apertura que tenía la versión en localStorage (el gate real es a nivel de
 // ruta, en src/proxy.ts; acá solo repetimos el chequeo por consistencia con
 // el resto de las server actions del proyecto, ver src/app/usuarios/actions.ts).
 async function requireSession() {
   const session = await auth();
   if (!session) throw new Error("Necesitás iniciar sesión.");
+  return session;
+}
+
+// Crear/editar/borrar contenido (no comentar) queda para Admin y Editor —
+// un Comentarista puede ver todo y dejar comentarios, pero no tocar el
+// contenido en sí. Mismo patrón que requireAdmin() en usuarios/actions.ts.
+async function requireEditor() {
+  const session = await auth();
+  if (session?.user.role !== "ADMIN" && session?.user.role !== "EDITOR") {
+    throw new Error("Solo un Administrador o Editor puede hacer esto.");
+  }
   return session;
 }
 
@@ -93,7 +104,7 @@ export interface CreateProposalInput {
 }
 
 export async function createProposal(input: CreateProposalInput): Promise<Proposal> {
-  await requireSession();
+  await requireEditor();
   if (!input.date || !input.time.trim() || !input.caption.trim()) {
     throw new Error("Fecha, hora y caption son obligatorios.");
   }
@@ -156,7 +167,7 @@ export interface UpdateProposalResult {
 }
 
 export async function updateProposal(id: string, patch: UpdateProposalInput): Promise<UpdateProposalResult> {
-  const session = await requireSession();
+  const session = await requireEditor();
 
   const current = await prisma.proposal.findUnique({
     where: { id },
@@ -268,7 +279,7 @@ export async function getProposalVersions(proposalId: string): Promise<ProposalV
 }
 
 export async function deleteProposal(id: string): Promise<void> {
-  await requireSession();
+  await requireEditor();
   await prisma.proposal.delete({ where: { id } });
   revalidatePath("/");
   revalidatePath("/calendario");

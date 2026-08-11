@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useState } from "react";
 import ArtTile from "./ArtTile";
 import ArtUploadZone, { type UploadedFile } from "./ArtUploadZone";
@@ -9,6 +10,7 @@ import { useBrand } from "@/lib/dashboard/BrandContext";
 import { downloadProposalArts } from "@/lib/dashboard/download";
 import { artLabel, fmtShort, isVerticalFormat, toneHex } from "@/lib/dashboard/format";
 import {
+  canEditContent,
   handleLiquidPointerEnter,
   iconButtonClass,
   LIQUID_FILL_CLASS,
@@ -58,6 +60,8 @@ export default function ArtViewer({
   onUpdateProposal,
 }: ArtViewerProps) {
   const brand = useBrand();
+  const { data: session } = useSession();
+  const canEdit = canEditContent(session?.user.role);
   const [downloading, setDownloading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -260,16 +264,18 @@ export default function ArtViewer({
                   <path d="M5 21h14" />
                 </svg>
               </button>
-              <button
-                type="button"
-                onClick={handleStartEdit}
-                onPointerEnter={handleLiquidPointerEnter}
-                title="Editar"
-                aria-label="Editar artes"
-                className={iconButtonClass}
-              >
-                <PencilIcon className="relative" />
-              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={handleStartEdit}
+                  onPointerEnter={handleLiquidPointerEnter}
+                  title="Editar"
+                  aria-label="Editar artes"
+                  className={iconButtonClass}
+                >
+                  <PencilIcon className="relative" />
+                </button>
+              )}
               <SegmentedGroup
                 items={[
                   { key: "slider", label: "Slider", active: gallery === "slider", onClick: () => onGalleryChange("slider") },

@@ -44,6 +44,7 @@ export default function CommentsPanel({
   const [uploadError, setUploadError] = useState("");
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function addImageFiles(files: File[]) {
     const images = files.filter((f) => f.type.startsWith("image/"));
@@ -77,6 +78,21 @@ export default function CommentsPanel({
 
   function removeDraftImage(id: string) {
     setDraftImages((prev) => prev.filter((img) => img.id !== id));
+  }
+
+  /** No hay hilos en el modelo de datos (Comment es una lista plana) — esto
+   * solo antepone una mención al texto y enfoca el textarea, para no tener
+   * que tocar el schema por un affordance mínimo de "responder". */
+  function startReply(author: string) {
+    const mention = `@${author} `;
+    setDraft((prev) => (prev.startsWith(mention) ? prev : mention + prev));
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      const pos = el.value.length;
+      el.setSelectionRange(pos, pos);
+    });
   }
 
   async function handleSubmit() {
@@ -140,6 +156,13 @@ export default function CommentsPanel({
                     ))}
                   </div>
                 )}
+                <button
+                  type="button"
+                  onClick={() => startReply(comment.author)}
+                  className={`mt-1 text-[11px] font-bold text-tx-3 transition-colors duration-[400ms] hover:text-brand-blue ${PRESS_SCALE_CLASS}`}
+                >
+                  Responder
+                </button>
               </div>
             </div>
           ))
@@ -152,6 +175,7 @@ export default function CommentsPanel({
         Comentando como <strong className="text-brand-ink">{authorName}</strong>
       </div>
       <textarea
+        ref={textareaRef}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onPaste={handlePaste}

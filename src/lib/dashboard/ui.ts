@@ -1,4 +1,13 @@
 import type { PointerEvent } from "react";
+import type { Role } from "@/generated/prisma/client";
+
+/** Admin y Editor pueden crear/editar/borrar contenido — un Comentarista
+ * solo puede ver y comentar (el gate real vive en las server actions,
+ * ver requireEditor() en proposals-actions.ts; esto es solo para no
+ * mostrarle al Comentarista un control que el server le va a rechazar). */
+export function canEditContent(role: Role | undefined): boolean {
+  return role === "ADMIN" || role === "EDITOR";
+}
 
 /** Capa "líquida" de hover: un ::before clip-path que se expande desde el
  * punto donde entró el mouse (ver `handleLiquidPointerEnter`) en vez de

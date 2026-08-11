@@ -1,10 +1,11 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useState } from "react";
 import VersionHistoryModal from "./VersionHistoryModal";
 import { dateLong, statusPillStyle } from "@/lib/dashboard/format";
 import { computeProposalStatus, DEPARTMENT_CHECK_COUNT } from "@/lib/dashboard/proposals";
-import { handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { Proposal } from "@/types/dashboard";
 
 interface CaptionPanelProps {
@@ -14,6 +15,8 @@ interface CaptionPanelProps {
 }
 
 export default function CaptionPanel({ proposal, onUpdateProposal, onDeleteProposal }: CaptionPanelProps) {
+  const { data: session } = useSession();
+  const canEdit = canEditContent(session?.user.role);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(proposal.caption);
@@ -21,6 +24,7 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
   const departmentApprovals = proposal.departmentApprovals ?? Array(DEPARTMENT_CHECK_COUNT).fill(false);
 
   function toggleDepartment(index: number) {
+    if (!canEdit) return;
     const next = departmentApprovals.map((value, i) => (i === index ? !value : value));
     onUpdateProposal(proposal.id, { departmentApprovals: next });
   }
@@ -71,16 +75,18 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
           <div className="text-[11px] tracking-label text-tx-3 uppercase">
             {dateLong(proposal.date)}
           </div>
-          <button
-            type="button"
-            onClick={handleDelete}
-            onPointerEnter={handleLiquidPointerEnter}
-            title="Borrar propuesta"
-            aria-label="Borrar propuesta"
-            className={`${iconButtonClass} shrink-0`}
-          >
-            <TrashIcon className="relative" />
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              onPointerEnter={handleLiquidPointerEnter}
+              title="Borrar propuesta"
+              aria-label="Borrar propuesta"
+              className={`${iconButtonClass} shrink-0`}
+            >
+              <TrashIcon className="relative" />
+            </button>
+          )}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-4">
           <span
@@ -140,9 +146,10 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
                   key={i}
                   type="button"
                   onClick={() => toggleDepartment(i)}
+                  disabled={!canEdit}
                   aria-pressed={checked}
                   title={checked ? `${label} · aprobado` : `${label} · pendiente`}
-                  className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-1 text-[10px] leading-none font-bold tracking-label uppercase transition-[color,border-color,background-color] duration-[400ms] ${PRESS_SCALE_CLASS} ${
+                  className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-1 text-[10px] leading-none font-bold tracking-label uppercase transition-[color,border-color,background-color] duration-[400ms] disabled:cursor-default ${PRESS_SCALE_CLASS} ${
                     checked
                       ? "border-brand-blue bg-brand-blue/[0.05] text-brand-blue"
                       : "border-line-2 bg-transparent text-[var(--color-brand-red-text)] hover:border-brand-red/40"
@@ -202,16 +209,18 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
                     <ClipboardIcon key="idle" className="relative" />
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleStartEdit}
-                  onPointerEnter={handleLiquidPointerEnter}
-                  title="Editar caption"
-                  aria-label="Editar caption"
-                  className={iconButtonClass}
-                >
-                  <PencilIcon className="relative" />
-                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={handleStartEdit}
+                    onPointerEnter={handleLiquidPointerEnter}
+                    title="Editar caption"
+                    aria-label="Editar caption"
+                    className={iconButtonClass}
+                  >
+                    <PencilIcon className="relative" />
+                  </button>
+                )}
               </>
             )}
           </div>

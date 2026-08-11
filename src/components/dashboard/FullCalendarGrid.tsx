@@ -15,6 +15,7 @@ interface FullCalendarGridProps {
   onSelectDate: (iso: string) => void;
   onOpenProposal: (id: string) => void;
   onMoveProposal: (id: string, newDate: string) => void;
+  canEdit: boolean;
 }
 
 /** Tipo MIME propio para el drag de un post — evita reaccionar a un drag
@@ -43,6 +44,7 @@ export default function FullCalendarGrid({
   onSelectDate,
   onOpenProposal,
   onMoveProposal,
+  canEdit,
 }: FullCalendarGridProps) {
   const currentIso = todayIso();
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export default function FullCalendarGrid({
   function handleDrop(e: DragEvent<HTMLDivElement>, iso: string) {
     e.preventDefault();
     setDragOverIso(null);
+    if (!canEdit) return;
     const id = e.dataTransfer.getData(DRAG_MIME);
     if (id) onMoveProposal(id, iso);
   }
@@ -79,7 +82,7 @@ export default function FullCalendarGrid({
             <div
               key={iso}
               onDragOver={(e) => {
-                if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+                if (!canEdit || !e.dataTransfer.types.includes(DRAG_MIME)) return;
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "move";
                 setDragOverIso(iso);
@@ -126,7 +129,7 @@ export default function FullCalendarGrid({
 
               <div className="group hidden h-[108px] flex-col gap-1 px-2 py-2 desktop:flex">
                 <div className="flex shrink-0 items-center justify-between gap-1">
-                  {inMonth ? <NewPostLink iso={iso} /> : <span className="h-5 w-5" />}
+                  {inMonth && canEdit ? <NewPostLink iso={iso} /> : <span className="h-5 w-5" />}
                   <span
                     className={`text-xs font-bold ${
                       isToday
@@ -149,6 +152,7 @@ export default function FullCalendarGrid({
                       isDragging={draggingId === proposal.id}
                       onDragStart={() => setDraggingId(proposal.id)}
                       onDragEnd={() => setDraggingId(null)}
+                      draggable={canEdit}
                     />
                   ))}
                   {dayProposals.length > MAX_VISIBLE_DESKTOP && (
@@ -176,18 +180,20 @@ function EventChip({
   isDragging,
   onDragStart,
   onDragEnd,
+  draggable,
 }: {
   proposal: Proposal;
   onOpen: () => void;
   isDragging: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
+  draggable: boolean;
 }) {
   const hex = toneHex(proposal.format);
   return (
     <button
       type="button"
-      draggable
+      draggable={draggable}
       onClick={onOpen}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_MIME, proposal.id);
@@ -195,10 +201,10 @@ function EventChip({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
-      title={`Arrastrar para reprogramar "${proposal.title}"`}
-      className={`flex shrink-0 cursor-grab items-center gap-1.5 rounded-sm border border-line-2 bg-panel-2 px-1.5 py-0.5 text-left transition-[border-color,transform,opacity] duration-[400ms] hover:border-brand-blue active:cursor-grabbing ${PRESS_SCALE_CLASS} ${
-        isDragging ? "opacity-40" : ""
-      }`}
+      title={draggable ? `Arrastrar para reprogramar "${proposal.title}"` : undefined}
+      className={`flex shrink-0 items-center gap-1.5 rounded-sm border border-line-2 bg-panel-2 px-1.5 py-0.5 text-left transition-[border-color,transform,opacity] duration-[400ms] hover:border-brand-blue ${
+        draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+      } ${PRESS_SCALE_CLASS} ${isDragging ? "opacity-40" : ""}`}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: hex }} />
       <span className="truncate text-[10px] leading-tight font-bold text-brand-ink">{proposal.title}</span>

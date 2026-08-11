@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -18,7 +19,7 @@ import {
 } from "@/lib/dashboard/proposals-actions";
 import { applyUpdateResult, proposalsInPeriod } from "@/lib/dashboard/proposals";
 import { dateLong, todayIso } from "@/lib/dashboard/format";
-import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import type { Gallery, Period, Proposal } from "@/types/dashboard";
 
@@ -42,6 +43,8 @@ function DashboardHome() {
   const [gallery, setGallery] = useState<Gallery>("slider");
   const today = todayIso();
   const { brandName } = useBrand();
+  const { data: session } = useSession();
+  const canEdit = canEditContent(session?.user.role);
 
   // Carga desde la base recién montado el componente (Server Components no
   // mezclan bien con todo el estado de interacción de esta pantalla — ver
@@ -76,6 +79,7 @@ function DashboardHome() {
   }
 
   function handleSelectEmptyDate(iso: string) {
+    if (!canEdit) return;
     router.push(`/nueva-propuesta?date=${iso}`);
   }
 
@@ -162,14 +166,16 @@ function DashboardHome() {
       </div>
 
       <Topbar view={period} onPeriodChange={handlePeriodChange} planLabel={brandName} />
-      <div className="flex justify-end px-4 pb-2 desktop:px-8">
-        <Link
-          href="/nueva-propuesta"
-          className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
-        >
-          + Cargar propuesta
-        </Link>
-      </div>
+      {canEdit && (
+        <div className="flex justify-end px-4 pb-2 desktop:px-8">
+          <Link
+            href="/nueva-propuesta"
+            className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+          >
+            + Cargar propuesta
+          </Link>
+        </div>
+      )}
 
       <div className="h-px shrink-0 bg-line" />
 
@@ -194,6 +200,7 @@ function DashboardHome() {
                 onSelectEmptyDate={handleSelectEmptyDate}
                 selectedMonth={selectedMonth}
                 onSelectedMonthChange={setSelectedMonth}
+                canEdit={canEdit}
               />
             </div>
           </div>
@@ -203,12 +210,14 @@ function DashboardHome() {
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
               <p className="text-[11px] tracking-label text-tx-3 uppercase">{dateLong(today)}</p>
               <p className="text-sm text-tx-3">No hay contenido programado para hoy.</p>
-              <Link
-                href={`/nueva-propuesta?date=${today}`}
-                className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
-              >
-                + Cargar propuesta para hoy
-              </Link>
+              {canEdit && (
+                <Link
+                  href={`/nueva-propuesta?date=${today}`}
+                  className={`inline-block text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+                >
+                  + Cargar propuesta para hoy
+                </Link>
+              )}
             </div>
           ) : (
             <div className="grid flex-1 grid-cols-1 desktop:min-h-0 desktop:grid-cols-[1.5fr_0.95fr]">

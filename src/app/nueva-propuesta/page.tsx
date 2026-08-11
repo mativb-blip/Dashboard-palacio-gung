@@ -1,13 +1,14 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import ArtUploadZone, { type UploadedFile } from "@/components/dashboard/ArtUploadZone";
 import InstagramPreview from "@/components/dashboard/InstagramPreview";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import { createProposal } from "@/lib/dashboard/proposals-actions";
-import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { ProposalFormat } from "@/types/dashboard";
 
 const NETWORKS = ["Instagram", "Mail", "Whatsapp", "LinkedIn"];
@@ -49,6 +50,12 @@ function NuevaPropuestaForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { contentPillars } = useBrand();
+  const { data: session, status } = useSession();
+  const canEdit = canEditContent(session?.user.role);
+
+  useEffect(() => {
+    if (status === "authenticated" && !canEdit) router.replace("/");
+  }, [status, canEdit, router]);
   const captionRef = useRef<HTMLTextAreaElement>(null);
   // Todavía no existe la propuesta cuando el usuario elige los archivos —
   // este id solo organiza la ruta en Blob Storage hasta que se guarde.
@@ -67,6 +74,8 @@ function NuevaPropuestaForm() {
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  if (status !== "authenticated" || !canEdit) return null;
 
   const isReel = format === "Reel";
   const previewImages = isReel
