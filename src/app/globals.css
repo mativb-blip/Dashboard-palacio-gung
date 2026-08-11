@@ -223,3 +223,51 @@ input[type="text"]:focus {
     animation: none;
   }
 }
+
+/* Moodboard (clonado de clevante.cz, ver grabación del 2026-08-10):
+   - reveal-item: cada título/párrafo/tarjeta aparece con fade+slide-up
+     apenas entra en el viewport (IntersectionObserver, ver Reveal en
+     moodboard/page.tsx) — no de una, en cascada según su índice
+     (--reveal-delay). 750ms + la misma curva de --ease-out que ya usa el
+     resto del proyecto: es la curva real de su sitio (confirmada
+     inspeccionando su CSS), no una aproximación.
+   - dim-group/dim-item: al pasar el mouse por una tarjeta de una grilla,
+     las demás de esa misma grilla se atenúan — sin JS, pura cascada CSS
+     (un dim-group con :hover atenúa a todos sus dim-item, y el dim-item
+     puntualmente hovereado se repone). */
+.reveal-item {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 750ms var(--ease-out),
+    transform 750ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal-item[data-in="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dim-item {
+  transition: opacity 400ms var(--ease-out);
+}
+
+.dim-group:hover .dim-item {
+  opacity: 0.45;
+}
+
+.dim-group .dim-item:hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-item {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+  .dim-item {
+    transition: none;
+  }
+}

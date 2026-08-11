@@ -1,7 +1,179 @@
 "use client";
 
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Topbar from "@/components/dashboard/Topbar";
 import { useBrand } from "@/lib/dashboard/BrandContext";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
+
+/** Fade + slide-up apenas el bloque entra en el viewport — una sola vez
+ * (desconecta el observer al entrar, no vuelve a ocultarse si se sale de
+ * cuadro). `delay` en ms escalona la cascada de una grilla según el índice
+ * del ítem (ver usos con `delay={i * 90}`). Sigue usándose para bloques que
+ * no son texto (tarjetas enteras, embeds de Instagram) — el texto en sí usa
+ * SplitReveal, letra o palabra por palabra. */
+function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      data-in={inView}
+      style={{ "--reveal-delay": `${delay}ms` } as React.CSSProperties}
+      className={`reveal-item ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface HeadingSegment {
+  text: string;
+  className?: string;
+}
+
+/** Títulos: reveal letra por letra al entrar en el viewport — clonado del
+ * tratamiento real de la referencia (clevante.cz, inspeccionado su DOM:
+ * cada carácter en su propio nodo, con stagger creciente).
+ * `text` acepta un string simple o un array de segmentos con su propia
+ * className — un título como "Tres niveles de intervención" mezcla peso
+ * normal y bold a mitad de frase.
+ *
+ * Cuerpo de texto (`unit="blur"`): sin split de por medio — todo el bloque
+ * pasa de desenfocado/opacidad 0 a nítido/opacidad 1 atado directamente al
+ * scroll (`scrub: true`, no "once"): a mitad de camino entre el inicio y el
+ * fin del rango, el texto está a mitad de desenfoque/opacidad, sin importar
+ * si se sigue bajando o se vuelve a subir. */
+function SplitReveal({
+  text,
+  className = "",
+  as: Tag = "h2",
+  unit = "char",
+  delay = 0,
+}: {
+  text: string | HeadingSegment[];
+  className?: string;
+  as?: "h2" | "h3" | "p";
+  unit?: "char" | "blur";
+  delay?: number;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  const segments: HeadingSegment[] = typeof text === "string" ? [{ text }] : text;
+  const plainText = segments.map((s) => s.text).join("");
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (unit === "blur") {
+      if (reduceMotion) {
+        gsap.set(el, { opacity: 1, filter: "blur(0px)" });
+        return;
+      }
+
+      gsap.set(el, { opacity: 0, filter: "blur(12px)" });
+      const tween = gsap.to(el, {
+        opacity: 1,
+        filter: "blur(0px)",
+        ease: "none",
+        scrollTrigger: {
+          trigger: el,
+          start: "top 90%",
+          // Distancia fija de scroll en vez de "top 55%": ese end relativo
+          // al viewport nunca se cumple para los últimos bloques de la
+          // página — el documento se queda sin scroll antes de que el
+          // elemento suba tanto, y el texto quedaba desenfocado para
+          // siempre. Con "+=300" (300px de scroll desde el start) alcanza
+          // con que haya ese margen debajo, no con llegar a una posición
+          // absoluta del viewport.
+          end: "+=300",
+          scrub: true,
+        },
+      });
+      return () => {
+        tween.scrollTrigger?.kill();
+        tween.kill();
+      };
+    }
+
+    const chars = el.querySelectorAll<HTMLSpanElement>("[data-part]");
+    if (reduceMotion) {
+      gsap.set(chars, { opacity: 1, y: 0 });
+      return;
+    }
+
+    gsap.set(chars, { opacity: 0, y: 24 });
+    const trigger = ScrollTrigger.create({
+      trigger: el,
+      start: "top 85%",
+      once: true,
+      onEnter: () => {
+        gsap.to(chars, {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          delay: delay / 1000,
+          ease: "power3.out",
+          stagger: 0.02,
+        });
+      },
+    });
+    return () => trigger.kill();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe correr al montar (una revelación única, no en cada re-render por cambio de props)
+  }, []);
+
+  if (unit === "blur") {
+    return (
+      <Tag ref={ref as never} className={className}>
+        {plainText}
+      </Tag>
+    );
+  }
+
+  return (
+    <Tag ref={ref as never} className={className} aria-label={plainText}>
+      <span aria-hidden="true">
+        {segments.map((segment, si) =>
+          segment.text.split("").map((char, ci) =>
+            char === " " ? (
+              <span key={`${si}-${ci}`}> </span>
+            ) : (
+              <span
+                key={`${si}-${ci}`}
+                data-part
+                className={`inline-block will-change-transform ${segment.className ?? ""}`}
+              >
+                {char}
+              </span>
+            ),
+          ),
+        )}
+      </span>
+    </Tag>
+  );
+}
 
 const COLD_AUDIENCE_REELS = [
   "https://www.instagram.com/p/DZQH5FACKF4/",
@@ -102,62 +274,96 @@ export default function MoodboardPage() {
       <Topbar view="moodboard" planLabel={brandName} />
       <div className="h-px shrink-0 bg-line" />
 
-      <div className="flex-1 px-4 py-12 desktop:px-16 desktop:py-20">
+      {/* pb más generoso que el pt: el scrub de blur/opacidad de los últimos
+          párrafos necesita margen de scroll DESPUÉS de que entran en
+          pantalla (ver "+=300" en SplitReveal) — sin este colchón, el
+          documento se queda sin scroll antes de que la animación llegue a
+          completarse y el texto quedaba desenfocado para siempre. */}
+      <div className="flex-1 px-4 pt-12 pb-32 desktop:px-16 desktop:pt-20 desktop:pb-48">
         <div className="mx-auto max-w-6xl">
-          <h2 className="mb-12 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:mb-16 desktop:text-[44px]">
-            Tres niveles de <span className="font-bold">intervención</span>
-          </h2>
+          <SplitReveal
+            text={[{ text: "Tres niveles de " }, { text: "intervención", className: "font-bold" }]}
+            className="mb-12 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:mb-16 desktop:text-[44px]"
+          />
 
-          <div className="grid gap-10 desktop:grid-cols-3">
-            {LEVELS.map((level) => (
-              <div key={level.number} className="border-t border-line pt-6">
+          <div className="dim-group grid gap-10 desktop:grid-cols-3">
+            {LEVELS.map((level, i) => (
+              <Reveal key={level.number} delay={i * 90} className="dim-item border-t border-line pt-6">
                 <div className="mb-5 text-xs tracking-label text-tx-3">{level.number}</div>
                 <h3 className="mb-4 text-2xl font-bold text-brand-ink">{level.title}</h3>
-                <p className="mb-6 text-[15px] text-tx-2">{level.lead}</p>
-                <p className="text-[15px] leading-relaxed text-tx-2">{level.body}</p>
-              </div>
+                <SplitReveal as="p" unit="blur" text={level.lead} className="mb-6 text-[15px] text-tx-2" />
+                <SplitReveal
+                  as="p"
+                  unit="blur"
+                  text={level.body}
+                  className="text-[15px] leading-relaxed text-tx-2"
+                />
+              </Reveal>
             ))}
 
-            <div className="rounded-lg border border-brand-blue bg-panel-2 p-8 desktop:p-10">
+            <Reveal delay={180} className="dim-item rounded-lg border border-brand-blue bg-panel-2 p-8 desktop:p-10">
               <div className="mb-5 text-xs tracking-label text-brand-blue">03</div>
               <h3 className="mb-4 text-2xl font-bold text-brand-ink">Ads</h3>
-              <p className="mb-8 text-[15px] text-tx-2">Nuevo enfoque, nuevas audiencias.</p>
-              <p className="mb-8 text-[15px] leading-relaxed font-semibold text-brand-ink">
-                Nueva segmentación de audiencias por intereses gastronómicos premium.
-              </p>
-              <p className="mb-8 text-[15px] leading-relaxed text-tx-2">
-                Análisis con IA y medición de métricas nuevas a 60 días.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                Audiencias personalizadas y similares (lookalike) para segmentar por zona donde vive el nuevo
-                cliente objetivo de la marca.
-              </p>
-            </div>
+              <SplitReveal
+                as="p"
+                unit="blur"
+                text="Nuevo enfoque, nuevas audiencias."
+                className="mb-8 text-[15px] text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                text="Nueva segmentación de audiencias por intereses gastronómicos premium."
+                className="mb-8 text-[15px] leading-relaxed font-semibold text-brand-ink"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                text="Análisis con IA y medición de métricas nuevas a 60 días."
+                className="mb-8 text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                text="Audiencias personalizadas y similares (lookalike) para segmentar por zona donde vive el nuevo cliente objetivo de la marca."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+            </Reveal>
           </div>
 
           <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
-            <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
-              Captación de público frío.
-            </h2>
+            <SplitReveal
+              text="Captación de público frío."
+              className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]"
+            />
             <div className="mb-12 flex max-w-3xl flex-col gap-4 desktop:mb-16">
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                La pauta de esta etapa llega solo a personas que nunca han visto la marca. Excluimos a
-                quienes ya siguen la cuenta o interactuaron con ella, para que cada peso invertido trabaje
-                hacia adentro, no hacia quien ya sabe que Palacio Gung existe.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                El creativo es un reel de proceso. No el plato terminado — el proceso. Manos, texturas, el
-                momento antes del emplatado. Eso es lo que diferencia a Palacio Gung de cualquier
-                restaurante que publica foto de producto y llama a eso contenido.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                La segmentación se concentra en zonas de Santo Domingo con perfil medio-alto. No por
-                alcance, sino por afinidad con la propuesta.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                El objetivo de esta etapa no es reserva ni pedido. Es interacción. Cada reacción,
-                comentario o guardado construye la audiencia que activa la siguiente fase.
-              </p>
+              <SplitReveal
+                as="p"
+                unit="blur"
+                text="La pauta de esta etapa llega solo a personas que nunca han visto la marca. Excluimos a quienes ya siguen la cuenta o interactuaron con ella, para que cada peso invertido trabaje hacia adentro, no hacia quien ya sabe que Palacio Gung existe."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                delay={80}
+                text="El creativo es un reel de proceso. No el plato terminado — el proceso. Manos, texturas, el momento antes del emplatado. Eso es lo que diferencia a Palacio Gung de cualquier restaurante que publica foto de producto y llama a eso contenido."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                delay={160}
+                text="La segmentación se concentra en zonas de Santo Domingo con perfil medio-alto. No por alcance, sino por afinidad con la propuesta."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                delay={240}
+                text="El objetivo de esta etapa no es reserva ni pedido. Es interacción. Cada reacción, comentario o guardado construye la audiencia que activa la siguiente fase."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
             </div>
 
             {/* iframe directo a /embed en vez del widget embed.js: ese
@@ -170,9 +376,10 @@ export default function MoodboardPage() {
                 like/comentar) sigue siendo el de Instagram — no se puede
                 re-tematizar, vive en un documento cross-origin. */}
             <div className="grid gap-6 desktop:grid-cols-3">
-              {COLD_AUDIENCE_REELS.map((url) => (
-                <div
+              {COLD_AUDIENCE_REELS.map((url, i) => (
+                <Reveal
                   key={url}
+                  delay={i * 90}
                   className="mx-[10%] aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2 desktop:mx-0"
                 >
                   <iframe
@@ -184,20 +391,22 @@ export default function MoodboardPage() {
                     scrolling="no"
                     title="Reel de Instagram"
                   />
-                </div>
+                </Reveal>
               ))}
             </div>
           </div>
 
           <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
-            <h2 className="mb-12 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:mb-16 desktop:text-[36px]">
-              Reels visuales ASMR, con narrativa.
-            </h2>
+            <SplitReveal
+              text="Reels visuales ASMR, con narrativa."
+              className="mb-12 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:mb-16 desktop:text-[36px]"
+            />
 
             <div className="grid gap-6 desktop:grid-cols-3">
-              {ASMR_REELS.map((url) => (
-                <div
+              {ASMR_REELS.map((url, i) => (
+                <Reveal
                   key={url}
+                  delay={i * 90}
                   className="mx-[10%] aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2 desktop:mx-0"
                 >
                   <iframe
@@ -209,44 +418,54 @@ export default function MoodboardPage() {
                     scrolling="no"
                     title="Reel de Instagram"
                   />
-                </div>
+                </Reveal>
               ))}
             </div>
           </div>
 
           <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
-            <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
-              Activación por perfil de cliente
-            </h2>
+            <SplitReveal
+              text="Activación por perfil de cliente"
+              className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]"
+            />
             <div className="mb-12 flex max-w-3xl flex-col gap-4 desktop:mb-16">
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                Quien llega aquí ya sabe que Palacio Gung existe. No hay que presentar el restaurante ni
-                explicar qué es la comida coreana. Esta etapa hace otra cosa: toma ese conocimiento y lo
-                ancla a un momento concreto.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                La cocina coreana tradicional no se improvisa. Tiene proceso, tiene técnica, tiene una
-                cultura detrás que no se puede fingir. Eso es exactamente lo que convierte cada ocasión en
-                un argumento — no una promesa de marketing, sino algo que quien ya vio el contenido puede
-                reconocer como real.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                La pauta llega a dos grupos: quienes ya interactuaron con la cuenta, y audiencias similares
-                construidas desde ese comportamiento. Historias. Mensaje directo. Sin introducción, porque
-                la audiencia no la necesita.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                Tres ocasiones distintas. Una sola cocina que las sostiene a todas.
-              </p>
+              <SplitReveal
+                as="p"
+                unit="blur"
+                text="Quien llega aquí ya sabe que Palacio Gung existe. No hay que presentar el restaurante ni explicar qué es la comida coreana. Esta etapa hace otra cosa: toma ese conocimiento y lo ancla a un momento concreto."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                delay={80}
+                text="La cocina coreana tradicional no se improvisa. Tiene proceso, tiene técnica, tiene una cultura detrás que no se puede fingir. Eso es exactamente lo que convierte cada ocasión en un argumento — no una promesa de marketing, sino algo que quien ya vio el contenido puede reconocer como real."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                delay={160}
+                text="La pauta llega a dos grupos: quienes ya interactuaron con la cuenta, y audiencias similares construidas desde ese comportamiento. Historias. Mensaje directo. Sin introducción, porque la audiencia no la necesita."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                delay={240}
+                text="Tres ocasiones distintas. Una sola cocina que las sostiene a todas."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
             </div>
 
             {/* Solo dos ítems — se limita el ancho de la grilla (en vez de
                 estirarla a max-w-6xl) para que las tarjetas mantengan el
                 mismo tamaño que las de 3 columnas de arriba, no el doble. */}
             <div className="grid max-w-[760px] gap-6 desktop:grid-cols-2">
-              {GASTRONOMIC_PROPOSAL_CAROUSELS.map((url) => (
-                <div
+              {GASTRONOMIC_PROPOSAL_CAROUSELS.map((url, i) => (
+                <Reveal
                   key={url}
+                  delay={i * 90}
                   className="mx-[10%] aspect-[9/16] overflow-hidden rounded-lg border border-line-2 bg-panel-2 desktop:mx-0"
                 >
                   <iframe
@@ -258,80 +477,111 @@ export default function MoodboardPage() {
                     scrolling="no"
                     title="Carrusel de Instagram"
                   />
-                </div>
+                </Reveal>
               ))}
             </div>
 
-            <div className="mt-12 grid gap-10 desktop:mt-16 desktop:grid-cols-3">
-              {OCCASIONS.map((occasion) => (
-                <div key={occasion.title} className="border-t border-line pt-6">
+            <div className="dim-group mt-12 grid gap-10 desktop:mt-16 desktop:grid-cols-3">
+              {OCCASIONS.map((occasion, i) => (
+                <Reveal key={occasion.title} delay={i * 90} className="dim-item border-t border-line pt-6">
                   <h3 className="mb-4 text-2xl font-bold text-brand-ink">{occasion.title}</h3>
-                  <p className="text-[15px] leading-relaxed text-tx-2">{occasion.body}</p>
-                </div>
+                  <SplitReveal
+                    as="p"
+                    unit="blur"
+                    text={occasion.body}
+                    className="text-[15px] leading-relaxed text-tx-2"
+                  />
+                </Reveal>
               ))}
             </div>
           </div>
 
           <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
-            <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
-              Cierre del embudo
-            </h2>
+            <SplitReveal
+              text="Cierre del embudo"
+              className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]"
+            />
             <div className="flex max-w-3xl flex-col gap-4">
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                Un embudo no termina en la conversión. Termina cuando la persona que fue a comer vuelve a
-                ser una oportunidad.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                Quien llegó por un reel, reservó por una historia y vivió la experiencia, ahora tiene un
-                criterio formado sobre Palacio Gung. Sabe lo que hay detrás de cada plato. Conoce la
-                cocina. Esa persona no necesita ser convencida de nuevo — necesita una razón distinta para
-                volver. Y esa razón la genera el siguiente ciclo del embudo.
-              </p>
-              <p className="text-[15px] leading-relaxed text-tx-2">
-                El contenido que se produce cada mes no acumula solo seguidores. Acumula contexto. Cada
-                pieza nueva llega a una audiencia que ya tiene una capa de conocimiento sobre la marca, y
-                eso hace que cada conversión siguiente sea más barata y más rápida que la anterior. Así
-                funciona un embudo bien ejecutado: no como campaña, sino como sistema.
-              </p>
+              <SplitReveal
+                as="p"
+                unit="blur"
+                text="Un embudo no termina en la conversión. Termina cuando la persona que fue a comer vuelve a ser una oportunidad."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                delay={80}
+                text="Quien llegó por un reel, reservó por una historia y vivió la experiencia, ahora tiene un criterio formado sobre Palacio Gung. Sabe lo que hay detrás de cada plato. Conoce la cocina. Esa persona no necesita ser convencida de nuevo — necesita una razón distinta para volver. Y esa razón la genera el siguiente ciclo del embudo."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
+              <SplitReveal
+                as="p"
+                unit="blur"
+                delay={160}
+                text="El contenido que se produce cada mes no acumula solo seguidores. Acumula contexto. Cada pieza nueva llega a una audiencia que ya tiene una capa de conocimiento sobre la marca, y eso hace que cada conversión siguiente sea más barata y más rápida que la anterior. Así funciona un embudo bien ejecutado: no como campaña, sino como sistema."
+                className="text-[15px] leading-relaxed text-tx-2"
+              />
             </div>
           </div>
 
           <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
-            <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
-              Métricas de revisión a 60 días
-            </h2>
-            <p className="mb-12 text-[15px] leading-relaxed text-tx-2 desktop:mb-16">Tres números. No más.</p>
+            <SplitReveal
+              text="Métricas de revisión a 60 días"
+              className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]"
+            />
+            <SplitReveal
+              as="p"
+              unit="blur"
+              text="Tres números. No más."
+              className="mb-12 text-[15px] leading-relaxed text-tx-2 desktop:mb-16"
+            />
 
-            <div className="grid gap-10 desktop:grid-cols-3">
-              {METRICS.map((metric) => (
-                <div key={metric.label} className="border-t border-line pt-6">
+            <div className="dim-group grid gap-10 desktop:grid-cols-3">
+              {METRICS.map((metric, i) => (
+                <Reveal key={metric.label} delay={i * 90} className="dim-item border-t border-line pt-6">
                   <h3 className="mb-4 text-2xl font-bold text-brand-ink">{metric.label}</h3>
-                  <p className="text-[15px] leading-relaxed text-tx-2">{metric.body}</p>
-                </div>
+                  <SplitReveal
+                    as="p"
+                    unit="blur"
+                    text={metric.body}
+                    className="text-[15px] leading-relaxed text-tx-2"
+                  />
+                </Reveal>
               ))}
             </div>
 
-            <p className="mt-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mt-16">
-              Estos tres números son la base de la reunión de los 60 días. No para justificar el trabajo —
-              para decidir qué ajustar y en qué dirección.
-            </p>
+            <SplitReveal
+              as="p"
+              unit="blur"
+              text="Estos tres números son la base de la reunión de los 60 días. No para justificar el trabajo — para decidir qué ajustar y en qué dirección."
+              className="mt-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mt-16"
+            />
           </div>
 
           <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
-            <h2 className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]">
-              Planificación de publicaciones
-            </h2>
-            <p className="mb-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mb-16">
-              La cadencia mensual está diseñada para sostener el embudo sin saturar la cuenta. Cada
-              formato tiene un rol definido — no se publica por volumen, se publica por intención.
-            </p>
+            <SplitReveal
+              text="Planificación de publicaciones"
+              className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]"
+            />
+            <SplitReveal
+              as="p"
+              unit="blur"
+              text="La cadencia mensual está diseñada para sostener el embudo sin saturar la cuenta. Cada formato tiene un rol definido — no se publica por volumen, se publica por intención."
+              className="mb-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mb-16"
+            />
 
-            <div className="grid gap-10 desktop:grid-cols-3">
-              {PUBLICATION_PLAN.map((item) => (
-                <div key={item.title} className="border-t border-line pt-6">
+            <div className="dim-group grid gap-10 desktop:grid-cols-3">
+              {PUBLICATION_PLAN.map((item, i) => (
+                <Reveal key={item.title} delay={i * 90} className="dim-item border-t border-line pt-6">
                   <h3 className="mb-4 text-2xl font-bold text-brand-ink">{item.title}</h3>
-                  <p className="text-[15px] leading-relaxed text-tx-2">{item.body}</p>
-                </div>
+                  <SplitReveal
+                    as="p"
+                    unit="blur"
+                    text={item.body}
+                    className="text-[15px] leading-relaxed text-tx-2"
+                  />
+                </Reveal>
               ))}
             </div>
           </div>
