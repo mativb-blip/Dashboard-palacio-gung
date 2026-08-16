@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { makeFileId, uploadBlob } from "@/components/dashboard/ArtUploadZone";
+import { isHeic, toDisplayableFile } from "@/lib/dashboard/media-file";
 import { sanitizeRichText, type TextAlign } from "@/lib/dashboard/rich-text";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import {
@@ -1805,49 +1806,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-/** HEIC/HEIF: el formato con el que la cámara del iPhone guarda las fotos por
- * defecto. El archivo es una foto perfectamente válida, pero Chrome, Firefox
- * y Edge no lo saben decodificar, así que un `<img>` con ese blob queda en
- * blanco para siempre. */
-const HEIC_EXTENSION = /\.(heic|heif)$/i;
-
-function isHeic(file: File): boolean {
-  // Algunos navegadores mandan el tipo vacío para HEIC: por eso también el nombre.
-  return /image\/hei[cf]/i.test(file.type) || HEIC_EXTENSION.test(file.name);
-}
-
-/** Pasa a JPEG lo que el navegador pueda decodificar pero no mostrar.
- *
- * Safari —también el del iPhone— sí decodifica HEIC, así que una foto subida
- * desde el teléfono se convierte ahí mismo y después se ve en cualquier lado.
- * Si el navegador tampoco puede decodificarla, se avisa en vez de guardar un
- * archivo que nunca se va a ver. */
-async function toDisplayableFile(file: File): Promise<File> {
-  if (!isHeic(file)) return file;
-
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    throw new Error(
-      `"${file.name}" está en formato HEIC y este navegador no puede abrirlo. Subila desde el iPhone, o cambiá Ajustes → Cámara → Formatos → "Más compatible".`,
-    );
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
-  bitmap.close();
-
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.92),
-  );
-  if (!blob) throw new Error(`No se pudo convertir "${file.name}" a un formato visible.`);
-
-  return new File([blob], file.name.replace(HEIC_EXTENSION, ".jpg"), { type: "image/jpeg" });
 }
 
 /** ¿Es una URL http(s) suelta? Solo entonces vale la pena crear una tarjeta

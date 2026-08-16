@@ -2,6 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import { useCallback, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import { isSupportedMedia, toDisplayableFile } from "@/lib/dashboard/media-file";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 
 export interface UploadedFile {
@@ -155,9 +156,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
   }
 
   async function addFiles(incoming: File[] | FileList) {
-    const valid = Array.from(incoming).filter((f) =>
-      isImage ? f.type.startsWith("image/") : f.type.startsWith("video/"),
-    );
+    const valid = Array.from(incoming).filter((f) => isSupportedMedia(f, isImage ? "image" : "video"));
     if (!valid.length) return;
 
     const oversized = valid.find((f) => f.size > MAX_FILE_SIZE_BYTES);
@@ -185,16 +184,20 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
         try {
+          // Un HEIC del iPhone se convierte a JPEG antes de subir: el archivo
+          // original sube bien pero después no se ve en ningún navegador que
+          // no sea Safari (ver media-file.ts).
+          const usable = await toDisplayableFile(file);
           const url = await uploadFileToBlob(
             proposalId,
-            file,
+            usable,
             (percentage) => patchStatus(statusId, { progress: Math.round(percentage) }),
             controller.signal,
           );
           patchStatus(statusId, { stage: "verificando", progress: 100 });
           const warning = await verifyUploadedBlob(url);
           patchStatus(statusId, { stage: "listo", message: warning ?? undefined });
-          return { id: makeFileId(), url, name: file.name };
+          return { id: makeFileId(), url, name: usable.name };
         } catch (e) {
           const message = controller.signal.aborted
             ? `"${file.name}" tardó más de 3 minutos y se canceló la subida. Probá de nuevo.`
@@ -301,7 +304,10 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
         <input
           ref={inputRef}
           type="file"
-          accept={accept}
+          // Las extensiones aparte de `image/*`: en algunos sistemas el
+          // selector no reconoce el HEIC del iPhone por tipo MIME y lo
+          // muestra deshabilitado.
+          accept={isImage ? `${accept},.heic,.heif` : accept}
           multiple={multiple}
           className="hidden"
           onChange={(e) => e.target.files && void addFiles(e.target.files)}
