@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { useBrand } from "@/lib/dashboard/BrandContext";
@@ -68,11 +68,25 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
       password,
       redirect: false,
     });
-    setLoading(false);
     if (result?.error) {
+      setLoading(false);
       setError("Email o contraseña incorrectos.");
       return;
     }
+
+    // La contraseña era correcta, pero eso no garantiza que la cookie de
+    // sesión haya quedado guardada: si el navegador bloquea cookies, navegar
+    // a la app solo rebota de vuelta acá, una y otra vez, sin decir por qué
+    // (pasó en un iPad). Se confirma antes de irse, y si no está se explica.
+    const session = await getSession();
+    setLoading(false);
+    if (!session) {
+      setError(
+        "Tu usuario y contraseña son correctos, pero el navegador no guardó la sesión. Si estás en iPhone o iPad: Ajustes → Safari → desactivá «Bloquear todas las cookies», y volvé a probar. En modo de navegación privada tampoco se guarda.",
+      );
+      return;
+    }
+
     window.location.href = redirectTarget;
   }
 
