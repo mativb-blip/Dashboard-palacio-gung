@@ -147,7 +147,10 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
   const archived = sessions.filter((s) => s.archived);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] font-sans text-brand-ink">
+    // dvh y no vh: en mobile la barra de direcciones del navegador se
+    // superpone al final de la ventana, y con 100vh las barras flotantes del
+    // canvas quedaban debajo de ella, inalcanzables.
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg)] font-sans text-brand-ink">
       <div className="flex h-[3px] w-full shrink-0">
         <span className="w-16 bg-brand-red" />
         <span className="flex-1 bg-brand-blue" />

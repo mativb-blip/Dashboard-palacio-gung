@@ -10,6 +10,7 @@ import {
   DEFAULT_NOTE_SIZE,
   DEFAULT_PANEL_SIZE,
   detectEmbedProvider,
+  fitMediaSize,
   isTextElement,
   MIN_ELEMENT_SIZE,
   type MoodboardElement,
@@ -77,6 +78,9 @@ type Interaction =
       start: Geometry;
       live: Geometry;
       handle?: ResizeHandle;
+      /** Solo resize: el elemento tiene una proporción propia que respetar
+       * (imagen o video). Shift la libera. */
+      lockAspect?: boolean;
       /** Solo rotate: ángulo del puntero respecto del centro al empezar. */
       grabAngle?: number;
       moved: boolean;
@@ -184,6 +188,19 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
   const pointerCanvasRef = useRef({ x: 200, y: 160 });
   /** Temporizador del "mantener apretado" y el punto donde arrancó. */
   const longPressRef = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  /** Dedos apoyados sobre el lienzo. Hace falta llevar la cuenta para
+   * distinguir un arrastre (uno) de un pellizco (dos): los eventos de puntero
+   * llegan de a uno y no traen a los hermanos. */
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  /** Estado del pellizco en curso — todo se mide contra el instante en que
+   * apoyó el segundo dedo, así el zoom no acumula error cuadro a cuadro. */
+  const pinchRef = useRef<{
+    startDist: number;
+    startScale: number;
+    startView: { x: number; y: number };
+    startMid: { x: number; y: number };
+    rect: { left: number; top: number };
+  } | null>(null);
   /** Respaldo del portapapeles del sistema: si el navegador no deja leer o
    * escribir el clipboard (permisos), copiar/pegar sigue andando en la
    * pestaña. */
@@ -311,6 +328,35 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
     [session.id, selectOnly],
   );
 
+  /** Mide el archivo antes de subirlo para poder crear el elemento con la
+   * proporción real. Si no se puede leer (formato raro, video sin metadatos),
+   * cae al tamaño por defecto en vez de fallar la inserción. */
+  const measureMedia = useCallback(async (file: File) => {
+    if (file.type.startsWith("image/")) {
+      try {
+        const bitmap = await createImageBitmap(file);
+        const size = fitMediaSize(bitmap.width, bitmap.height);
+        bitmap.close();
+        return size;
+      } catch {
+        return { ...DEFAULT_ELEMENT_SIZE };
+      }
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      return await new Promise<{ width: number; height: number }>((resolve) => {
+        const probe = document.createElement("video");
+        probe.preload = "metadata";
+        probe.onloadedmetadata = () => resolve(fitMediaSize(probe.videoWidth, probe.videoHeight));
+        probe.onerror = () => resolve({ ...DEFAULT_ELEMENT_SIZE });
+        probe.src = objectUrl;
+      });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }, []);
+
   const uploadAndAdd = useCallback(
     async (files: File[], at: { x: number; y: number }) => {
       const media = files.filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
@@ -324,17 +370,22 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
           const chipId = makeFileId();
           setUploads((prev) => [...prev, { id: chipId, name: file.name, progress: 0 }]);
           try {
-            const url = await uploadBlob(`moodboard/${session.id}`, file, (percentage) =>
-              setUploads((prev) =>
-                prev.map((u) => (u.id === chipId ? { ...u, progress: Math.round(percentage) } : u)),
+            // Se mide en paralelo con la subida: son independientes y así no
+            // se suma la espera de una a la de la otra.
+            const [url, size] = await Promise.all([
+              uploadBlob(`moodboard/${session.id}`, file, (percentage) =>
+                setUploads((prev) =>
+                  prev.map((u) => (u.id === chipId ? { ...u, progress: Math.round(percentage) } : u)),
+                ),
               ),
-            );
+              measureMedia(file),
+            ]);
             await addElement({
               type: file.type.startsWith("video/") ? "video" : "image",
               x: at.x + index * 28,
               y: at.y + index * 28,
-              width: DEFAULT_ELEMENT_SIZE.width,
-              height: DEFAULT_ELEMENT_SIZE.height,
+              width: size.width,
+              height: size.height,
               url,
               filename: file.name,
             });
@@ -347,7 +398,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         }),
       );
     },
-    [addElement, session.id],
+    [addElement, measureMedia, session.id],
   );
 
   /** Vuelca elementos copiados al tablero, conservando su disposición
@@ -645,8 +696,76 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
     }
   }, [queuePatch]);
 
+  /** Deja el elemento como estaba y suelta la interacción sin guardar nada.
+   * Se usa cuando apoya un segundo dedo: ese gesto pasó a ser un pellizco, y
+   * el arrastre que había empezado con el primer dedo no debe quedar. */
+  const abortInteraction = useCallback(() => {
+    const it = interactionRef.current;
+    interactionRef.current = null;
+    if (!it || it.kind === "pan") return;
+    if (it.kind === "move") {
+      for (const target of it.targets) paint(target.node, target.start);
+    } else {
+      paint(it.node, it.start);
+    }
+  }, []);
+
   useEffect(() => {
+    /** Solo interesan los dedos que apoyaron sobre el lienzo. Va en fase de
+     * captura sobre `window` para verlos todos: los que caen sobre un
+     * elemento cortan la propagación del evento de React. */
+    function onDown(e: PointerEvent) {
+      const node = viewportRef.current;
+      if (!node || !(e.target instanceof Node) || !node.contains(e.target)) return;
+      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (pointersRef.current.size === 2) {
+        cancelLongPress();
+        abortInteraction();
+        const [a, b] = [...pointersRef.current.values()];
+        const rect = node.getBoundingClientRect();
+        pinchRef.current = {
+          startDist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
+          startScale: viewRef.current.scale,
+          startView: { x: viewRef.current.x, y: viewRef.current.y },
+          startMid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+          rect: { left: rect.left, top: rect.top },
+        };
+      }
+    }
+
     function onMove(e: PointerEvent) {
+      if (pointersRef.current.has(e.pointerId)) {
+        pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      }
+
+      // Pellizco: el punto del tablero que estaba bajo el centro de los dos
+      // dedos tiene que seguir ahí, y la separación entre ellos manda la
+      // escala. Mover los dos dedos juntos desplaza (el centro se corre), así
+      // que el gesto sirve para acercar y para navegar a la vez.
+      const pinch = pinchRef.current;
+      if (pinch) {
+        const points = [...pointersRef.current.values()];
+        if (points.length < 2) return;
+        const [a, b] = points;
+        const distance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const nextScale = clamp(
+          (pinch.startScale * distance) / pinch.startDist,
+          MIN_SCALE,
+          MAX_SCALE,
+        );
+        const anchorX = (pinch.startMid.x - pinch.rect.left - pinch.startView.x) / pinch.startScale;
+        const anchorY = (pinch.startMid.y - pinch.rect.top - pinch.startView.y) / pinch.startScale;
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        setView({
+          scale: nextScale,
+          x: midX - pinch.rect.left - anchorX * nextScale,
+          y: midY - pinch.rect.top - anchorY * nextScale,
+        });
+        return;
+      }
+
       const it = interactionRef.current;
       const v = viewRef.current;
 
@@ -691,7 +810,12 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       }
 
       if (it.kind === "resize" && it.handle) {
-        it.live = applyResize(it.start, it.handle, dx, dy, e.shiftKey);
+        // Imagen y video conservan su proporción al agarrar una esquina —
+        // se insertan con la del archivo y no tiene sentido deformarlos sin
+        // querer. Shift invierte la regla, y las asas de los bordes siguen
+        // siendo libres (ahí el recorte es deliberado).
+        const keepRatio = it.lockAspect ? !e.shiftKey : e.shiftKey;
+        it.live = applyResize(it.start, it.handle, dx, dy, keepRatio);
       } else if (it.kind === "rotate") {
         const center = centerOf(it.start);
         const rectNow = viewportRef.current?.getBoundingClientRect();
@@ -709,20 +833,47 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       paint(it.node, it.live);
     }
 
-    function onUp() {
+    function onUp(e: PointerEvent) {
+      pointersRef.current.delete(e.pointerId);
       cancelLongPress();
+
+      if (pinchRef.current) {
+        // Mientras dure el pellizco no hay nada que guardar: el gesto movió
+        // la vista, no los elementos.
+        if (pointersRef.current.size >= 2) return;
+        pinchRef.current = null;
+
+        // Si queda un dedo apoyado, el gesto sigue como desplazamiento desde
+        // donde está ahora — sin esto el lienzo se queda clavado hasta
+        // levantar y volver a tocar.
+        const [remaining] = [...pointersRef.current.values()];
+        if (remaining) {
+          interactionRef.current = {
+            kind: "pan",
+            pointerX: remaining.x,
+            pointerY: remaining.y,
+            viewX: viewRef.current.x,
+            viewY: viewRef.current.y,
+            moved: true, // vino de un pellizco: no es un toque para deseleccionar
+          };
+        }
+        return;
+      }
+
       endInteraction();
     }
 
+    window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     return () => {
+      window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [endInteraction, cancelLongPress]);
+  }, [endInteraction, cancelLongPress, abortInteraction]);
 
   function geometryOf(element: MoodboardElement): Geometry {
     return {
@@ -796,6 +947,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         start,
         live: start,
         handle,
+        lockAspect: element.type === "image" || element.type === "video",
         grabAngle,
         moved: false,
       };
@@ -1327,9 +1479,12 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         )}
       </div>
 
-      {/* Zoom */}
+      {/* Zoom. `safe-area-inset-bottom` deja libre la franja del indicador de
+          inicio del teléfono; el alto de la ventana ya descuenta la barra del
+          navegador (ver el 100dvh de MoodboardWorkspace). */}
       <div
-        className={`absolute right-3 bottom-3 z-20 flex items-center gap-1 rounded border border-line-2 bg-[var(--bg)]/90 p-1 backdrop-blur ${
+        style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+        className={`absolute right-3 z-20 flex items-center gap-1 rounded border border-line-2 bg-[var(--bg)]/90 p-1 backdrop-blur ${
           capturing ? "hidden" : ""
         }`}
       >
@@ -1340,7 +1495,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
           type="button"
           onClick={() => setView((v) => ({ ...v, scale: 1 }))}
           title="Zoom 100%"
-          className="min-w-[46px] px-1 text-[11px] font-bold tabular-nums text-tx-2 hover:text-brand-blue"
+          className="min-w-[42px] px-1 text-[11px] font-bold tabular-nums text-tx-2 hover:text-brand-blue"
         >
           {Math.round(view.scale * 100)}%
         </button>
@@ -1352,25 +1507,31 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
           type="button"
           onClick={fitToContent}
           title="Ajustar a contenido"
-          className="px-1.5 text-[10px] font-bold tracking-label text-tx-2 uppercase hover:text-brand-blue"
+          aria-label="Ajustar a contenido"
+          className="flex items-center px-1.5 text-[10px] font-bold tracking-label text-tx-2 uppercase hover:text-brand-blue"
         >
-          Ajustar
+          <FitIcon />
+          <span className="hidden desktop:inline">Ajustar</span>
         </button>
         <span className="mx-0.5 h-4 w-px bg-line" />
         <button
           type="button"
           onClick={() => setExportStep({ step: "setup" })}
           title="Exportar como imagen"
+          aria-label="Exportar como imagen"
           disabled={elements.length === 0}
           className="flex items-center gap-1 px-1.5 text-[10px] font-bold tracking-label text-tx-2 uppercase hover:text-brand-blue disabled:cursor-default disabled:opacity-40 disabled:hover:text-tx-2"
         >
           <ExportIcon />
-          Exportar
+          <span className="hidden desktop:inline">Exportar</span>
         </button>
       </div>
 
       {uploads.length > 0 && !capturing && (
-        <ul className="absolute bottom-3 left-3 z-20 flex w-[260px] flex-col gap-1">
+        <ul
+          style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+          className="absolute left-3 z-20 flex w-[min(260px,calc(100vw-6rem))] flex-col gap-1"
+        >
           {uploads.map((u) => (
             <li key={u.id} className="rounded border border-line-2 bg-[var(--bg)]/95 px-2 py-1.5 backdrop-blur">
               <div className="flex items-center gap-2 text-[11px] text-tx-3">
@@ -1658,14 +1819,17 @@ function ToolButton({
       onPointerDown={(e) => e.stopPropagation()}
       onClick={onClick}
       title={label}
-      className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[10px] font-bold tracking-label uppercase backdrop-blur transition-colors duration-[400ms] ${PRESS_SCALE_CLASS} ${
+      aria-label={label}
+      className={`flex h-[30px] items-center justify-center gap-1.5 rounded border px-2 text-[10px] font-bold tracking-label uppercase backdrop-blur transition-colors duration-[400ms] desktop:px-2.5 ${PRESS_SCALE_CLASS} ${
         active
           ? "border-brand-blue bg-brand-blue text-[var(--bg)]"
           : "border-line-2 bg-[var(--bg)]/90 text-tx-2 hover:border-brand-blue hover:text-brand-blue"
       }`}
     >
       {children}
-      {label}
+      {/* En mobile la fila entera no entra con las etiquetas: quedan solo los
+          íconos (el nombre sigue disponible en `title`/`aria-label`). */}
+      <span className="hidden desktop:inline">{label}</span>
     </button>
   );
 }
@@ -1711,7 +1875,10 @@ function ExportFrameOverlay({
           hoja vertical el borde inferior cae fuera de la pantalla y la barra
           quedaba cortada. El hueco de la derecha es para el control de zoom,
           que hay que poder usar justamente ahora. */}
-      <div className="pointer-events-auto absolute bottom-3 left-3 flex max-w-[min(560px,calc(100%-260px))] flex-wrap items-center gap-2 rounded border border-line-2 bg-[var(--bg)] px-2.5 py-2 shadow-lg">
+      <div
+        style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+        className="pointer-events-auto absolute left-3 flex max-w-[min(560px,calc(100%-1.5rem))] flex-wrap items-center gap-2 rounded border border-line-2 bg-[var(--bg)] px-2.5 py-2 shadow-lg desktop:max-w-[min(560px,calc(100%-260px))]"
+      >
         <span className="text-[11px] leading-snug text-tx-3">
           Movés y hacés zoom en el tablero para encuadrar. Lo que quede adentro del rojo se exporta —
           con los reels incluidos, porque sale de una captura de pantalla.
@@ -1867,6 +2034,18 @@ function LinkIcon() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
       <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+    </svg>
+  );
+}
+
+/** Flechas hacia las cuatro esquinas — "encajar el contenido en la vista". */
+function FitIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9V4h5" />
+      <path d="M20 9V4h-5" />
+      <path d="M4 15v5h5" />
+      <path d="M20 15v5h-5" />
     </svg>
   );
 }

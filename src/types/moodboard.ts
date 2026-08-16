@@ -69,6 +69,22 @@ export interface MoodboardElementPatch {
 
 /** Tamaño por defecto de un elemento nuevo, en unidades de canvas. */
 export const DEFAULT_ELEMENT_SIZE = { width: 300, height: 300 };
+
+/** Lado más largo que puede tener una imagen o un video recién insertado.
+ * El otro lado sale de la proporción real del archivo — nada entra deformado
+ * ni recortado a un cuadrado. */
+export const MEDIA_MAX_SIDE = 340;
+
+/** Encaja un tamaño real dentro de MEDIA_MAX_SIDE conservando la proporción.
+ * Nunca agranda: un archivo chico entra a su tamaño natural. */
+export function fitMediaSize(naturalWidth: number, naturalHeight: number) {
+  if (!naturalWidth || !naturalHeight) return { ...DEFAULT_ELEMENT_SIZE };
+  const scale = Math.min(1, MEDIA_MAX_SIDE / Math.max(naturalWidth, naturalHeight));
+  return {
+    width: Math.max(MIN_ELEMENT_SIZE, Math.round(naturalWidth * scale)),
+    height: Math.max(MIN_ELEMENT_SIZE, Math.round(naturalHeight * scale)),
+  };
+}
 export const DEFAULT_NOTE_SIZE = { width: 240, height: 180 };
 export const DEFAULT_PANEL_SIZE = { width: 380, height: 260 };
 export const DEFAULT_EMBED_SIZE = { width: 260, height: 420 };
