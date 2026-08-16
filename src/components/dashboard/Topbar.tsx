@@ -18,9 +18,9 @@ const COMPACT_NAV_QUERY = "(min-width: 640px)";
 
 /** "calendario" cuando el Topbar se muestra en /calendario — ahí Post/Feed
  * navegan de vuelta al panel (`/?period=...`) en lugar de alternar in-place.
- * "moodboard" cuando se muestra en /moodboard, página propia sin relación
+ * "estrategia" cuando se muestra en /estrategia, página propia sin relación
  * con proposals/período. */
-type TopbarView = "month" | "grid" | "calendario" | "moodboard";
+type TopbarView = "month" | "grid" | "calendario" | "estrategia";
 
 interface TopbarProps {
   view: TopbarView;
@@ -60,29 +60,29 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
   // Misma fuente de datos para el SegmentedGroup de desktop y la lista
   // apilada de mobile — se calcula una sola vez, no se duplica la lógica de
   // ruteo (href vs. onClick) en dos lugares distintos.
-  const moodboardItem: SegmentedItem = {
-    key: "moodboard",
-    label: "Moodboard",
-    active: view === "moodboard",
-    href: view === "moodboard" ? undefined : "/moodboard",
+  const estrategiaItem: SegmentedItem = {
+    key: "estrategia",
+    label: "Estrategia",
+    active: view === "estrategia",
+    href: view === "estrategia" ? undefined : "/estrategia",
   };
   const items: SegmentedItem[] =
     view === "calendario"
       ? [
-          moodboardItem,
+          estrategiaItem,
           { key: "calendario", label: "Calendario", active: true },
           { key: "month", label: "Post", active: false, href: "/?period=month" },
           { key: "grid", label: "Feed", active: false, href: "/?period=grid" },
         ]
-      : view === "moodboard"
+      : view === "estrategia"
         ? [
-            moodboardItem,
+            estrategiaItem,
             { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
             { key: "month", label: "Post", active: false, href: "/?period=month" },
             { key: "grid", label: "Feed", active: false, href: "/?period=grid" },
           ]
         : [
-            moodboardItem,
+            estrategiaItem,
             { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
             { key: "month", label: "Post", active: view === "month", onClick: () => onPeriodChange?.("month") },
             { key: "grid", label: "Feed", active: view === "grid", onClick: () => onPeriodChange?.("grid") },
@@ -277,8 +277,8 @@ function CompactNav({ items }: { items: SegmentedItem[] }) {
 
 function NavIcon({ itemKey, className }: { itemKey: string; className?: string }) {
   switch (itemKey) {
-    case "moodboard":
-      return <MoodboardIcon className={className} />;
+    case "estrategia":
+      return <EstrategiaIcon className={className} />;
     case "calendario":
       return <CalendarIcon className={className} />;
     case "grid":
@@ -288,7 +288,7 @@ function NavIcon({ itemKey, className }: { itemKey: string; className?: string }
   }
 }
 
-function MoodboardIcon({ className }: { className?: string }) {
+function EstrategiaIcon({ className }: { className?: string }) {
   return (
     <svg
       width="16"
