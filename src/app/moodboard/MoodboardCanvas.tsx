@@ -373,7 +373,11 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
 
   const uploadAndAdd = useCallback(
     async (files: File[], at: { x: number; y: number }) => {
-      const media = files.filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+      // isHeic aparte: el iPhone a veces manda esos archivos con el tipo
+      // vacío, y sin esto se descartaban en silencio.
+      const media = files.filter(
+        (f) => f.type.startsWith("image/") || f.type.startsWith("video/") || isHeic(f),
+      );
       if (!media.length) return;
       setError("");
 
@@ -384,24 +388,30 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
           const chipId = makeFileId();
           setUploads((prev) => [...prev, { id: chipId, name: file.name, progress: 0 }]);
           try {
+            // Antes de subir: si es un HEIC del iPhone, se convierte a JPEG
+            // (o se avisa). Sin esto se guardaba un archivo que después no
+            // se ve en ningún navegador que no sea Safari.
+            const usable = await toDisplayableFile(file);
+
             // Se mide en paralelo con la subida: son independientes y así no
             // se suma la espera de una a la de la otra.
             const [url, size] = await Promise.all([
-              uploadBlob(`moodboard/${session.id}`, file, (percentage) =>
+              uploadBlob(`moodboard/${session.id}`, usable, (percentage) =>
                 setUploads((prev) =>
                   prev.map((u) => (u.id === chipId ? { ...u, progress: Math.round(percentage) } : u)),
                 ),
               ),
-              measureMedia(file),
+              measureMedia(usable),
             ]);
             await addElement({
-              type: file.type.startsWith("video/") ? "video" : "image",
+              type: usable.type.startsWith("video/") ? "video" : "image",
               x: at.x + index * 28,
               y: at.y + index * 28,
               width: size.width,
               height: size.height,
               url,
-              filename: file.name,
+              // El nombre ya convertido (.jpg), que es lo que quedó guardado.
+              filename: usable.name,
             });
             setUploads((prev) => prev.filter((u) => u.id !== chipId));
           } catch (e) {
@@ -1788,6 +1798,49 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/** HEIC/HEIF: el formato con el que la cámara del iPhone guarda las fotos por
+ * defecto. El archivo es una foto perfectamente válida, pero Chrome, Firefox
+ * y Edge no lo saben decodificar, así que un `<img>` con ese blob queda en
+ * blanco para siempre. */
+const HEIC_EXTENSION = /\.(heic|heif)$/i;
+
+function isHeic(file: File): boolean {
+  // Algunos navegadores mandan el tipo vacío para HEIC: por eso también el nombre.
+  return /image\/hei[cf]/i.test(file.type) || HEIC_EXTENSION.test(file.name);
+}
+
+/** Pasa a JPEG lo que el navegador pueda decodificar pero no mostrar.
+ *
+ * Safari —también el del iPhone— sí decodifica HEIC, así que una foto subida
+ * desde el teléfono se convierte ahí mismo y después se ve en cualquier lado.
+ * Si el navegador tampoco puede decodificarla, se avisa en vez de guardar un
+ * archivo que nunca se va a ver. */
+async function toDisplayableFile(file: File): Promise<File> {
+  if (!isHeic(file)) return file;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(
+      `"${file.name}" está en formato HEIC y este navegador no puede abrirlo. Subila desde el iPhone, o cambiá Ajustes → Cámara → Formatos → "Más compatible".`,
+    );
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.92),
+  );
+  if (!blob) throw new Error(`No se pudo convertir "${file.name}" a un formato visible.`);
+
+  return new File([blob], file.name.replace(HEIC_EXTENSION, ".jpg"), { type: "image/jpeg" });
 }
 
 /** ¿Es una URL http(s) suelta? Solo entonces vale la pena crear una tarjeta
