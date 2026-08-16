@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendAlertEmail } from "@/lib/dashboard/notify-email";
+import { sendPushToAdmins } from "@/lib/dashboard/notify-push";
 import { APPROVAL_REMINDER_HOURS_BEFORE } from "@/lib/dashboard/proposals";
 import { parseProposalDateTime, todayInSantoDomingo } from "@/lib/dashboard/schedule-time";
 import { getAdminEmail } from "@/lib/dashboard/site-settings";
@@ -70,41 +71,38 @@ export async function GET(request: Request): Promise<NextResponse> {
     // approvalReminderSent en false de nuevo si se invalida más adelante).
     if (!proposal.approvalReminderSent && !isApproved && diffMs > 0 && diffMs <= APPROVAL_REMINDER_MS) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { approvalReminderSent: true } });
-      if (adminEmail) {
-        await sendAlertEmail({
-          to: adminEmail,
-          title: "Aprobación pendiente",
-          body: `"${proposal.title}" (${proposal.network}) se publica el ${proposal.date} ${proposal.time} y todavía no está aprobado.`,
-        });
-      }
+      const title = "Aprobación pendiente";
+      const body = `"${proposal.title}" (${proposal.network}) se publica el ${proposal.date} ${proposal.time} y todavía no está aprobado.`;
+      await Promise.all([
+        adminEmail ? sendAlertEmail({ to: adminEmail, title, body }) : Promise.resolve(),
+        sendPushToAdmins({ title, body }),
+      ]);
       sentApproval++;
     }
 
     // Recordatorios de publicación (1h antes/a la hora).
     if (!proposal.reminderSentT60 && diffMs > 0 && diffMs <= HOUR_MS) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { reminderSentT60: true } });
-      if (adminEmail) {
-        await sendAlertEmail({
-          to: adminEmail,
-          title: "Falta 1 hora para publicar",
-          body: `"${proposal.title}" (${proposal.network}) se publica a las ${proposal.time}.`,
-        });
-      }
+      const title = "Falta 1 hora para publicar";
+      const body = `"${proposal.title}" (${proposal.network}) se publica a las ${proposal.time}.`;
+      await Promise.all([
+        adminEmail ? sendAlertEmail({ to: adminEmail, title, body }) : Promise.resolve(),
+        sendPushToAdmins({ title, body }),
+      ]);
       sentT60++;
     }
 
     if (!proposal.reminderSentT0 && diffMs <= 0) {
       await prisma.proposal.update({ where: { id: proposal.id }, data: { reminderSentT0: true } });
-      if (adminEmail) {
-        await sendAlertEmail({
-          to: adminEmail,
-          // Escalado simple (ficha 3, punto 4): si a la hora de publicar
-          // sigue sin aprobación, el mensaje lo deja explícito en vez de
-          // mandar el aviso genérico de "es la hora".
-          title: isApproved ? "Es hora de publicar" : "Sin aprobar y ya es la hora de publicar",
-          body: `"${proposal.title}" (${proposal.network}) está programado para ahora${isApproved ? "" : " — todavía no tiene la aprobación de Jun"}.`,
-        });
-      }
+      // Escalado simple (ficha 3, punto 4): si a la hora de publicar sigue
+      // sin aprobación, el mensaje lo deja explícito en vez de mandar el
+      // aviso genérico de "es la hora".
+      const title = isApproved ? "Es hora de publicar" : "Sin aprobar y ya es la hora de publicar";
+      const body = `"${proposal.title}" (${proposal.network}) está programado para ahora${isApproved ? "" : " — todavía no tiene la aprobación de Jun"}.`;
+      await Promise.all([
+        adminEmail ? sendAlertEmail({ to: adminEmail, title, body }) : Promise.resolve(),
+        sendPushToAdmins({ title, body }),
+      ]);
       sentT0++;
     }
   }

@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { sendAlertEmail, sendCommentNotification } from "@/lib/dashboard/notify-email";
+import { sendPushToAdmins } from "@/lib/dashboard/notify-push";
 import { computeProposalStatus, deriveTitle, PROPOSAL_VERSION_LIMIT } from "@/lib/dashboard/proposals";
 import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 import type {
@@ -166,7 +167,13 @@ export interface UpdateProposalResult {
 }
 
 export async function updateProposal(id: string, patch: UpdateProposalInput): Promise<UpdateProposalResult> {
-  const session = await requireEditor();
+  // Aprobar (el checkbox de "Jun") no es "editar contenido" — Jun es
+  // Comentarista y es quien de verdad aprueba, así que un patch que solo
+  // toca departmentApprovals alcanza con sesión. Si además toca algún campo
+  // de contenido (fecha/caption/media/artN), sigue restringido a Editor/Admin.
+  const patchKeys = Object.keys(patch);
+  const isApprovalOnly = patchKeys.length > 0 && patchKeys.every((key) => key === "departmentApprovals");
+  const session = isApprovalOnly ? await requireSession() : await requireEditor();
 
   const current = await prisma.proposal.findUnique({
     where: { id },
@@ -247,14 +254,13 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
   });
 
   if (justApproved) {
+    const title = "Jun aprobó un post";
+    const body = current.title ? `"${current.title}" quedó aprobado.` : "Un post quedó aprobado.";
     const to = await getAdminEmail();
-    if (to) {
-      await sendAlertEmail({
-        to,
-        title: "Jun aprobó un post",
-        body: current.title ? `"${current.title}" quedó aprobado.` : "Un post quedó aprobado.",
-      });
-    }
+    await Promise.all([
+      to ? sendAlertEmail({ to, title, body }) : Promise.resolve(),
+      sendPushToAdmins({ title, body }),
+    ]);
   }
 
   revalidatePath("/");
@@ -323,17 +329,22 @@ export async function addComment(proposalId: string, input: AddCommentInput): Pr
     // (SiteSettings) manda si un Admin lo seteó a mano; si no, cae a
     // getAdminEmail().
     const notifyTo = brand.commentNotifyTo || (await getAdminEmail());
-    if (notifyTo) {
-      await sendCommentNotification({
-        proposalTitle: proposal.title,
-        proposalDate: proposal.date,
-        author: row.author,
-        text: row.text,
-        to: notifyTo,
-        cc: brand.commentNotifyCc,
-        senderEmail: brand.senderEmail || notifyTo,
-      });
-    }
+    await Promise.all([
+      notifyTo &&
+        sendCommentNotification({
+          proposalTitle: proposal.title,
+          proposalDate: proposal.date,
+          author: row.author,
+          text: row.text,
+          to: notifyTo,
+          cc: brand.commentNotifyCc,
+          senderEmail: brand.senderEmail || notifyTo,
+        }),
+      sendPushToAdmins({
+        title: `Nuevo comentario en "${proposal.title}"`,
+        body: `${row.author}: ${row.text}`,
+      }),
+    ]);
   }
 
   revalidatePath("/");
@@ -377,16 +388,15 @@ export async function toggleCommentResolved(commentId: string): Promise<boolean>
       comments: before.comments.map((c) => (c.id === commentId ? { ...c, resolved: updated.resolved } : c)),
     };
     if (computeProposalStatus(after) === "Aprobado") {
+      const title = "Post aprobado";
+      const body = before.title
+        ? `"${before.title}" quedó aprobado — se resolvieron los cambios solicitados.`
+        : "Un post quedó aprobado al resolverse los cambios solicitados.";
       const to = await getAdminEmail();
-      if (to) {
-        await sendAlertEmail({
-          to,
-          title: "Post aprobado",
-          body: before.title
-            ? `"${before.title}" quedó aprobado — se resolvieron los cambios solicitados.`
-            : "Un post quedó aprobado al resolverse los cambios solicitados.",
-        });
-      }
+      await Promise.all([
+        to ? sendAlertEmail({ to, title, body }) : Promise.resolve(),
+        sendPushToAdmins({ title, body }),
+      ]);
     }
   }
 

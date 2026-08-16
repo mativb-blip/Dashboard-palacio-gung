@@ -23,8 +23,10 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
   const [showHistory, setShowHistory] = useState(false);
   const departmentApprovals = proposal.departmentApprovals ?? Array(DEPARTMENT_CHECK_COUNT).fill(false);
 
+  // Aprobar no es "editar contenido" — Jun es Comentarista y es quien de
+  // verdad aprueba, así que esto no depende de canEdit (a diferencia de
+  // borrar/editar caption, más abajo).
   function toggleDepartment(index: number) {
-    if (!canEdit) return;
     const next = departmentApprovals.map((value, i) => (i === index ? !value : value));
     onUpdateProposal(proposal.id, { departmentApprovals: next });
   }
@@ -146,7 +148,6 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
                   key={i}
                   type="button"
                   onClick={() => toggleDepartment(i)}
-                  disabled={!canEdit}
                   aria-pressed={checked}
                   title={checked ? `${label} · aprobado` : `${label} · pendiente`}
                   className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-1 text-[10px] leading-none font-bold tracking-label uppercase transition-[color,border-color,background-color] duration-[400ms] disabled:cursor-default ${PRESS_SCALE_CLASS} ${
