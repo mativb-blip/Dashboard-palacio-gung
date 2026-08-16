@@ -1448,6 +1448,10 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
             : "radial-gradient(circle, color-mix(in srgb, var(--color-brand-blue) 22%, transparent) 1px, transparent 1px)",
           backgroundSize: `${24 * view.scale}px ${24 * view.scale}px`,
           backgroundPosition: `${view.x}px ${view.y}px`,
+          // Hoja blanca al exportar: el tablero se trabaja en oscuro, pero
+          // esto se imprime. Solo cambia el fondo — los elementos van tal
+          // cual se ven en pantalla.
+          backgroundColor: capturing ? "#FFFFFF" : undefined,
         }}
         className={`h-full w-full cursor-grab touch-none active:cursor-grabbing ${
           dragOver ? "ring-2 ring-brand-blue ring-inset" : ""

@@ -69,6 +69,19 @@ function nextPaint(): Promise<void> {
  * que desaparecieran las barras y el recuadro rojo. */
 const CAPTURE_SETTLE_MS = 320;
 
+/** Techo para que el primer cuadro llegue. Si el navegador concede el
+ * permiso pero después el stream no entrega nada, sin esto la exportación se
+ * queda en "Exportando…" para siempre, con la interfaz escondida. */
+const CAPTURE_START_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ExportCaptureError(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 interface CaptureOptions {
   preset: PaperPreset;
   orientation: Orientation;
@@ -132,7 +145,11 @@ export async function captureFrameToBlob({
     video.srcObject = stream;
     video.muted = true;
     video.playsInline = true;
-    await video.play();
+    await withTimeout(
+      video.play(),
+      CAPTURE_START_TIMEOUT_MS,
+      "La captura no llegó a arrancar. Probá de nuevo.",
+    );
 
     onBeforeGrab();
     await nextPaint();
