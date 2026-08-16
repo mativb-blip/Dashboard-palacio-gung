@@ -18,9 +18,13 @@ const COMPACT_NAV_QUERY = "(min-width: 640px)";
 
 /** "calendario" cuando el Topbar se muestra en /calendario — ahí Post/Feed
  * navegan de vuelta al panel (`/?period=...`) en lugar de alternar in-place.
- * "estrategia" cuando se muestra en /estrategia, página propia sin relación
- * con proposals/período. */
-type TopbarView = "month" | "grid" | "calendario" | "estrategia";
+ * "estrategia" y "moodboard" son páginas propias, sin relación con
+ * proposals/período: se comportan igual que "calendario" a efectos del nav. */
+type TopbarView = "month" | "grid" | "calendario" | "estrategia" | "moodboard";
+
+/** Vistas que son una página aparte (no un período del panel): desde ellas
+ * Post/Feed navegan por href en vez de alternar el período in-place. */
+const STANDALONE_VIEWS: TopbarView[] = ["calendario", "estrategia", "moodboard"];
 
 interface TopbarProps {
   view: TopbarView;
@@ -43,6 +47,10 @@ const mobileRowClass =
 
 export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { data: session } = useSession();
+  // El Moodboard es espacio de trabajo personal del Admin — para el resto de
+  // los roles el ítem ni aparece (el gate real vive en moodboard/actions.ts).
+  const isAdmin = session?.user.role === "ADMIN";
 
   // Si la ventana crece a desktop con el menú de mobile abierto (resize,
   // rotar una tablet), cerrarlo — el botón de hamburguesa ya está oculto ahí
@@ -60,33 +68,27 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
   // Misma fuente de datos para el SegmentedGroup de desktop y la lista
   // apilada de mobile — se calcula una sola vez, no se duplica la lógica de
   // ruteo (href vs. onClick) en dos lugares distintos.
-  const estrategiaItem: SegmentedItem = {
-    key: "estrategia",
-    label: "Estrategia",
-    active: view === "estrategia",
-    href: view === "estrategia" ? undefined : "/estrategia",
-  };
-  const items: SegmentedItem[] =
-    view === "calendario"
-      ? [
-          estrategiaItem,
-          { key: "calendario", label: "Calendario", active: true },
-          { key: "month", label: "Post", active: false, href: "/?period=month" },
-          { key: "grid", label: "Feed", active: false, href: "/?period=grid" },
-        ]
-      : view === "estrategia"
-        ? [
-            estrategiaItem,
-            { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
-            { key: "month", label: "Post", active: false, href: "/?period=month" },
-            { key: "grid", label: "Feed", active: false, href: "/?period=grid" },
-          ]
-        : [
-            estrategiaItem,
-            { key: "calendario", label: "Calendario", active: false, href: "/calendario" },
-            { key: "month", label: "Post", active: view === "month", onClick: () => onPeriodChange?.("month") },
-            { key: "grid", label: "Feed", active: view === "grid", onClick: () => onPeriodChange?.("grid") },
-          ];
+  const standalone = STANDALONE_VIEWS.includes(view);
+
+  const pageItem = (key: TopbarView, label: string, href: string): SegmentedItem => ({
+    key,
+    label,
+    active: view === key,
+    // La página en la que ya estás no navega a ningún lado.
+    href: view === key ? undefined : href,
+  });
+
+  const items: SegmentedItem[] = [
+    ...(isAdmin ? [pageItem("moodboard", "Moodboard", "/moodboard")] : []),
+    pageItem("estrategia", "Estrategia", "/estrategia"),
+    pageItem("calendario", "Calendario", "/calendario"),
+    standalone
+      ? { key: "month", label: "Post", active: false, href: "/?period=month" }
+      : { key: "month", label: "Post", active: view === "month", onClick: () => onPeriodChange?.("month") },
+    standalone
+      ? { key: "grid", label: "Feed", active: false, href: "/?period=grid" }
+      : { key: "grid", label: "Feed", active: view === "grid", onClick: () => onPeriodChange?.("grid") },
+  ];
 
   return (
     <header className="relative flex shrink-0 items-center justify-between gap-3 px-4 py-3 desktop:px-8 desktop:py-4">
@@ -277,6 +279,8 @@ function CompactNav({ items }: { items: SegmentedItem[] }) {
 
 function NavIcon({ itemKey, className }: { itemKey: string; className?: string }) {
   switch (itemKey) {
+    case "moodboard":
+      return <MoodboardIcon className={className} />;
     case "estrategia":
       return <EstrategiaIcon className={className} />;
     case "calendario":
@@ -286,6 +290,30 @@ function NavIcon({ itemKey, className }: { itemKey: string; className?: string }
     default:
       return <PostIcon className={className} />;
   }
+}
+
+/** Chinches sobre un tablero — el Moodboard es el corcho de referencias,
+ * distinto de la grilla ordenada de Estrategia. */
+function MoodboardIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="2.5" y="3.5" width="19" height="17" rx="2" />
+      <circle cx="8" cy="9" r="1.6" />
+      <circle cx="16" cy="14.5" r="1.6" />
+      <path d="M8 10.6v5.9" />
+      <path d="M16 13v-5.4" />
+    </svg>
+  );
 }
 
 function EstrategiaIcon({ className }: { className?: string }) {

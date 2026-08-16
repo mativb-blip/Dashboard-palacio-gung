@@ -96,17 +96,22 @@ export async function verifyUploadedBlob(url: string): Promise<string | null> {
   return null;
 }
 
+/** Nombre de archivo seguro para una ruta de Blob Storage. */
+export function safeBlobName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+}
+
 /** Sube el archivo directo a Vercel Blob desde el navegador — el SDK pide un
  * token de cliente a /api/blob/upload y hace el PUT él mismo; el archivo
- * nunca pasa por nuestro servidor. */
-export async function uploadFileToBlob(
-  proposalId: string,
+ * nunca pasa por nuestro servidor. `folder` organiza la ruta y nada más: no
+ * es un límite de seguridad (el gate real está en la ruta del token). */
+export async function uploadBlob(
+  folder: string,
   file: File,
   onProgress?: (percentage: number) => void,
   abortSignal?: AbortSignal,
 ): Promise<string> {
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
-  const pathname = `proposals/${proposalId}/${makeFileId()}-${safeName}`;
+  const pathname = `${folder}/${makeFileId()}-${safeBlobName(file.name)}`;
 
   try {
     const blob = await upload(pathname, file, {
@@ -120,6 +125,15 @@ export async function uploadFileToBlob(
   } catch (e) {
     throw new Error(e instanceof Error ? e.message : "No se pudo subir el archivo.");
   }
+}
+
+export function uploadFileToBlob(
+  proposalId: string,
+  file: File,
+  onProgress?: (percentage: number) => void,
+  abortSignal?: AbortSignal,
+): Promise<string> {
+  return uploadBlob(`proposals/${proposalId}`, file, onProgress, abortSignal);
 }
 
 /** Ventana de carga de artes: pegar (⌘V o botón), arrastrar, o buscar en Finder. */

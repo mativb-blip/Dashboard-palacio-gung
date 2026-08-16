@@ -38,6 +38,7 @@ model User {
   accounts Account[]
   sessions Session[]
   pushSubscriptions PushSubscription[]
+  moodboardSessions MoodboardSession[]
 }
 
 model Account {
@@ -206,6 +207,76 @@ model ProposalComment {
   createdAt  DateTime @default(now())
 
   @@index([proposalId])
+}
+
+/// Tablero de referencias visuales del Admin — uso personal, previo a que
+/// una idea se convierta en Propuesta. A diferencia de Proposal (que pasa por
+/// aprobación del cliente), esto no lo ve nadie más: la sección entera está
+/// gateada a rol ADMIN, y cada sesión además guarda su `ownerId`.
+model MoodboardSession {
+  id         String    @id @default(cuid())
+  name       String
+  ownerId    String
+  owner      User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Opcional: para qué tanda de contenido es esta sesión (solo informativo).
+  targetDate DateTime?
+  /// null = activa. Archivar en vez de borrar: el material de referencia
+  /// sirve de contexto histórico aunque la tanda ya se haya publicado.
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  elements MoodboardElement[]
+
+  @@index([ownerId])
+}
+
+/// Un objeto suelto del canvas libre. Posición y tamaño van en columnas
+/// planas (no un JSON `position`/`size`) a propósito: al arrastrar se guarda
+/// solo x/y con debounce, y un update parcial de columnas es más barato que
+/// leer-modificar-escribir un blob JSON entero.
+model MoodboardElement {
+  id        String           @id @default(cuid())
+  sessionId String
+  session   MoodboardSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  /// "image" | "video" | "video-embed" | "text-note" | "text-panel" — String
+  /// simple, mismo criterio que Proposal.format: coincide letra por letra con
+  /// el union type de src/types/moodboard.ts, sin mapeo enum↔string en cada
+  /// lectura.
+  type      String
+  /// Coordenadas del canvas (no de pantalla) — el pan/zoom de la vista no las
+  /// toca, así el tablero se ve igual en cualquier tamaño de ventana.
+  x         Float
+  y         Float
+  width     Float
+  height    Float
+  /// Orden de apilado cuando dos elementos se superponen.
+  zIndex    Int              @default(0)
+  rotation  Float            @default(0)
+
+  /// image/video: URL en Blob Storage. video-embed: la URL pegada (Instagram,
+  /// TikTok, YouTube). text-note usa `text` y deja estos en null.
+  url       String?          @db.Text
+  filename  String?
+  embedUrl  String?          @db.Text
+  text      String?          @db.Text
+  /// Etiqueta de color libre (hex) — un punto en la esquina, sin semántica fija.
+  color     String?
+  notes     String?          @db.Text
+
+  /// Formato de los elementos de texto. Va en columnas y no dentro del HTML
+  /// de `text` a propósito: el sanitizador borra TODOS los atributos (ver
+  /// sanitizeRichText en src/lib/dashboard/rich-text.ts), así que un
+  /// style="" inline no sobreviviría. Aplican al bloque entero; el negrita/
+  /// cursiva/listas sí es inline y vive en el HTML.
+  fontSize  Int?
+  textAlign String?
+  textColor String?
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([sessionId])
 }
 
 /// Suscripción de Web Push de un navegador/dispositivo (ver
