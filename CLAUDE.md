@@ -20,7 +20,9 @@ Vista única, responsive, alta fidelidad. Idioma: español (RD).
 - **Recordatorios de publicación** (1h antes + a la hora): un GitHub Action (`.github/workflows/reminders.yml`) llama a `/api/cron/reminders` cada 10 min — el cron nativo de Vercel en Hobby solo corre 1 vez por día, no alcanza. Autenticado con `CRON_SECRET` (bearer token), no con sesión — por eso `api/cron` está excluido del gate de login en `src/proxy.ts`. La hora de la propuesta (`Proposal.time`, texto libre tipo "6:30 PM") se parsea asumiendo siempre UTC-4 (`schedule-time.ts` — Santo Domingo no tiene horario de verano). Cada propuesta dispara cada recordatorio una sola vez (`reminderSentT60`/`reminderSentT0`).
 - Alias de import `@/*` → `src/*`
 
-Scripts: `npm run dev`, `npm run build` (corre `prisma migrate deploy` primero), `npm start`, `npm run lint`, `npm run db:migrate`, `npm run db:seed`.
+Scripts: `npm run dev`, `npm run build` (migra primero, ver abajo), `npm start`, `npm run lint`, `npm run db:migrate`, `npm run db:seed`.
+
+> **El build migra antes de compilar**, pero vía `scripts/migrate-deploy.mjs` y no llamando a `prisma migrate deploy` directo. Prisma toma un advisory lock de Postgres antes de migrar; si dos deploys de Vercel se solapan (alcanza con pushear dos veces seguidas) el segundo espera el lock y aborta a los 10s con `P1002`, tirando abajo un build que no tenía nada malo. El script reintenta **solo** ante ese error, con espera creciente; cualquier otra falla corta en el primer intento. No se desactiva el lock: existe para que dos migraciones simultáneas no dejen el esquema a medio aplicar.
 
 > Ver [AGENTS.md](AGENTS.md): esta versión de Next.js tiene breaking changes respecto al conocimiento de entrenamiento — consultar `node_modules/next/dist/docs/` antes de escribir código nuevo.
 
