@@ -1440,9 +1440,12 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         onContextMenu={(e) => e.preventDefault()}
         style={{
           // Cuadrícula de fondo que se mueve con el lienzo — la referencia
-          // visual de que esto es un espacio infinito y no una página.
-          backgroundImage:
-            "radial-gradient(circle, color-mix(in srgb, var(--color-brand-blue) 22%, transparent) 1px, transparent 1px)",
+          // visual de que esto es un espacio infinito y no una página. Se
+          // apaga durante la captura: en la hoja exportada es ruido, no
+          // información.
+          backgroundImage: capturing
+            ? "none"
+            : "radial-gradient(circle, color-mix(in srgb, var(--color-brand-blue) 22%, transparent) 1px, transparent 1px)",
           backgroundSize: `${24 * view.scale}px ${24 * view.scale}px`,
           backgroundPosition: `${view.x}px ${view.y}px`,
         }}
