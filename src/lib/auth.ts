@@ -39,8 +39,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // Gate de acceso centralizado — corre en src/proxy.ts para toda la app.
     // /login queda siempre público (ahí se inicia sesión, y un Admin ya
     // logueado también puede entrar para personalizar el fondo/logo).
+    // /diagnostico también: existe para cuando NO se puede iniciar sesión, así
+    // que gatearlo lo volvería inútil. No expone datos de nadie — ver
+    // src/app/api/diagnostico/route.ts.
     authorized({ request, auth }) {
-      if (request.nextUrl.pathname === "/login") return true;
+      const { pathname } = request.nextUrl;
+      if (pathname === "/login" || pathname === "/diagnostico" || pathname === "/api/diagnostico") {
+        return true;
+      }
       return Boolean(auth?.user);
     },
     async jwt({ token, user }) {
