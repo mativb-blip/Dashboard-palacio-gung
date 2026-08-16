@@ -193,13 +193,21 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
    * llegan de a uno y no traen a los hermanos. */
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   /** Estado del pellizco en curso — todo se mide contra el instante en que
-   * apoyó el segundo dedo, así el zoom no acumula error cuadro a cuadro. */
+   * apoyó el segundo dedo, así el zoom no acumula error cuadro a cuadro.
+   *
+   * Dos modos según dónde caen los dedos: sobre algo ya seleccionado el
+   * gesto escala ESE elemento (`targets`), y sobre el fondo mueve la vista. */
   const pinchRef = useRef<{
     startDist: number;
     startScale: number;
     startView: { x: number; y: number };
     startMid: { x: number; y: number };
     rect: { left: number; top: number };
+    /** null = pellizco de vista (zoom del lienzo). */
+    targets: MoveTarget[] | null;
+    /** Límites del factor para que ningún elemento colapse ni se dispare. */
+    minFactor: number;
+    maxFactor: number;
   } | null>(null);
   /** Respaldo del portapapeles del sistema: si el navegador no deja leer o
    * escribir el clipboard (permisos), copiar/pegar sigue andando en la
@@ -260,6 +268,10 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
 
   const queuePatchRef = useRef(queuePatch);
   const flushRef = useRef(flush);
+  // El listener de punteros vive fuera de React (se registra una sola vez):
+  // necesita leer la selección y los elementos actuales sin re-registrarse.
+  const selectedIdsRef = useRef(selectedIds);
+  const elementsRef = useRef(elements);
 
   // Único punto donde se actualizan los espejos (ver el comentario de arriba):
   // sin lista de dependencias, corre después de cada render.
@@ -268,6 +280,8 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
     countCallbackRef.current = onElementCountChange;
     queuePatchRef.current = queuePatch;
     flushRef.current = flush;
+    selectedIdsRef.current = selectedIds;
+    elementsRef.current = elements;
   });
 
   // Al desmontar (cambio de sesión, salir de la página) va lo que quede
@@ -724,12 +738,44 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         abortInteraction();
         const [a, b] = [...pointersRef.current.values()];
         const rect = node.getBoundingClientRect();
+
+        // ¿El gesto empezó sobre algo que ya estaba seleccionado? Alcanza con
+        // que UNO de los dos dedos caiga encima: pellizcar una imagen chica
+        // deja el otro dedo afuera casi siempre.
+        const onSelection = [a, b].some((point) => {
+          const hit = document.elementFromPoint(point.x, point.y);
+          const owner = hit instanceof Element ? hit.closest<HTMLElement>("[data-el-id]") : null;
+          return Boolean(owner?.dataset.elId && selectedIdsRef.current.has(owner.dataset.elId));
+        });
+
+        let targets: MoveTarget[] | null = null;
+        let minFactor = 0.02;
+        let maxFactor = 50;
+
+        if (onSelection) {
+          targets = [];
+          for (const id of selectedIdsRef.current) {
+            const element = elementsRef.current.find((el) => el.id === id);
+            const targetNode = node.querySelector<HTMLElement>(`[data-el-id="${CSS.escape(id)}"]`);
+            if (!element || !targetNode) continue;
+            const start = geometryOf(element);
+            targets.push({ id, node: targetNode, start, live: start });
+            // Ninguno puede bajar del mínimo agarrable ni pasarse de largo.
+            minFactor = Math.max(minFactor, MIN_ELEMENT_SIZE / Math.min(start.width, start.height));
+            maxFactor = Math.min(maxFactor, 6000 / Math.max(start.width, start.height));
+          }
+          if (!targets.length) targets = null;
+        }
+
         pinchRef.current = {
           startDist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
           startScale: viewRef.current.scale,
           startView: { x: viewRef.current.x, y: viewRef.current.y },
           startMid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
           rect: { left: rect.left, top: rect.top },
+          targets,
+          minFactor,
+          maxFactor: Math.max(minFactor, maxFactor),
         };
       }
     }
@@ -749,15 +795,40 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         if (points.length < 2) return;
         const [a, b] = points;
         const distance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+
+        // El punto del tablero que estaba bajo el centro de los dedos.
+        const anchorX = (pinch.startMid.x - pinch.rect.left - pinch.startView.x) / pinch.startScale;
+        const anchorY = (pinch.startMid.y - pinch.rect.top - pinch.startView.y) / pinch.startScale;
+
+        if (pinch.targets) {
+          // Escalar lo seleccionado. Es un escalado uniforme alrededor del
+          // ancla, así que la proporción se conserva sola — que es lo que se
+          // espera al pellizcar una foto. Si además se corren los dos dedos,
+          // el elemento acompaña: en touch escalar y mover es un solo gesto.
+          const factor = clamp(distance / pinch.startDist, pinch.minFactor, pinch.maxFactor);
+          const shiftX = (midX - pinch.startMid.x) / pinch.startScale;
+          const shiftY = (midY - pinch.startMid.y) / pinch.startScale;
+
+          for (const target of pinch.targets) {
+            target.live = {
+              ...target.start,
+              x: anchorX + (target.start.x - anchorX) * factor + shiftX,
+              y: anchorY + (target.start.y - anchorY) * factor + shiftY,
+              width: target.start.width * factor,
+              height: target.start.height * factor,
+            };
+            paint(target.node, target.live);
+          }
+          return;
+        }
+
         const nextScale = clamp(
           (pinch.startScale * distance) / pinch.startDist,
           MIN_SCALE,
           MAX_SCALE,
         );
-        const anchorX = (pinch.startMid.x - pinch.rect.left - pinch.startView.x) / pinch.startScale;
-        const anchorY = (pinch.startMid.y - pinch.rect.top - pinch.startView.y) / pinch.startScale;
-        const midX = (a.x + b.x) / 2;
-        const midY = (a.y + b.y) / 2;
         setView({
           scale: nextScale,
           x: midX - pinch.rect.left - anchorX * nextScale,
@@ -838,10 +909,27 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       cancelLongPress();
 
       if (pinchRef.current) {
-        // Mientras dure el pellizco no hay nada que guardar: el gesto movió
-        // la vista, no los elementos.
         if (pointersRef.current.size >= 2) return;
+        const finished = pinchRef.current;
         pinchRef.current = null;
+
+        // Un pellizco de vista no deja nada que guardar; uno que escaló
+        // elementos sí, y recién acá (durante el gesto se pintó directo en
+        // el DOM, sin pasar por el estado).
+        if (finished.targets) {
+          const byId = new Map(finished.targets.map((t) => [t.id, t.live]));
+          setElements((prev) =>
+            prev.map((el) => {
+              const live = byId.get(el.id);
+              return live ? { ...el, x: live.x, y: live.y, width: live.width, height: live.height } : el;
+            }),
+          );
+          for (const [id, live] of byId) {
+            // Por ref: este efecto registra los listeners una sola vez y no
+            // debe volver a hacerlo cada vez que cambia `queuePatch`.
+            queuePatchRef.current(id, { x: live.x, y: live.y, width: live.width, height: live.height });
+          }
+        }
 
         // Si queda un dedo apoyado, el gesto sigue como desplazamiento desde
         // donde está ahora — sin esto el lienzo se queda clavado hasta
