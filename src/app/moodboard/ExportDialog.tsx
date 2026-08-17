@@ -24,7 +24,7 @@ export default function ExportDialog({ onCancel, onConfirm }: ExportDialogProps)
       onClick={onCancel}
     >
       <div
-        className="modal-card-in flex w-full max-w-[380px] flex-col overflow-hidden rounded-lg border border-line-2 bg-[var(--bg)] font-sans text-brand-ink shadow-lg"
+        className="glass-strong modal-card-in flex w-full max-w-[380px] flex-col overflow-hidden rounded-lg border border-line-2 font-sans text-brand-ink shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">

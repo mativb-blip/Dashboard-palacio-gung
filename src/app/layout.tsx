@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth";
 import { BrandProvider } from "@/lib/dashboard/BrandContext";
 import { getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
+import AmbientBackground from "@/components/dashboard/AmbientBackground";
 import PushRegister from "@/components/dashboard/PushRegister";
 import "./globals.css";
 
@@ -52,6 +53,11 @@ export default async function RootLayout({
   return (
     <html lang="es" className={`antialiased ${montserrat.variable}`} style={brandStyle}>
       <body>
+        {/* Fondo de toda la app: es lo que dejan ver las superficies de
+            vidrio. Va acá y no en cada página para que el ambiente sea
+            continuo al navegar. El login monta el suyo encima, porque ahí
+            puede ser una foto que sube un Admin. */}
+        <AmbientBackground />
         <BrandProvider brand={brand}>
           <SessionProvider session={session}>
             <PushRegister />

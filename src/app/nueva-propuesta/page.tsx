@@ -138,7 +138,7 @@ function NuevaPropuestaForm() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 bg-[var(--bg)] px-4 py-8 font-sans text-brand-ink">
+    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-4 py-8 font-sans text-brand-ink">
       <div>
         <Link
           href="/"

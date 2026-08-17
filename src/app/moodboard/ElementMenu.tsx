@@ -46,7 +46,7 @@ export default function ElementMenu({
       <div className="fixed inset-0 z-40" onPointerDown={onClose} onContextMenu={(e) => e.preventDefault()} />
       <div
         style={{ left, top, width: MENU_WIDTH }}
-        className="fixed z-50 flex flex-col gap-0.5 rounded border border-line-2 bg-[var(--bg)] p-1.5 shadow-lg"
+        className="glass-strong fixed z-50 flex flex-col gap-0.5 rounded border border-line-2 p-1.5 shadow-lg"
       >
         {isText && <MenuRow label="Editar texto" onClick={onEditNote} />}
         <MenuRow label="Duplicar" onClick={onDuplicate} />

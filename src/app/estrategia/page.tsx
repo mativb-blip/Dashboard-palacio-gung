@@ -319,7 +319,7 @@ export default function EstrategiaPage() {
   const { brandName } = useBrand();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] font-sans text-brand-ink">
+    <div className="flex min-h-screen flex-col font-sans text-brand-ink">
       <div className="flex h-[3px] w-full shrink-0">
         <span className="w-16 bg-brand-red" />
         <span className="flex-1 bg-brand-blue" />

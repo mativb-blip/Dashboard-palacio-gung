@@ -22,7 +22,7 @@
   --color-tx-2: #b7bac1;
   --color-tx-3: var(--muted);
   --color-line: var(--line);
-  --color-line-2: rgba(255, 255, 255, 0.14);
+  --color-line-2: rgba(255, 255, 255, 0.18);
 
   /* Montserrat Variable (next/font/google, ver layout.tsx) reemplaza Arial
      y también a Outfit/Sora en --font-thin — clevante usa UNA sola fuente
@@ -50,12 +50,18 @@
 
 :root {
   --bg: #08090b;
-  --surface: #101216;
+  /* Vidrio, no un gris opaco: las superficies dejan ver el ambiente de atrás
+     (ver AmbientBackground), igual que la tarjeta del login. Esto solo las
+     vuelve translúcidas; el desenfoque lo agrega .glass, reservado al chrome
+     grande — backdrop-filter es caro y hay ~75 superficies en la app. */
+  --surface: rgba(255, 255, 255, 0.075);
   --fg: #f4f5f7;
   --muted: #888d96;
   --accent-dim: rgba(125, 163, 192, 0.16);
-  --line: rgba(255, 255, 255, 0.09);
-  --line-soft: rgba(255, 255, 255, 0.05);
+  /* Bordes un punto más vivos que antes: sobre vidrio, un hairline al 9% se
+     pierde contra el ambiente y las superficies dejan de tener canto. */
+  --line: rgba(255, 255, 255, 0.12);
+  --line-soft: rgba(255, 255, 255, 0.06);
   --background: var(--bg);
   /* Tinte claro del acento para texto sobre el fondo oscuro del login — ya
      no hace falta aclarar tanto como antes (el acento ya es claro, no un
@@ -87,6 +93,50 @@ body {
   background: var(--background);
   color: var(--color-brand-ink);
   font-family: var(--font-sans);
+}
+
+/* ── Vidrio ────────────────────────────────────────────────────────────────
+ * El look del login llevado al dashboard entero. Son dos piezas:
+ *
+ * 1. El ambiente de atrás — componente AmbientBackground, montado una vez en
+ *    el layout raíz. Sin algo con variación detrás, una superficie
+ *    translúcida sobre negro plano se ve igual que una opaca: el vidrio
+ *    necesita tener qué dejar pasar.
+ * 2. .glass / .glass-strong — la superficie en sí, para el chrome grande
+ *    (barras, paneles, modales, menús). Al resto le alcanza con ser
+ *    translúcido (ver --surface): detrás solo hay un degradado suave, así
+ *    que desenfocarlo no cambiaría nada y backdrop-filter cuesta caro.
+ */
+
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-color: var(--color-line-2);
+}
+
+/* Para lo que se apoya SOBRE contenido (menús, diálogos, barras flotantes).
+ * Bastante más opaco que .glass: acá abajo puede haber una foto, no un
+ * degradado suave. Con menos cuerpo el contenido de atrás competía con el
+ * texto del diálogo en vez de quedar como una textura. */
+.glass-strong {
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border-color: var(--color-line-2);
+}
+
+/* Safari en iOS aplica backdrop-filter sobre un elemento sin fondo propio de
+ * forma inconsistente; el fondo explícito de arriba ya lo cubre. Si el
+ * navegador no soporta backdrop-filter, se compensa con más opacidad para
+ * que nunca quede texto sobre un fondo transparente. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+  }
+  .glass-strong {
+    background: var(--bg);
+  }
 }
 
 textarea::placeholder,

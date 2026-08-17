@@ -20,13 +20,29 @@ interface Check {
 
 const TEST_COOKIE = "diag-cookie-test";
 
+/** Ninguna comprobación puede colgar la página: si una petición no vuelve,
+ * esto la corta y se sigue con las demás. Una herramienta de diagnóstico que
+ * se queda en "ejecutando…" no diagnostica nada — que es justo lo que pasó
+ * la primera vez en el iPad. */
+function fetchWithTimeout(url: string, ms = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { cache: "no-store", signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
+}
+
 export default function DiagnosticoPage() {
   const [checks, setChecks] = useState<Check[]>([]);
   const [raw, setRaw] = useState("");
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     async function run() {
       const results: Check[] = [];
+      // Se pinta después de CADA comprobación, no al final: si una se
+      // atasca o rompe, igual se ven las anteriores.
+      const publish = () => setChecks([...results]);
 
       results.push({
         label: "El navegador dice que acepta cookies",
@@ -35,6 +51,7 @@ export default function DiagnosticoPage() {
           ? "navigator.cookieEnabled = true"
           : "navigator.cookieEnabled = false — están bloqueadas en los ajustes del navegador.",
       });
+      publish();
 
       // Prueba real: escribir una cookie y ver si sobrevive. El navegador
       // puede decir que las acepta y bloquearlas igual.
@@ -48,10 +65,11 @@ export default function DiagnosticoPage() {
           : "Se escribió y desapareció: el navegador las está descartando. En iPhone/iPad: Ajustes → Safari → «Bloquear todas las cookies» debe estar DESACTIVADO.",
       });
       document.cookie = `${TEST_COOKIE}=; path=/; Max-Age=0`;
+      publish();
 
       let serverTime: string | null = null;
       try {
-        const res = await fetch("/api/diagnostico", { cache: "no-store" });
+        const res = await fetchWithTimeout("/api/diagnostico");
         const data = await res.json();
         serverTime = data.horaDelServidor;
         setRaw(JSON.stringify(data, null, 2));
@@ -69,9 +87,10 @@ export default function DiagnosticoPage() {
           detail: `No se pudo consultar: ${e instanceof Error ? e.message : "error de red"}`,
         });
       }
+      publish();
 
       try {
-        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        const res = await fetchWithTimeout("/api/auth/session");
         const session = await res.json();
         const logged = Boolean(session?.user);
         results.push({
@@ -82,6 +101,7 @@ export default function DiagnosticoPage() {
       } catch {
         results.push({ label: "Hay una sesión iniciada", ok: false, detail: "No se pudo consultar." });
       }
+      publish();
 
       // Un reloj corrido invalida el token apenas se emite, con el mismo
       // síntoma de rebote.
@@ -104,15 +124,26 @@ export default function DiagnosticoPage() {
       });
 
       results.push({ label: "Navegador", ok: null, detail: navigator.userAgent });
-
-      setChecks(results);
+      publish();
     }
 
-    void run();
+    run()
+      .catch((e: unknown) => {
+        // Ni un error inesperado puede dejar la página en blanco: se muestra.
+        setChecks((prev) => [
+          ...prev,
+          {
+            label: "El diagnóstico se interrumpió",
+            ok: false,
+            detail: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+          },
+        ]);
+      })
+      .finally(() => setDone(true));
   }, []);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-[var(--bg)] px-4 py-8 font-sans text-brand-ink">
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 px-4 py-8 font-sans text-brand-ink">
       <div>
         <h1 className="text-lg font-bold">Diagnóstico de acceso</h1>
         <p className="mt-1 text-xs leading-relaxed text-tx-3">
@@ -121,7 +152,13 @@ export default function DiagnosticoPage() {
         </p>
       </div>
 
-      {checks.length === 0 && <p className="text-sm text-tx-3">Ejecutando comprobaciones…</p>}
+      {checks.length === 0 && !done && <p className="text-sm text-tx-3">Ejecutando comprobaciones…</p>}
+      {checks.length === 0 && done && (
+        <p className="text-sm text-brand-red">
+          No se pudo ejecutar ninguna comprobación. Es probable que el navegador esté bloqueando el
+          JavaScript de la página.
+        </p>
+      )}
 
       <ul className="flex flex-col gap-2">
         {checks.map((check) => (

@@ -159,7 +159,7 @@ function DashboardHome() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] desktop:h-screen desktop:overflow-hidden">
+    <div className="flex min-h-screen flex-col desktop:h-screen desktop:overflow-hidden">
       <div className="flex h-[3px] w-full shrink-0">
         <span className="w-16 bg-brand-red" />
         <span className="flex-1 bg-brand-blue" />
@@ -235,7 +235,7 @@ function DashboardHome() {
                 />
               </div>
 
-              <aside className="flex flex-col gap-[18px] bg-[var(--bg)] px-4 pt-[18px] pb-7 desktop:gap-5 desktop:overflow-y-auto desktop:px-8 desktop:py-[26px]">
+              <aside className="flex flex-col gap-[18px] px-4 pt-[18px] pb-7 desktop:gap-5 desktop:overflow-y-auto desktop:px-8 desktop:py-[26px]">
                 <CaptionPanel
                   key={`caption-${selectedProposal.id}`}
                   proposal={selectedProposal}

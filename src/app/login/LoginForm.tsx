@@ -125,32 +125,18 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--bg)] px-4 py-8 font-sans">
-      {/* Fondo con degradé + acentos de marca (o imagen subida por un Admin) —
-          excepción deliberada al "fondo siempre blanco" del design system,
-          acotada solo a esta pantalla. */}
-      {backgroundUrl ? (
+    // Sin fondo propio: el ambiente lo pone el layout raíz (AmbientBackground)
+    // y es el mismo de todo el dashboard. Un `bg-[var(--bg)]` acá lo taparía,
+    // porque esa capa va detrás de todo (-z-10).
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8 font-sans">
+      {/* Si un Admin subió una imagen, reemplaza al ambiente compartido solo en
+          esta pantalla: va por encima (absolute, sin z negativo) y con un velo
+          para que la tarjeta siga legible sobre cualquier foto. */}
+      {backgroundUrl && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element -- imagen subida por un Administrador, servida como data URL */}
           <img src={backgroundUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
           <div className="pointer-events-none absolute inset-0 bg-black/45" />
-        </>
-      ) : (
-        <>
-          {/* Antes: gradiente + un blob azul y uno rojo compitiendo por atención.
-              Ahora: humo neutro (blancos muy tenues) + un solo acento azul de
-              marca, más grano — deja el azul como único acento, sin rojo. */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--color-brand-blue)_0%,_var(--bg)_55%,_var(--bg)_100%)] opacity-70" />
-          <div className="pointer-events-none absolute -top-[10%] -left-[8%] h-[55%] w-[55%] rounded-full bg-white/[0.05] blur-[100px]" />
-          <div className="pointer-events-none absolute -right-[10%] -bottom-[15%] h-[60%] w-[60%] rounded-full bg-brand-blue/25 blur-[100px]" />
-          <div className="pointer-events-none absolute top-[35%] right-[5%] h-[38%] w-[38%] rounded-full bg-white/[0.04] blur-[100px]" />
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay"
-            style={{
-              backgroundImage:
-                "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")",
-            }}
-          />
         </>
       )}
 

@@ -58,7 +58,7 @@ export default function UseAsProposalDialog({ element, onClose }: UseAsProposalD
       onClick={onClose}
     >
       <div
-        className="modal-card-in flex max-h-[90vh] w-full max-w-[420px] flex-col overflow-hidden rounded-lg border border-line-2 bg-[var(--bg)] font-sans text-brand-ink shadow-lg"
+        className="glass-strong modal-card-in flex max-h-[90vh] w-full max-w-[420px] flex-col overflow-hidden rounded-lg border border-line-2 font-sans text-brand-ink shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">

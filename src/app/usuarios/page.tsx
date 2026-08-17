@@ -37,7 +37,7 @@ export default async function UsuariosPage() {
   const brand = resolveBrand(await getSiteSettings());
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 bg-[var(--bg)] px-4 py-8 font-sans text-brand-ink">
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-4 py-8 font-sans text-brand-ink">
       <AddUserPanel email={session.user.email ?? ""} roleOptions={ROLE_OPTIONS} />
 
       <UsersTable users={users} currentUserId={session.user.id} roleOptions={ROLE_OPTIONS} />
@@ -50,7 +50,7 @@ export default async function UsuariosPage() {
 
 function AccessMessage({ title, message }: { title: string; message: string }) {
   return (
-    <div className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-3 bg-[var(--bg)] px-4 text-center font-sans text-brand-ink">
+    <div className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-3 px-4 text-center font-sans text-brand-ink">
       <h1 className="text-xl font-bold">{title}</h1>
       <p className="text-sm text-tx-2">{message}</p>
       <Link href="/login" className="text-sm font-bold text-brand-blue">

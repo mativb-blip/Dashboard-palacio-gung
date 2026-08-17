@@ -150,7 +150,7 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
     // dvh y no vh: en mobile la barra de direcciones del navegador se
     // superpone al final de la ventana, y con 100vh las barras flotantes del
     // canvas quedaban debajo de ella, inalcanzables.
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg)] font-sans text-brand-ink">
+    <div className="flex h-[100dvh] flex-col overflow-hidden font-sans text-brand-ink">
       <div className="flex h-[3px] w-full shrink-0">
         <span className="w-16 bg-brand-red" />
         <span className="flex-1 bg-brand-blue" />
@@ -235,7 +235,7 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
           <>
             {/* Capa de cierre por click afuera — sin listener global en document. */}
             <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
-            <div className="absolute top-full left-4 z-20 mt-1 flex max-h-[60vh] w-[300px] flex-col overflow-y-auto rounded border border-line-2 bg-[var(--bg)] p-1.5 shadow-lg desktop:left-8">
+            <div className="glass-strong absolute top-full left-4 z-20 mt-1 flex max-h-[60vh] w-[300px] flex-col overflow-y-auto rounded border border-line-2 p-1.5 shadow-lg desktop:left-8">
               <button
                 type="button"
                 onClick={() => void handleCreate()}

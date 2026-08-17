@@ -39,10 +39,9 @@ const MAX_SCALE = 3;
 const SAVE_DEBOUNCE_MS = 700;
 /** Separación entre elementos al alinearlos en fila. */
 const ARRANGE_GAP = 24;
-/** Cuánto hay que mantener apretado (y cuán quieto) para que en mobile
- * aparezca el menú de portapapeles. */
-const LONG_PRESS_MS = 480;
-const LONG_PRESS_TOLERANCE_PX = 8;
+/** Cuánto se puede mover un dedo y que el gesto siga contando como un toque
+ * y no como un arrastre. */
+const TAP_TOLERANCE_PX = 8;
 
 interface ViewState {
   x: number;
@@ -146,9 +145,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
   const [interactiveId, setInteractiveId] = useState<string | null>(null);
   const [view, setView] = useState<ViewState>({ x: 0, y: 0, scale: 1 });
   const [menu, setMenu] = useState<{ element: MoodboardElement; x: number; y: number } | null>(null);
-  /** Menú de portapapeles del lienzo (mantener apretado en mobile, o clic
-   * derecho sobre el fondo en desktop). */
-  const [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number; at: { x: number; y: number } } | null>(null);
   const [proposalFor, setProposalFor] = useState<MoodboardElement | null>(null);
   const [uploads, setUploads] = useState<UploadChip[]>([]);
   const [linkValue, setLinkValue] = useState("");
@@ -187,8 +183,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
   /** Última posición del puntero sobre el canvas — dónde cae lo que se pega
    * con ⌘V (el evento `paste` no trae coordenadas). */
   const pointerCanvasRef = useRef({ x: 200, y: 160 });
-  /** Temporizador del "mantener apretado" y el punto donde arrancó. */
-  const longPressRef = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
   /** Dedos apoyados sobre el lienzo. Hace falta llevar la cuenta para
    * distinguir un arrastre (uno) de un pellizco (dos): los eventos de puntero
    * llegan de a uno y no traen a los hermanos. */
@@ -215,11 +209,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
    * pestaña. */
   const localClipboardRef = useRef<ClipboardElement[]>([]);
 
-  const cancelLongPress = useCallback(() => {
-    if (!longPressRef.current) return;
-    clearTimeout(longPressRef.current.timer);
-    longPressRef.current = null;
-  }, []);
 
   // El contador de la barra de sesiones se sincroniza solo cuando cambia la
   // cantidad. El callback va por ref y NO en las dependencias: el padre lo
@@ -745,7 +734,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (pointersRef.current.size === 2) {
-        cancelLongPress();
         abortInteraction();
         const [a, b] = [...pointersRef.current.values()];
         const rect = node.getBoundingClientRect();
@@ -859,19 +847,12 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         };
       }
 
-      // Moverse cancela el "mantener apretado": era un arrastre, no un
-      // long-press.
-      const press = longPressRef.current;
-      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > LONG_PRESS_TOLERANCE_PX) {
-        cancelLongPress();
-      }
-
       if (!it) return;
 
       if (it.kind === "pan") {
         const shiftX = e.clientX - it.pointerX;
         const shiftY = e.clientY - it.pointerY;
-        if (Math.hypot(shiftX, shiftY) > LONG_PRESS_TOLERANCE_PX) it.moved = true;
+        if (Math.hypot(shiftX, shiftY) > TAP_TOLERANCE_PX) it.moved = true;
         setView((prev) => ({ ...prev, x: it.viewX + shiftX, y: it.viewY + shiftY }));
         return;
       }
@@ -917,7 +898,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
 
     function onUp(e: PointerEvent) {
       pointersRef.current.delete(e.pointerId);
-      cancelLongPress();
 
       if (pinchRef.current) {
         if (pointersRef.current.size >= 2) return;
@@ -972,7 +952,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [endInteraction, cancelLongPress, abortInteraction]);
+  }, [endInteraction, abortInteraction]);
 
   function geometryOf(element: MoodboardElement): Geometry {
     return {
@@ -993,8 +973,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
     if (e.button !== 0) return;
     if (editingId === element.id) return;
     e.stopPropagation();
-    cancelLongPress();
-    setCanvasMenu(null);
 
     const node = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-el-id]");
     if (!node) return;
@@ -1068,25 +1046,9 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       moved: false,
     };
 
-    // Mantener apretado el fondo abre el menú de portapapeles — la única vía
-    // en mobile, donde no hay clic derecho.
-    cancelLongPress();
-    const { clientX, clientY } = e;
-    const at = toCanvas(clientX, clientY);
-    longPressRef.current = {
-      x: clientX,
-      y: clientY,
-      timer: setTimeout(() => {
-        longPressRef.current = null;
-        interactionRef.current = null; // no seguir desplazando el lienzo
-        setCanvasMenu({ x: clientX, y: clientY, at });
-      }, LONG_PRESS_MS),
-    };
-
     // Los popovers sí se cierran de una; la selección espera al pointerup
     // (ver endInteraction).
     setMenu(null);
-    setCanvasMenu(null);
     setLinkOpen(false);
   }
 
@@ -1132,7 +1094,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       if (e.key === "Escape") {
         setSelectedIds(new Set());
         setMenu(null);
-        setCanvasMenu(null);
         setInteractiveId(null);
         return;
       }
@@ -1578,6 +1539,15 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
           <MultiSelectIcon />
         </IconToolButton>
 
+        {/* Solo en mobile: ahí no hay ⌘V ni clic derecho, así que sin este
+            botón no habría forma de pegar. En desktop sobra — el atajo de
+            siempre ya funciona sobre todo el lienzo. */}
+        <span className="desktop:hidden">
+          <IconToolButton onClick={() => void pasteFromSystem(viewCenter())} label="Pegar">
+            <PasteIcon />
+          </IconToolButton>
+        </span>
+
         {selectedIds.size > 0 && (
           <span className="flex h-[30px] items-center rounded border border-line-2 bg-[var(--bg)]/90 px-2 text-[10px] font-bold tracking-label text-tx-3 uppercase backdrop-blur">
             {selectedIds.size} {selectedIds.size === 1 ? "elegido" : "elegidos"}
@@ -1715,57 +1685,6 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
           onBack={() => setExportStep({ step: "setup" })}
           onExport={() => void runExport(exportStep.preset, exportStep.orientation)}
         />
-      )}
-
-      {canvasMenu && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onPointerDown={() => setCanvasMenu(null)}
-            onContextMenu={(e) => e.preventDefault()}
-          />
-          <div
-            style={{
-              left: Math.min(canvasMenu.x, window.innerWidth - 180),
-              top: Math.min(canvasMenu.y, window.innerHeight - 180),
-            }}
-            className="fixed z-50 flex w-[168px] flex-col gap-0.5 rounded border border-line-2 bg-[var(--bg)] p-1.5 shadow-lg"
-          >
-            <ClipboardRow
-              label="Pegar"
-              onClick={() => {
-                const at = canvasMenu.at;
-                setCanvasMenu(null);
-                void pasteFromSystem(at);
-              }}
-            />
-            <ClipboardRow
-              label={`Copiar${selectedIds.size ? ` (${selectedIds.size})` : ""}`}
-              disabled={selectedIds.size === 0}
-              onClick={() => {
-                setCanvasMenu(null);
-                void copySelection();
-              }}
-            />
-            <ClipboardRow
-              label={`Cortar${selectedIds.size ? ` (${selectedIds.size})` : ""}`}
-              disabled={selectedIds.size === 0}
-              onClick={() => {
-                setCanvasMenu(null);
-                void cutSelection();
-              }}
-            />
-            <div className="my-1 h-px bg-line" />
-            <ClipboardRow
-              label="Seleccionar todo"
-              disabled={elements.length === 0}
-              onClick={() => {
-                setCanvasMenu(null);
-                setSelectedIds(new Set(elements.map((el) => el.id)));
-              }}
-            />
-          </div>
-        </>
       )}
 
       {menu && (
@@ -2063,27 +1982,6 @@ function IconToolButton({
   );
 }
 
-function ClipboardRow({
-  label,
-  onClick,
-  disabled,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded px-2 py-1.5 text-left text-xs text-tx-2 transition-colors duration-[400ms] hover:bg-panel-2 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
-    >
-      {label}
-    </button>
-  );
-}
-
 function IconBtn({
   onClick,
   label,
@@ -2162,6 +2060,18 @@ function ExportIcon() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <path d="M7 10l5 5 5-5" />
       <path d="M12 15V3" />
+    </svg>
+  );
+}
+
+/** Portapapeles clásico. */
+function PasteIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M9 13h6" />
+      <path d="M9 17h4" />
     </svg>
   );
 }
