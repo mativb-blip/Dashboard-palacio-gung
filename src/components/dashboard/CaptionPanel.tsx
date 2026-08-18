@@ -22,6 +22,7 @@ import {
 } from "@/lib/dashboard/proposals-actions";
 import {
   describeInstagramMusicUrl,
+  instagramEmbedSrc,
   normalizeInstagramMusicUrl,
 } from "@/lib/dashboard/instagram-music";
 import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
@@ -560,6 +561,10 @@ function MusicSection({
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
+  // Uno solo a la vez, y montado recién al abrirlo: cada reproductor es un
+  // iframe de Instagram (varios cientos de KB), y dos sonando juntos no le
+  // sirven a nadie.
+  const [playingId, setPlayingId] = useState("");
 
   function handleAdd() {
     // La misma validación corre en el server (es la que manda); acá se repite
@@ -611,49 +616,94 @@ function MusicSection({
           <p className="text-[13px] text-tx-3">Sin música propuesta.</p>
         )}
 
-        {options.map((option) => (
-          <div
-            key={option.id}
-            className={`flex items-center gap-2 rounded border px-3 py-2 transition-[border-color,background-color] duration-[400ms] ${
-              option.selected ? "border-brand-blue bg-brand-blue/[0.05]" : "border-line-2 bg-panel-2"
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => onSelect(option.id, !option.selected)}
-              disabled={busy}
-              aria-pressed={option.selected}
-              title={option.selected ? "Quitar la selección" : "Elegir esta música"}
-              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-[400ms] disabled:cursor-default ${PRESS_SCALE_CLASS} ${
-                option.selected ? "border-brand-blue bg-brand-blue" : "border-line-2 hover:border-brand-blue"
+        {options.map((option) => {
+          const embedSrc = instagramEmbedSrc(option.url);
+          const playing = playingId === option.id;
+          return (
+            <div
+              key={option.id}
+              className={`rounded border transition-[border-color,background-color] duration-[400ms] ${
+                option.selected ? "border-brand-blue bg-brand-blue/[0.05]" : "border-line-2 bg-panel-2"
               }`}
             >
-              {option.selected && <CheckIcon className="check-pop-in h-2.5 w-2.5 text-[var(--bg)]" />}
-            </button>
-            <a
-              href={option.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="min-w-0 flex-1 truncate text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue hover:underline"
-              title={option.url}
-            >
-              {option.label || describeInstagramMusicUrl(option.url)}
-            </a>
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => onDelete(option.id)}
-                onPointerEnter={handleLiquidPointerEnter}
-                disabled={busy}
-                title="Quitar esta música"
-                aria-label="Quitar esta música"
-                className={`${iconButtonClass} shrink-0`}
-              >
-                <TrashIcon className="relative" />
-              </button>
-            )}
-          </div>
-        ))}
+              <div className="flex items-center gap-2 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => onSelect(option.id, !option.selected)}
+                  disabled={busy}
+                  aria-pressed={option.selected}
+                  title={option.selected ? "Quitar la selección" : "Elegir esta música"}
+                  className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-[400ms] disabled:cursor-default ${PRESS_SCALE_CLASS} ${
+                    option.selected ? "border-brand-blue bg-brand-blue" : "border-line-2 hover:border-brand-blue"
+                  }`}
+                >
+                  {option.selected && <CheckIcon className="check-pop-in h-2.5 w-2.5 text-[var(--bg)]" />}
+                </button>
+                <a
+                  href={option.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-w-0 flex-1 truncate text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue hover:underline"
+                  title={option.url}
+                >
+                  {option.label || describeInstagramMusicUrl(option.url)}
+                </a>
+                {embedSrc && (
+                  <button
+                    type="button"
+                    onClick={() => setPlayingId(playing ? "" : option.id)}
+                    onPointerEnter={handleLiquidPointerEnter}
+                    aria-expanded={playing}
+                    title={playing ? "Cerrar la vista previa" : "Ver el reel"}
+                    aria-label={playing ? "Cerrar la vista previa" : "Ver el reel"}
+                    className={`${iconButtonClass} shrink-0${playing ? " border-brand-blue bg-brand-blue/[0.06] text-brand-blue" : ""}`}
+                  >
+                    {playing ? <CloseIcon className="relative" /> : <EyeIcon className="relative" />}
+                  </button>
+                )}
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(option.id)}
+                    onPointerEnter={handleLiquidPointerEnter}
+                    disabled={busy}
+                    title="Quitar esta música"
+                    aria-label="Quitar esta música"
+                    className={`${iconButtonClass} shrink-0`}
+                  >
+                    <TrashIcon className="relative" />
+                  </button>
+                )}
+              </div>
+
+              {embedSrc && playing && (
+                <div className="border-t border-line-2 px-3 py-3">
+                  {/* Mismo iframe directo a /embed que usa /estrategia — el
+                      chrome de adentro (header, "Ver perfil") es de Instagram
+                      y vive en otro origen, no se puede re-tematizar. Y su
+                      botón de play NO reproduce acá: abre Instagram en una
+                      pestaña nueva (ver instagramEmbedSrc). */}
+                  <iframe
+                    src={embedSrc}
+                    className="mx-auto aspect-[9/16] w-full max-w-[240px] rounded"
+                    style={{ border: 0 }}
+                    allow="autoplay; encrypted-media; fullscreen"
+                    allowFullScreen
+                    scrolling="no"
+                    title={option.label || "Reel de Instagram"}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {options.length > 0 && (
+          <p className="text-[11px] leading-[1.4] text-tx-3">
+            Instagram no deja reproducir su contenido fuera de Instagram: la vista previa muestra la
+            portada y el play abre la canción en una pestaña nueva.
+          </p>
+        )}
 
         {adding && (
           <div className="flex flex-col gap-2">
@@ -663,11 +713,15 @@ function MusicSection({
                 setUrl(e.target.value);
                 setError("");
               }}
-              placeholder="Pegá el enlace de Instagram"
+              placeholder="Pegá el enlace del reel o del audio"
               inputMode="url"
               autoFocus
               className="min-h-9 w-full rounded border border-line-2 bg-panel-2 px-3 text-[13px] text-brand-ink"
             />
+            <p className="text-[11px] leading-[1.4] text-tx-3">
+              Si pegás el reel que usa la canción, se ve la portada acá; la página de audio queda
+              solo como enlace.
+            </p>
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
@@ -814,4 +868,42 @@ function fallbackCopy(text: string) {
   } finally {
     document.body.removeChild(ta);
   }
+}
+
+function EyeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
 }

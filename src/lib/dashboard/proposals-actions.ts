@@ -7,7 +7,10 @@ import type { Prisma } from "@/generated/prisma/client";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { sendAlertEmail, sendCommentNotification } from "@/lib/dashboard/notify-email";
 import { sendPushToAdmins } from "@/lib/dashboard/notify-push";
-import { normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
+import {
+  describeInstagramMusicUrl,
+  normalizeInstagramMusicUrl,
+} from "@/lib/dashboard/instagram-music";
 import {
   CAPTION_OPTIONS_LIMIT,
   computeProposalStatus,
@@ -204,6 +207,43 @@ const CONTENT_FIELDS = ["date", "caption", "images", "video"] as const;
  * texto de "aprobación invalidada". */
 function editorName(session: { user: { name?: string | null; email?: string | null } }): string {
   return session.user.name || session.user.email || "Desconocido";
+}
+
+/** Aviso al Admin de que alguien eligió una alternativa (caption o música).
+ *
+ * No se manda cuando el que elige es Admin: el destinatario es él mismo
+ * (getAdminEmail), y avisarle de su propio click es ruido — el aviso existe
+ * para enterarse de lo que hace Jun, que es Comentarista.
+ *
+ * El cuerpo va de una sola línea a propósito: sendAlertEmail lo mete escapado
+ * dentro de un único <p>, así que un \n no se vería. */
+async function notifyChoice(
+  session: { user: { role: string; name?: string | null; email?: string | null } },
+  title: string,
+  body: string,
+): Promise<void> {
+  if (session.user.role === "ADMIN") return;
+  const to = await getAdminEmail();
+  await Promise.all([
+    to ? sendAlertEmail({ to, title, body }) : Promise.resolve(),
+    sendPushToAdmins({ title, body }),
+  ]);
+}
+
+/** Texto de una línea para el cuerpo del mail — un caption largo entero
+ * convierte el aviso en un muro. */
+function excerpt(text: string, max = 160): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
+
+/** Nombre legible de la propuesta para los avisos. */
+async function proposalLabel(proposalId: string): Promise<string> {
+  const row = await prisma.proposal.findUnique({
+    where: { id: proposalId },
+    select: { title: true },
+  });
+  return row?.title ? `"${row.title}"` : "Un post";
 }
 
 /** Guarda el estado anterior del caption/media antes de pisarlo (ficha 5) y
@@ -624,7 +664,21 @@ export async function selectCaptionOption(optionId: string): Promise<CaptionOpti
   ]);
 
   const extra = await commitCaptionMirror(option.proposalId, option.text, editorName(session));
-  return captionResult(option.proposalId, extra);
+  const result = await captionResult(option.proposalId, extra);
+
+  const position = result.captionOptions.findIndex((o) => o.id === optionId);
+  const label = await proposalLabel(option.proposalId);
+  await notifyChoice(
+    session,
+    `${editorName(session)} eligió un caption`,
+    `${label}${position >= 0 ? ` — alternativa ${position + 1} de ${result.captionOptions.length}` : ""}: ` +
+      excerpt(option.text) +
+      // Si la propuesta ya estaba aprobada, elegir otra alternativa la
+      // desaprueba (ver commitCaptionMirror) — eso es lo que hay que hacer,
+      // y el Admin necesita enterarse en el mismo aviso.
+      (extra.approvalInvalidatedReason ? " — Esto invalidó la aprobación anterior." : ""),
+  );
+  return result;
 }
 
 async function listMusicOptions(proposalId: string): Promise<ProposalMusicOption[]> {
@@ -684,10 +738,13 @@ export async function setMusicOptionSelected(
   optionId: string,
   selected: boolean,
 ): Promise<ProposalMusicOption[]> {
-  await requireSession();
+  const session = await requireSession();
   const option = await prisma.proposalMusicOption.findUnique({ where: { id: optionId } });
   if (!option) throw new Error("Esa música ya no existe.");
 
+  // Desmarcar no avisa: la propuesta se queda sin música elegida, que es un
+  // estado válido (un post puede no llevar ninguna) y no una decisión que el
+  // Admin necesite recibir por mail.
   if (!selected) {
     await prisma.proposalMusicOption.update({ where: { id: optionId }, data: { selected: false } });
     return listMusicOptions(option.proposalId);
@@ -700,5 +757,13 @@ export async function setMusicOptionSelected(
     }),
     prisma.proposalMusicOption.update({ where: { id: optionId }, data: { selected: true } }),
   ]);
-  return listMusicOptions(option.proposalId);
+  const result = await listMusicOptions(option.proposalId);
+
+  const label = await proposalLabel(option.proposalId);
+  await notifyChoice(
+    session,
+    `${editorName(session)} eligió la música`,
+    `${label}: ${option.label || describeInstagramMusicUrl(option.url)} — ${option.url}`,
+  );
+  return result;
 }
