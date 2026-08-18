@@ -141,6 +141,11 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
   /** Modo de selección múltiple para touch: sin Shift disponible, cada toque
    * suma o saca de la selección mientras está activo. */
   const [multiSelect, setMultiSelect] = useState(false);
+  /** Con el tablero bloqueado, tocar solo desplaza y hace zoom: los elementos
+   * no se mueven, no se redimensionan y la selección queda congelada. En
+   * touch es muy fácil arrastrar una foto sin querer mientras se navega, y
+   * deshacer eso a mano es tedioso. */
+  const [locked, setLocked] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [interactiveId, setInteractiveId] = useState<string | null>(null);
   const [view, setView] = useState<ViewState>({ x: 0, y: 0, scale: 1 });
@@ -262,6 +267,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
   // necesita leer la selección y los elementos actuales sin re-registrarse.
   const selectedIdsRef = useRef(selectedIds);
   const elementsRef = useRef(elements);
+  const lockedRef = useRef(locked);
 
   // Único punto donde se actualizan los espejos (ver el comentario de arriba):
   // sin lista de dependencias, corre después de cada render.
@@ -272,6 +278,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
     flushRef.current = flush;
     selectedIdsRef.current = selectedIds;
     elementsRef.current = elements;
+    lockedRef.current = locked;
   });
 
   // Al desmontar (cambio de sesión, salir de la página) va lo que quede
@@ -676,7 +683,8 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       // Va acá y no en el pointerdown a propósito: si arranca un long-press,
       // el menú de portapapeles necesita la selección todavía viva para poder
       // ofrecer Copiar/Cortar.
-      if (!it.moved) {
+      // Bloqueado, la selección está congelada: un toque al fondo no la borra.
+      if (!it.moved && !lockedRef.current) {
         setSelectedIds(new Set());
         setEditingId(null);
         setInteractiveId(null);
@@ -741,7 +749,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         // ¿El gesto empezó sobre algo que ya estaba seleccionado? Alcanza con
         // que UNO de los dos dedos caiga encima: pellizcar una imagen chica
         // deja el otro dedo afuera casi siempre.
-        const onSelection = [a, b].some((point) => {
+        const onSelection = !lockedRef.current && [a, b].some((point) => {
           const hit = document.elementFromPoint(point.x, point.y);
           const owner = hit instanceof Element ? hit.closest<HTMLElement>("[data-el-id]") : null;
           return Boolean(owner?.dataset.elId && selectedIdsRef.current.has(owner.dataset.elId));
@@ -972,6 +980,9 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
   ) {
     if (e.button !== 0) return;
     if (editingId === element.id) return;
+    // Bloqueado: el toque no llega al elemento, así que cae al lienzo y
+    // desplaza la vista — que es lo que se espera al navegar un tablero.
+    if (locked) return;
     e.stopPropagation();
 
     const node = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-el-id]");
@@ -1111,19 +1122,20 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         void copySelection();
         return;
       }
-      if (meta && e.key.toLowerCase() === "x" && selectedIds.size) {
+      // Copiar sí, pero nada que modifique el tablero mientras esté bloqueado.
+      if (meta && e.key.toLowerCase() === "x" && selectedIds.size && !locked) {
         e.preventDefault();
         void cutSelection();
         return;
       }
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size && !locked) {
         e.preventDefault();
         void deleteSelection();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedIds, elements, copySelection, cutSelection, deleteSelection]);
+  }, [selectedIds, elements, locked, copySelection, cutSelection, deleteSelection]);
 
   // ── Acciones sobre un elemento ──────────────────────────────────────────
 
@@ -1564,6 +1576,24 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
           capturing ? "hidden" : ""
         }`}
       >
+        {/* Solo en mobile: en desktop el puntero es preciso y no hace falta
+            protegerse de arrastres accidentales. */}
+        <span className="desktop:hidden flex items-center">
+          <button
+            type="button"
+            onClick={() => setLocked((v) => !v)}
+            title={locked ? "Desbloquear el tablero" : "Bloquear selección"}
+            aria-label={locked ? "Desbloquear el tablero" : "Bloquear selección"}
+            aria-pressed={locked}
+            className={`flex h-6 w-6 items-center justify-center rounded transition-colors duration-[400ms] ${PRESS_SCALE_CLASS} ${
+              locked ? "bg-brand-blue text-[var(--bg)]" : "text-tx-2 hover:bg-panel-2 hover:text-brand-blue"
+            }`}
+          >
+            {locked ? <LockClosedIcon /> : <LockOpenIcon />}
+          </button>
+          <span className="mx-0.5 h-4 w-px bg-line" />
+        </span>
+
         <IconBtn onClick={() => zoomBy(1 / 1.2)} label="Alejar">
           −
         </IconBtn>
@@ -2060,6 +2090,26 @@ function ExportIcon() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <path d="M7 10l5 5 5-5" />
       <path d="M12 15V3" />
+    </svg>
+  );
+}
+
+/** Candado cerrado: el tablero está bloqueado. */
+function LockClosedIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="10.5" width="16" height="10.5" rx="2" />
+      <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+    </svg>
+  );
+}
+
+/** Candado abierto: se puede tocar y mover todo. */
+function LockOpenIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="10.5" width="16" height="10.5" rx="2" />
+      <path d="M8 10.5V7a4 4 0 0 1 7.5-1.9" />
     </svg>
   );
 }
