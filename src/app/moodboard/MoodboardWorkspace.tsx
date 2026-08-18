@@ -16,6 +16,9 @@ import MoodboardCanvas from "./MoodboardCanvas";
 
 interface MoodboardWorkspaceProps {
   initialSessions: MoodboardSessionSummary[];
+  /** Solo el Admin edita. Para el resto esto es un tablero de consulta: se
+   * navega y se exporta, pero no se toca nada. */
+  canEdit: boolean;
 }
 
 function defaultSessionName(): string {
@@ -28,7 +31,7 @@ function formatCreated(iso: string): string {
   return new Date(iso).toLocaleDateString("es-DO", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspaceProps) {
+export default function MoodboardWorkspace({ initialSessions, canEdit }: MoodboardWorkspaceProps) {
   const { brandName } = useBrand();
   const [sessions, setSessions] = useState(initialSessions);
   const [activeId, setActiveId] = useState<string | null>(
@@ -175,7 +178,7 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
 
         {current && (
           <>
-            {renaming ? (
+            {renaming && canEdit ? (
               <input
                 autoFocus
                 defaultValue={current.name}
@@ -192,10 +195,12 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
             ) : (
               <button
                 type="button"
-                onDoubleClick={() => setRenaming(true)}
-                onClick={() => setRenaming(true)}
-                title="Renombrar sesión"
-                className="min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-sm font-bold transition-colors duration-[400ms] hover:bg-panel-2"
+                onDoubleClick={() => canEdit && setRenaming(true)}
+                onClick={() => canEdit && setRenaming(true)}
+                title={canEdit ? "Renombrar sesión" : current.name}
+                className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-sm font-bold transition-colors duration-[400ms] ${
+                  canEdit ? "hover:bg-panel-2" : "cursor-default"
+                }`}
               >
                 {current.name}
                 {current.archived && (
@@ -210,24 +215,34 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
               {formatCreated(current.createdAt)}
             </span>
 
-            <button
-              type="button"
-              onClick={() => void handleToggleArchive()}
-              title={current.archived ? "Desarchivar sesión" : "Archivar sesión"}
-              aria-label={current.archived ? "Desarchivar sesión" : "Archivar sesión"}
-              className={iconButtonClass}
-            >
-              <ArchiveIcon className="relative" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleDelete()}
-              title="Borrar sesión"
-              aria-label="Borrar sesión"
-              className={`${iconButtonClass} hover:border-brand-red hover:text-brand-red`}
-            >
-              <TrashIcon className="relative" />
-            </button>
+            {canEdit && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleToggleArchive()}
+                  title={current.archived ? "Desarchivar sesión" : "Archivar sesión"}
+                  aria-label={current.archived ? "Desarchivar sesión" : "Archivar sesión"}
+                  className={iconButtonClass}
+                >
+                  <ArchiveIcon className="relative" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  title="Borrar sesión"
+                  aria-label="Borrar sesión"
+                  className={`${iconButtonClass} hover:border-brand-red hover:text-brand-red`}
+                >
+                  <TrashIcon className="relative" />
+                </button>
+              </>
+            )}
+
+            {!canEdit && (
+              <span className="rounded-sm border border-line-2 px-1.5 py-0.5 text-[10px] font-bold tracking-label text-tx-3 uppercase">
+                Solo lectura
+              </span>
+            )}
           </>
         )}
 
@@ -236,14 +251,16 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
             {/* Capa de cierre por click afuera — sin listener global en document. */}
             <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
             <div className="glass-strong absolute top-full left-4 z-20 mt-1 flex max-h-[60vh] w-[300px] flex-col overflow-y-auto rounded border border-line-2 p-1.5 shadow-lg desktop:left-8">
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                className={`mb-1 flex items-center gap-2 rounded bg-brand-blue px-3 py-2 text-xs font-bold tracking-label text-[var(--bg)] uppercase ${PRESS_SCALE_CLASS}`}
-              >
-                <PlusIcon />
-                Nueva sesión
-              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => void handleCreate()}
+                  className={`mb-1 flex items-center gap-2 rounded bg-brand-blue px-3 py-2 text-xs font-bold tracking-label text-[var(--bg)] uppercase ${PRESS_SCALE_CLASS}`}
+                >
+                  <PlusIcon />
+                  Nueva sesión
+                </button>
+              )}
 
               {active.map((s) => (
                 <SessionRow
@@ -305,17 +322,20 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
               Tu tablero de referencias
             </h2>
             <p className="max-w-sm text-sm leading-relaxed text-tx-2">
-              Pegá capturas, arrastrá archivos y guardá links de reels en un lienzo libre. Cuando una
-              referencia sirva, se convierte en propuesta con un clic.
+              {canEdit
+                ? "Pegá capturas, arrastrá archivos y guardá links de reels en un lienzo libre. Cuando una referencia sirva, se convierte en propuesta con un clic."
+                : "Todavía no hay tableros para ver. Cuando el Administrador arme uno, va a aparecer acá."}
             </p>
-            <button
-              type="button"
-              onClick={() => void handleCreate()}
-              className={`flex items-center gap-2 rounded bg-brand-blue px-4 py-2.5 text-xs font-bold tracking-label text-[var(--bg)] uppercase ${PRESS_SCALE_CLASS}`}
-            >
-              <PlusIcon />
-              Crear primera sesión
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                className={`flex items-center gap-2 rounded bg-brand-blue px-4 py-2.5 text-xs font-bold tracking-label text-[var(--bg)] uppercase ${PRESS_SCALE_CLASS}`}
+              >
+                <PlusIcon />
+                Crear primera sesión
+              </button>
+            )}
           </div>
         )}
 
@@ -326,6 +346,7 @@ export default function MoodboardWorkspace({ initialSessions }: MoodboardWorkspa
           <MoodboardCanvas
             key={current.id}
             session={current}
+            canEdit={canEdit}
             onElementCountChange={(count) => patchSummary(current.id, { elementCount: count })}
           />
         )}

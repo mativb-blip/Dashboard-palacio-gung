@@ -3,9 +3,10 @@ import { auth } from "@/lib/auth";
 import { listSessions } from "./actions";
 import MoodboardWorkspace from "./MoodboardWorkspace";
 
-/** Tablero personal del Admin — no es parte del flujo de aprobación que ve el
- * cliente. El gate se repite en cada server action (ver requireAdmin en
- * actions.ts): esto solo evita renderizar la pantalla al que no corresponde. */
+/** Tablero de referencias del Admin. Lo EDITA solo él; el resto de los roles
+ * lo ve en modo lectura, para tener a mano el material de referencia sin
+ * poder tocarlo. El gate real de escritura vive en cada server action (ver
+ * requireAdmin en actions.ts): esconder los controles no es un permiso. */
 export default async function MoodboardPage() {
   const session = await auth();
 
@@ -18,18 +19,10 @@ export default async function MoodboardPage() {
     );
   }
 
-  if (session.user.role !== "ADMIN") {
-    return (
-      <AccessMessage
-        title="Acceso restringido"
-        message="El Moodboard es un espacio de trabajo personal del Administrador."
-      />
-    );
-  }
-
   const sessions = await listSessions();
+  const canEdit = session.user.role === "ADMIN";
 
-  return <MoodboardWorkspace initialSessions={sessions} />;
+  return <MoodboardWorkspace initialSessions={sessions} canEdit={canEdit} />;
 }
 
 function AccessMessage({ title, message }: { title: string; message: string }) {

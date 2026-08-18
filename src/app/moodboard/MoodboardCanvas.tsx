@@ -120,6 +120,8 @@ interface UploadChip {
 interface MoodboardCanvasProps {
   session: MoodboardSessionDetail;
   onElementCountChange: (count: number) => void;
+  /** Solo el Admin edita; el resto ve el tablero y no puede tocarlo. */
+  canEdit: boolean;
 }
 
 const RAD = Math.PI / 180;
@@ -135,7 +137,7 @@ function paint(node: HTMLElement, g: Geometry) {
   node.style.height = `${g.height}px`;
 }
 
-export default function MoodboardCanvas({ session, onElementCountChange }: MoodboardCanvasProps) {
+export default function MoodboardCanvas({ session, onElementCountChange, canEdit }: MoodboardCanvasProps) {
   const [elements, setElements] = useState<MoodboardElement[]>(session.elements);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   /** Modo de selección múltiple para touch: sin Shift disponible, cada toque
@@ -146,6 +148,10 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
    * touch es muy fácil arrastrar una foto sin querer mientras se navega, y
    * deshacer eso a mano es tedioso. */
   const [locked, setLocked] = useState(false);
+  /** Sin permiso de edición el tablero está bloqueado siempre — es
+   * exactamente el mismo comportamiento, así que se reutiliza en vez de
+   * duplicar los cortes en cada gesto. */
+  const frozen = locked || !canEdit;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [interactiveId, setInteractiveId] = useState<string | null>(null);
   const [view, setView] = useState<ViewState>({ x: 0, y: 0, scale: 1 });
@@ -267,7 +273,8 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
   // necesita leer la selección y los elementos actuales sin re-registrarse.
   const selectedIdsRef = useRef(selectedIds);
   const elementsRef = useRef(elements);
-  const lockedRef = useRef(locked);
+  const frozenRef = useRef(frozen);
+  const canEditRef = useRef(canEdit);
 
   // Único punto donde se actualizan los espejos (ver el comentario de arriba):
   // sin lista de dependencias, corre después de cada render.
@@ -278,7 +285,8 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
     flushRef.current = flush;
     selectedIdsRef.current = selectedIds;
     elementsRef.current = elements;
-    lockedRef.current = locked;
+    frozenRef.current = frozen;
+    canEditRef.current = canEdit;
   });
 
   // Al desmontar (cambio de sesión, salir de la página) va lo que quede
@@ -523,6 +531,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
   // y el usuario viene de copiar en otra app. Se ignora si está escribiendo.
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
+      if (!canEditRef.current) return;
       // `instanceof Element` y no un cast: el target de un evento puede ser
       // `window` o un nodo de texto, y ahí `closest` no existe.
       const target = e.target;
@@ -684,7 +693,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
       // el menú de portapapeles necesita la selección todavía viva para poder
       // ofrecer Copiar/Cortar.
       // Bloqueado, la selección está congelada: un toque al fondo no la borra.
-      if (!it.moved && !lockedRef.current) {
+      if (!it.moved && !frozenRef.current) {
         setSelectedIds(new Set());
         setEditingId(null);
         setInteractiveId(null);
@@ -749,7 +758,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         // ¿El gesto empezó sobre algo que ya estaba seleccionado? Alcanza con
         // que UNO de los dos dedos caiga encima: pellizcar una imagen chica
         // deja el otro dedo afuera casi siempre.
-        const onSelection = !lockedRef.current && [a, b].some((point) => {
+        const onSelection = !frozenRef.current && [a, b].some((point) => {
           const hit = document.elementFromPoint(point.x, point.y);
           const owner = hit instanceof Element ? hit.closest<HTMLElement>("[data-el-id]") : null;
           return Boolean(owner?.dataset.elId && selectedIdsRef.current.has(owner.dataset.elId));
@@ -982,7 +991,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
     if (editingId === element.id) return;
     // Bloqueado: el toque no llega al elemento, así que cae al lienzo y
     // desplaza la vista — que es lo que se espera al navegar un tablero.
-    if (locked) return;
+    if (frozen) return;
     e.stopPropagation();
 
     const node = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-el-id]");
@@ -1123,19 +1132,19 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         return;
       }
       // Copiar sí, pero nada que modifique el tablero mientras esté bloqueado.
-      if (meta && e.key.toLowerCase() === "x" && selectedIds.size && !locked) {
+      if (meta && e.key.toLowerCase() === "x" && selectedIds.size && !frozen) {
         e.preventDefault();
         void cutSelection();
         return;
       }
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size && !locked) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size && !frozen) {
         e.preventDefault();
         void deleteSelection();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedIds, elements, locked, copySelection, cutSelection, deleteSelection]);
+  }, [selectedIds, elements, frozen, copySelection, cutSelection, deleteSelection]);
 
   // ── Acciones sobre un elemento ──────────────────────────────────────────
 
@@ -1384,6 +1393,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
         ref={viewportRef}
         onPointerDown={handleViewportPointerDown}
         onDragOver={(e) => {
+          if (!canEdit) return;
           e.preventDefault();
           setDragOver(true);
         }}
@@ -1391,6 +1401,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
           if (e.currentTarget === e.target) setDragOver(false);
         }}
         onDrop={(e) => {
+          if (!canEdit) return;
           e.preventDefault();
           setDragOver(false);
           const files = Array.from(e.dataTransfer.files ?? []);
@@ -1450,9 +1461,10 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
               onPointerDownBody={(e, el) => beginElementInteraction(e, el, "move")}
               onPointerDownHandle={(e, el, handle) => beginElementInteraction(e, el, "resize", handle)}
               onPointerDownRotate={(e, el) => beginElementInteraction(e, el, "rotate")}
-              onOpenMenu={(cx, cy, el) => setMenu({ element: el, x: cx, y: cy })}
+              onOpenMenu={(cx, cy, el) => canEdit && setMenu({ element: el, x: cx, y: cy })}
               onCommitText={handleCommitText}
               onStartEdit={(id) => {
+                if (!canEdit) return;
                 selectOnly(id);
                 setEditingId(id);
               }}
@@ -1474,7 +1486,7 @@ export default function MoodboardCanvas({ session, onElementCountChange }: Moodb
 
       {/* Herramientas del tablero — flotan sobre el lienzo, no le comen alto.
           Se esconden durante la captura para no salir impresas. */}
-      <div className={`absolute top-3 left-3 z-20 flex flex-wrap items-start gap-1.5 ${capturing ? "hidden" : ""}`}>
+      <div className={`absolute top-3 left-3 z-20 flex flex-wrap items-start gap-1.5 ${capturing || !canEdit ? "hidden" : ""}`}>
         <ToolButton onClick={() => fileInputRef.current?.click()} label="Subir">
           <UploadIcon />
         </ToolButton>

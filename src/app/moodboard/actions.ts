@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { deriveTitle } from "@/lib/dashboard/proposals";
 import { sanitizeRichText, TEXT_ALIGNS, type TextAlign } from "@/lib/dashboard/rich-text";
+import type { Role } from "@/generated/prisma/client";
 import {
   DEFAULT_ELEMENT_SIZE,
   isTextElement,
@@ -24,17 +25,37 @@ const ELEMENT_TYPES: MoodboardElementType[] = [
   "text-panel",
 ];
 
-/** El Moodboard es material de trabajo del Admin, no del cliente — a
- * diferencia de las propuestas (que cualquier sesión puede leer y comentar),
- * acá el gate es ADMIN en cada action, igual que en usuarios/actions.ts. La
- * sección tampoco se muestra en el Topbar a otros roles, pero el chequeo real
- * vive acá: ocultar un botón no es un permiso. */
+/** El Moodboard lo EDITA solo el Admin. Este gate va en cada action que
+ * escribe; ocultar un botón no es un permiso. Mismo criterio que
+ * usuarios/actions.ts. */
 async function requireAdmin() {
   const session = await auth();
   if (session?.user.role !== "ADMIN") {
-    throw new Error("Solo un Administrador puede usar el Moodboard.");
+    throw new Error("Solo un Administrador puede editar el Moodboard.");
   }
   return session;
+}
+
+/** Leer, en cambio, lo puede cualquiera con sesión: el tablero se comparte
+ * como referencia con quien revisa el contenido. */
+async function requireSession() {
+  const session = await auth();
+  if (!session) throw new Error("Necesitás iniciar sesión.");
+  return session;
+}
+
+/** De quién son los tableros que se muestran. Un Admin ve los suyos; el
+ * resto ve los del Admin — este dashboard está pensado para un solo Admin
+ * real (mismo supuesto que getAdminEmail en site-settings.ts), así que se
+ * toma el primero por antigüedad. Devuelve null si no hay ninguno. */
+async function boardsOwnerId(user: { id: string; role: Role }): Promise<string | null> {
+  if (user.role === "ADMIN") return user.id;
+  const admin = await prisma.user.findFirst({
+    where: { role: "ADMIN" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return admin?.id ?? null;
 }
 
 /** Además del rol, cada sesión pertenece a quien la creó: un segundo Admin no
@@ -89,9 +110,15 @@ function toElement(row: ElementRow): MoodboardElement {
 // ── Sesiones ──────────────────────────────────────────────────────────────
 
 export async function listSessions(): Promise<MoodboardSessionSummary[]> {
-  const session = await requireAdmin();
+  const session = await requireSession();
+  const ownerId = await boardsOwnerId(session.user);
+  if (!ownerId) return [];
+
+  const canEdit = session.user.role === "ADMIN";
   const rows = await prisma.moodboardSession.findMany({
-    where: { ownerId: session.user.id },
+    // A quien solo mira no le mostramos las archivadas: son el orden interno
+    // del Admin, no material para compartir.
+    where: { ownerId, ...(canEdit ? {} : { archivedAt: null }) },
     orderBy: [{ archivedAt: "asc" }, { createdAt: "desc" }],
     include: { _count: { select: { elements: true } } },
   });
@@ -105,9 +132,16 @@ export async function listSessions(): Promise<MoodboardSessionSummary[]> {
 }
 
 export async function getSession(sessionId: string): Promise<MoodboardSessionDetail | null> {
-  const authSession = await requireAdmin();
+  const authSession = await requireSession();
+  const ownerId = await boardsOwnerId(authSession.user);
+  if (!ownerId) return null;
+
   const row = await prisma.moodboardSession.findFirst({
-    where: { id: sessionId, ownerId: authSession.user.id },
+    where: {
+      id: sessionId,
+      ownerId,
+      ...(authSession.user.role === "ADMIN" ? {} : { archivedAt: null }),
+    },
     include: {
       elements: { orderBy: { zIndex: "asc" } },
       _count: { select: { elements: true } },

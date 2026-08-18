@@ -47,10 +47,6 @@ const mobileRowClass =
 
 export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { data: session } = useSession();
-  // El Moodboard es espacio de trabajo personal del Admin — para el resto de
-  // los roles el ítem ni aparece (el gate real vive en moodboard/actions.ts).
-  const isAdmin = session?.user.role === "ADMIN";
 
   // Si la ventana crece a desktop con el menú de mobile abierto (resize,
   // rotar una tablet), cerrarlo — el botón de hamburguesa ya está oculto ahí
@@ -79,7 +75,9 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
   });
 
   const items: SegmentedItem[] = [
-    ...(isAdmin ? [pageItem("moodboard", "Moodboard", "/moodboard")] : []),
+    // El Moodboard lo ven todos los roles; editarlo, solo el Admin (el gate
+    // de escritura vive en moodboard/actions.ts).
+    pageItem("moodboard", "Moodboard", "/moodboard"),
     pageItem("estrategia", "Estrategia", "/estrategia"),
     pageItem("calendario", "Calendario", "/calendario"),
     standalone
