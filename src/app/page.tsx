@@ -114,6 +114,13 @@ function DashboardHome() {
     }
   }
 
+  /** Patch solo local — lo usan las acciones que guardan por su cuenta (las
+   * alternativas de caption y las músicas, ver CaptionPanel) y necesitan
+   * volcar acá lo que el server ya persistió. */
+  function handlePatchProposal(id: string, patch: Partial<Proposal>) {
+    setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
   async function handleUpdateProposal(id: string, patch: Partial<Proposal>) {
     setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
     try {
@@ -240,6 +247,7 @@ function DashboardHome() {
                   key={`caption-${selectedProposal.id}`}
                   proposal={selectedProposal}
                   onUpdateProposal={handleUpdateProposal}
+                  onPatchProposal={handlePatchProposal}
                   onDeleteProposal={handleDeleteProposal}
                 />
                 <div className="h-px bg-line" />

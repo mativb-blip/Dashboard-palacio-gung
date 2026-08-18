@@ -39,6 +39,16 @@ El estado de una propuesta se deriva automáticamente (no se elige a mano): **Pe
 
 **Historial de versiones**: cada vez que se edita `date`/`caption`/`images`/`video`, `updateProposal()` guarda un snapshot del valor *anterior* en `ProposalVersion` (podado a las últimas `PROPOSAL_VERSION_LIMIT` = 8 por propuesta) — "Ver historial" en `CaptionPanel` abre `VersionHistoryModal` con Antes/Ahora en paralelo.
 
+## Alternativas de caption y música
+El Editor/Admin puede cargar **varias alternativas de caption** en la vista Post y Jun (Comentarista) elige **una sola**. La elegida se refleja en `Proposal.caption`, que sigue siendo el caption "real" para el título, las versiones, el preview, el export y las notificaciones — por eso `caption` no se derivó de la relación: hay once archivos que lo consumen y el espejo los deja intactos. La invariante (`Proposal.caption` == el texto de la fila `selected`) la mantiene `commitCaptionMirror()` en `proposals-actions.ts`, único lugar por donde pasa cualquier cambio del caption vigente.
+
+- **Permisos**: cargar/editar/borrar alternativas requiere Editor o Admin (`requireEditor()`); **elegir** una alcanza con sesión (`requireSession()`), igual que la casilla de aprobación — elegir es justamente lo que hace Jun, que es Comentarista.
+- **Cambiar la elegida invalida una aprobación previa**, exactamente igual que editar el caption a mano (ver `CONTENT_FIELDS`): lo que se va a publicar dejó de ser lo que Jun aprobó. Si todavía no estaba aprobada —el caso normal mientras Jun compara— no pasa nada. También guarda snapshot en `ProposalVersion`.
+- **Siempre queda al menos una alternativa** y siempre hay exactamente una elegida: `createProposal()` crea la primera, la migración hizo backfill de las existentes, borrar la elegida pasa la selección a la que sobrevive, y `deleteCaptionOption()` se niega a borrar la última.
+- **UI**: con una sola alternativa el panel se ve igual que siempre (caption plano, lápiz en el encabezado); las casillas y las tarjetas aparecen recién a partir de la segunda. Tope de `CAPTION_OPTIONS_LIMIT` = 6, que es de lectura, no técnico.
+- **Música de Instagram**: misma mecánica de selección única, debajo del caption, pero acá "ninguna elegida" es válido (un post puede no llevar música) y no toca la aprobación. Se pega un enlace y `normalizeInstagramMusicUrl()` (`src/lib/dashboard/instagram-music.ts`) lo restringe a `instagram.com` y le saca query y hash — es un link que después se abre desde el panel, y dejarlo como texto libre lo volvería un "pegá cualquier URL" para mandar a los demás a donde sea. La misma función corre en el cliente, solo para mostrar el motivo sin esperar el round-trip; la que manda es la del server.
+- **Guardado**: estas acciones **no** pasan por `updateProposal()` — tienen las suyas y devuelven el listado ya persistido, que `CaptionPanel` vuelca al estado con `onPatchProposal` (patch solo local). Un patch de `updateProposal()` con solo `captionOptions` sería un patch vacío para el server y encima le exigiría rol de Editor a Jun.
+
 ## Moodboard
 Tablero de referencias del Administrador, previo al flujo de aprobación. Lo arma y lo edita solo él; el resto de los roles lo ve en modo lectura. Vive en `/moodboard` (`src/app/moodboard/`) y es un **canvas libre** tipo corcho — los elementos se posicionan en coordenadas x/y absolutas, se redimensionan, rotan y superponen; no es una grilla.
 
@@ -65,6 +75,8 @@ Proposal: { id, date, time, network, format, status, title, caption, hashtags, a
             contentPillar?, approvalInvalidatedReason?,
             reminderSentT60/T0, approvalReminderSent }
 ProposalVersion: { id, proposalId, caption, images[], video, editedBy, createdAt }
+ProposalCaptionOption: { id, proposalId, text, selected, order, createdAt }
+ProposalMusicOption:   { id, proposalId, url, label?, selected, order, createdAt }
 SiteSettings: { brandName, brandColorPrimary/Dark, brandColorAccent, instagramHandle,
                 senderEmail, commentNotifyTo/Cc, loginBackgroundUrl, loginLogoUrl,
                 contentPillars[] }

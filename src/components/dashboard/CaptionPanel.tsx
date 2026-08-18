@@ -4,24 +4,66 @@ import { useSession } from "next-auth/react";
 import { useState } from "react";
 import VersionHistoryModal from "./VersionHistoryModal";
 import { dateLong, statusPillStyle } from "@/lib/dashboard/format";
-import { computeProposalStatus, DEPARTMENT_CHECK_COUNT } from "@/lib/dashboard/proposals";
+import {
+  CAPTION_OPTIONS_LIMIT,
+  computeProposalStatus,
+  DEPARTMENT_CHECK_COUNT,
+  MUSIC_OPTIONS_LIMIT,
+} from "@/lib/dashboard/proposals";
+import {
+  addCaptionOption,
+  addMusicOption,
+  deleteCaptionOption,
+  deleteMusicOption,
+  selectCaptionOption,
+  setMusicOptionSelected,
+  updateCaptionOption,
+  type CaptionOptionsResult,
+} from "@/lib/dashboard/proposals-actions";
+import {
+  describeInstagramMusicUrl,
+  normalizeInstagramMusicUrl,
+} from "@/lib/dashboard/instagram-music";
 import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
-import type { Proposal } from "@/types/dashboard";
+import type { Proposal, ProposalMusicOption } from "@/types/dashboard";
 
 interface CaptionPanelProps {
   proposal: Proposal;
   onUpdateProposal: (id: string, patch: Partial<Proposal>) => void;
+  /** Aplica un patch SOLO al estado local — las alternativas de caption y las
+   * músicas se guardan con sus propias server actions (ver más abajo), no con
+   * updateProposal(), así que este canal es para reconciliar la pantalla con
+   * lo que el server ya guardó. */
+  onPatchProposal: (id: string, patch: Partial<Proposal>) => void;
   onDeleteProposal: (id: string) => void;
 }
 
-export default function CaptionPanel({ proposal, onUpdateProposal, onDeleteProposal }: CaptionPanelProps) {
+export default function CaptionPanel({
+  proposal,
+  onUpdateProposal,
+  onPatchProposal,
+  onDeleteProposal,
+}: CaptionPanelProps) {
   const { data: session } = useSession();
   const canEdit = canEditContent(session?.user.role);
   const [copied, setCopied] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(proposal.caption);
+  /** Id de la alternativa que se está editando; "" = ninguna. */
+  const [editingId, setEditingId] = useState("");
+  const [draft, setDraft] = useState("");
+  const [addingCaption, setAddingCaption] = useState(false);
+  const [newCaption, setNewCaption] = useState("");
+  const [busy, setBusy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const departmentApprovals = proposal.departmentApprovals ?? Array(DEPARTMENT_CHECK_COUNT).fill(false);
+
+  const captionOptions = proposal.captionOptions ?? [];
+  const musicOptions = proposal.musicOptions ?? [];
+  const selectedCaption = captionOptions.find((o) => o.selected) ?? captionOptions[0];
+  // Toda propuesta tiene al menos una alternativa (la crea createProposal y el
+  // backfill de la migración) — el fallback a proposal.caption es solo para no
+  // dejar la pantalla en blanco si alguna vez llegara una sin opciones.
+  const captionText = selectedCaption?.text ?? proposal.caption;
+  const showAlternatives = captionOptions.length > 1;
 
   // Aprobar no es "editar contenido" — Jun es Comentarista y es quien de
   // verdad aprueba, así que esto no depende de canEdit (a diferencia de
@@ -37,23 +79,91 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
     }
   }
 
-  function handleStartEdit() {
-    setDraft(proposal.caption);
-    setEditing(true);
+  /** Corre una acción de alternativas y vuelca lo que devolvió el server —
+   * incluida la aprobación, que el server puede haber invalidado si lo que se
+   * cambió fue el caption vigente. */
+  async function runCaptionAction(action: () => Promise<CaptionOptionsResult>) {
+    setBusy(true);
+    try {
+      const result = await action();
+      onPatchProposal(proposal.id, {
+        captionOptions: result.captionOptions,
+        caption: result.caption,
+        // El server pudo haber invalidado la aprobación si lo que cambió fue
+        // el caption vigente (ver commitCaptionMirror).
+        ...(result.departmentApprovals !== undefined
+          ? { departmentApprovals: result.departmentApprovals }
+          : {}),
+        ...(result.approvalInvalidatedReason !== undefined
+          ? { approvalInvalidatedReason: result.approvalInvalidatedReason ?? undefined }
+          : {}),
+      });
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : "No se pudo guardar el cambio.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runMusicAction(action: () => Promise<ProposalMusicOption[]>) {
+    setBusy(true);
+    try {
+      const musicOptionsNext = await action();
+      onPatchProposal(proposal.id, { musicOptions: musicOptionsNext });
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : "No se pudo guardar el cambio.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleSelectCaption(optionId: string) {
+    const target = captionOptions.find((o) => o.id === optionId);
+    if (!target || target.selected) return;
+    // Optimista: la casilla tiene que responder en el acto; runCaptionAction
+    // reconcilia después con lo que guardó el server.
+    onPatchProposal(proposal.id, {
+      captionOptions: captionOptions.map((o) => ({ ...o, selected: o.id === optionId })),
+      caption: target.text,
+    });
+    void runCaptionAction(() => selectCaptionOption(optionId));
+  }
+
+  function handleStartEdit(optionId: string, text: string) {
+    setEditingId(optionId);
+    setDraft(text);
   }
 
   function handleCancelEdit() {
-    setDraft(proposal.caption);
-    setEditing(false);
+    setEditingId("");
+    setDraft("");
   }
 
-  function handleSaveEdit() {
-    onUpdateProposal(proposal.id, { caption: draft.trim() });
-    setEditing(false);
+  async function handleSaveEdit() {
+    const optionId = editingId;
+    const text = draft.trim();
+    if (!optionId || !text) return;
+    handleCancelEdit();
+    await runCaptionAction(() => updateCaptionOption(optionId, text));
+  }
+
+  async function handleAddCaption() {
+    const text = newCaption.trim();
+    if (!text) return;
+    setAddingCaption(false);
+    setNewCaption("");
+    await runCaptionAction(() => addCaptionOption(proposal.id, text));
+  }
+
+  async function handleDeleteCaption(optionId: string) {
+    if (!window.confirm("¿Borrar esta alternativa de caption?")) return;
+    await runCaptionAction(() => deleteCaptionOption(optionId));
   }
 
   async function handleCopy() {
-    const text = `${proposal.caption}\n\n${proposal.hashtags}`;
+    const text = `${captionText}\n\n${proposal.hashtags}`;
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
@@ -175,74 +285,423 @@ export default function CaptionPanel({ proposal, onUpdateProposal, onDeletePropo
 
       <div>
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5">
-          <div className="text-[11px] tracking-label text-tx-3 uppercase">Caption propuesto</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11px] tracking-label text-tx-3 uppercase">Caption propuesto</span>
+            {showAlternatives && (
+              <span className="text-[10px] font-bold text-tx-3 tabular-nums">
+                {captionOptions.length} alternativas
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
-            {editing ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
-                >
-                  Guardar
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  onPointerEnter={handleLiquidPointerEnter}
-                  title={copied ? "Copiado ✓" : "Copiar caption"}
-                  aria-label={copied ? "Copiado" : "Copiar caption"}
-                  className={`${iconButtonClass}${copied ? " border-brand-blue bg-brand-blue/[0.06] text-brand-blue" : ""}`}
-                >
-                  {copied ? (
-                    <CheckIcon key="copied" className="art-fade-in relative" />
-                  ) : (
-                    <ClipboardIcon key="idle" className="relative" />
-                  )}
-                </button>
-                {canEdit && (
-                  <button
-                    type="button"
-                    onClick={handleStartEdit}
-                    onPointerEnter={handleLiquidPointerEnter}
-                    title="Editar caption"
-                    aria-label="Editar caption"
-                    className={iconButtonClass}
-                  >
-                    <PencilIcon className="relative" />
-                  </button>
-                )}
-              </>
+            <button
+              type="button"
+              onClick={handleCopy}
+              onPointerEnter={handleLiquidPointerEnter}
+              title={copied ? "Copiado ✓" : "Copiar el caption elegido"}
+              aria-label={copied ? "Copiado" : "Copiar el caption elegido"}
+              className={`${iconButtonClass}${copied ? " border-brand-blue bg-brand-blue/[0.06] text-brand-blue" : ""}`}
+            >
+              {copied ? (
+                <CheckIcon key="copied" className="art-fade-in relative" />
+              ) : (
+                <ClipboardIcon key="idle" className="relative" />
+              )}
+            </button>
+            {/* Editar en el encabezado solo tiene sentido cuando hay una sola
+                alternativa; con varias, cada una trae su propio lápiz. */}
+            {canEdit && !showAlternatives && selectedCaption && !editingId && (
+              <button
+                type="button"
+                onClick={() => handleStartEdit(selectedCaption.id, selectedCaption.text)}
+                onPointerEnter={handleLiquidPointerEnter}
+                title="Editar caption"
+                aria-label="Editar caption"
+                className={iconButtonClass}
+              >
+                <PencilIcon className="relative" />
+              </button>
+            )}
+            {canEdit && captionOptions.length < CAPTION_OPTIONS_LIMIT && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingCaption(true);
+                  setNewCaption("");
+                }}
+                onPointerEnter={handleLiquidPointerEnter}
+                disabled={busy || addingCaption}
+                title="Agregar otra alternativa de caption"
+                aria-label="Agregar otra alternativa de caption"
+                className={iconButtonClass}
+              >
+                <PlusIcon className="relative" />
+              </button>
             )}
           </div>
         </div>
-        {editing ? (
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            className="min-h-32 w-full resize-y rounded border border-line-2 bg-panel-2 px-3 py-2 text-[15px] leading-[1.5] text-brand-ink"
-          />
-        ) : (
-          <>
-            <p className="mb-3 text-[15px] leading-[1.62] whitespace-pre-line text-brand-ink">
+
+        {showAlternatives && (
+          <p className="mb-2 text-[11px] leading-[1.4] text-tx-3">
+            Marcá la alternativa aprobada — solo una puede quedar elegida.
+          </p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {captionOptions.length === 0 && (
+            <p className="text-[15px] leading-[1.62] whitespace-pre-line text-brand-ink">
               {proposal.caption}
             </p>
-            <div className="text-sm leading-[1.6] font-bold text-brand-blue">{proposal.hashtags}</div>
-          </>
+          )}
+          {captionOptions.map((option) => {
+            const isEditing = editingId === option.id;
+            if (isEditing) {
+              return (
+                <CaptionEditor
+                  key={option.id}
+                  value={draft}
+                  onChange={setDraft}
+                  onCancel={handleCancelEdit}
+                  onSave={handleSaveEdit}
+                  busy={busy}
+                />
+              );
+            }
+            // Con una sola alternativa no hay nada que elegir: se muestra el
+            // caption plano, igual que antes de que existieran las
+            // alternativas.
+            if (!showAlternatives) {
+              return (
+                <p
+                  key={option.id}
+                  className="text-[15px] leading-[1.62] whitespace-pre-line text-brand-ink"
+                >
+                  {option.text}
+                </p>
+              );
+            }
+            return (
+              <div
+                key={option.id}
+                className={`rounded border transition-[border-color,background-color] duration-[400ms] ${
+                  option.selected
+                    ? "border-brand-blue bg-brand-blue/[0.05]"
+                    : "border-line-2 bg-panel-2"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectCaption(option.id)}
+                    disabled={busy}
+                    aria-pressed={option.selected}
+                    title={option.selected ? "Alternativa elegida" : "Elegir esta alternativa"}
+                    className={`inline-flex items-center gap-1.5 text-[10px] leading-none font-bold tracking-label uppercase disabled:cursor-default ${PRESS_SCALE_CLASS} ${
+                      option.selected ? "text-brand-blue" : "text-tx-3 hover:text-brand-blue"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-[400ms] ${
+                        option.selected ? "border-brand-blue bg-brand-blue" : "border-line-2"
+                      }`}
+                    >
+                      {option.selected && (
+                        <CheckIcon className="check-pop-in h-2.5 w-2.5 text-[var(--bg)]" />
+                      )}
+                    </span>
+                    {option.selected ? "Elegido" : "Elegir"}
+                  </button>
+                  {canEdit && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(option.id, option.text)}
+                        onPointerEnter={handleLiquidPointerEnter}
+                        disabled={busy}
+                        title="Editar esta alternativa"
+                        aria-label="Editar esta alternativa"
+                        className={iconButtonClass}
+                      >
+                        <PencilIcon className="relative" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCaption(option.id)}
+                        onPointerEnter={handleLiquidPointerEnter}
+                        disabled={busy}
+                        title="Borrar esta alternativa"
+                        aria-label="Borrar esta alternativa"
+                        className={iconButtonClass}
+                      >
+                        <TrashIcon className="relative" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="px-3 pt-2 pb-3 text-[15px] leading-[1.62] whitespace-pre-line text-brand-ink">
+                  {option.text}
+                </p>
+              </div>
+            );
+          })}
+
+          {addingCaption && (
+            <CaptionEditor
+              value={newCaption}
+              onChange={setNewCaption}
+              onCancel={() => {
+                setAddingCaption(false);
+                setNewCaption("");
+              }}
+              onSave={handleAddCaption}
+              busy={busy}
+              placeholder="Escribí la otra alternativa de caption…"
+              saveLabel="Agregar"
+            />
+          )}
+        </div>
+
+        <div className="mt-3 text-sm leading-[1.6] font-bold text-brand-blue">{proposal.hashtags}</div>
+      </div>
+
+      {(canEdit || musicOptions.length > 0) && (
+        <>
+          <div className="h-px bg-line" />
+          <MusicSection
+            options={musicOptions}
+            canEdit={canEdit}
+            busy={busy}
+            onAdd={(url, label) => runMusicAction(() => addMusicOption(proposal.id, url, label))}
+            onDelete={(optionId) => runMusicAction(() => deleteMusicOption(optionId))}
+            onSelect={(optionId, selected) => {
+              onPatchProposal(proposal.id, {
+                musicOptions: musicOptions.map((m) => ({
+                  ...m,
+                  selected: selected && m.id === optionId,
+                })),
+              });
+              void runMusicAction(() => setMusicOptionSelected(optionId, selected));
+            }}
+          />
+        </>
+      )}
+
+      {showHistory && <VersionHistoryModal proposal={proposal} onClose={() => setShowHistory(false)} />}
+    </div>
+  );
+}
+
+function CaptionEditor({
+  value,
+  onChange,
+  onCancel,
+  onSave,
+  busy,
+  placeholder,
+  saveLabel = "Guardar",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+  busy: boolean;
+  placeholder?: string;
+  saveLabel?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoFocus
+        className="min-h-32 w-full resize-y rounded border border-line-2 bg-panel-2 px-3 py-2 text-[15px] leading-[1.5] text-brand-ink"
+      />
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={busy || !value.trim()}
+          className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+        >
+          {saveLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Músicas de Instagram propuestas — misma mecánica de selección única que
+ * las alternativas de caption, con la diferencia de que acá se puede
+ * desmarcar: un post puede no llevar música. */
+function MusicSection({
+  options,
+  canEdit,
+  busy,
+  onAdd,
+  onDelete,
+  onSelect,
+}: {
+  options: ProposalMusicOption[];
+  canEdit: boolean;
+  busy: boolean;
+  onAdd: (url: string, label?: string) => void;
+  onDelete: (optionId: string) => void;
+  onSelect: (optionId: string, selected: boolean) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [url, setUrl] = useState("");
+  const [label, setLabel] = useState("");
+  const [error, setError] = useState("");
+
+  function handleAdd() {
+    // La misma validación corre en el server (es la que manda); acá se repite
+    // para poder mostrar el motivo exacto sin esperar el round-trip.
+    let normalized: string;
+    try {
+      normalized = normalizeInstagramMusicUrl(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Enlace inválido.");
+      return;
+    }
+    setAdding(false);
+    setUrl("");
+    setLabel("");
+    setError("");
+    onAdd(normalized, label.trim() || undefined);
+  }
+
+  return (
+    <div>
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5">
+        <span className="text-[11px] tracking-label text-tx-3 uppercase">Música de Instagram</span>
+        {canEdit && options.length < MUSIC_OPTIONS_LIMIT && !adding && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(true);
+              setError("");
+            }}
+            onPointerEnter={handleLiquidPointerEnter}
+            disabled={busy}
+            title="Agregar una música"
+            aria-label="Agregar una música"
+            className={iconButtonClass}
+          >
+            <PlusIcon className="relative" />
+          </button>
         )}
       </div>
 
-      {showHistory && <VersionHistoryModal proposal={proposal} onClose={() => setShowHistory(false)} />}
+      {options.length > 1 && (
+        <p className="mb-2 text-[11px] leading-[1.4] text-tx-3">
+          Marcá la música aprobada — solo una puede quedar elegida.
+        </p>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {options.length === 0 && !adding && (
+          <p className="text-[13px] text-tx-3">Sin música propuesta.</p>
+        )}
+
+        {options.map((option) => (
+          <div
+            key={option.id}
+            className={`flex items-center gap-2 rounded border px-3 py-2 transition-[border-color,background-color] duration-[400ms] ${
+              option.selected ? "border-brand-blue bg-brand-blue/[0.05]" : "border-line-2 bg-panel-2"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => onSelect(option.id, !option.selected)}
+              disabled={busy}
+              aria-pressed={option.selected}
+              title={option.selected ? "Quitar la selección" : "Elegir esta música"}
+              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-[400ms] disabled:cursor-default ${PRESS_SCALE_CLASS} ${
+                option.selected ? "border-brand-blue bg-brand-blue" : "border-line-2 hover:border-brand-blue"
+              }`}
+            >
+              {option.selected && <CheckIcon className="check-pop-in h-2.5 w-2.5 text-[var(--bg)]" />}
+            </button>
+            <a
+              href={option.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-w-0 flex-1 truncate text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue hover:underline"
+              title={option.url}
+            >
+              {option.label || describeInstagramMusicUrl(option.url)}
+            </a>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => onDelete(option.id)}
+                onPointerEnter={handleLiquidPointerEnter}
+                disabled={busy}
+                title="Quitar esta música"
+                aria-label="Quitar esta música"
+                className={`${iconButtonClass} shrink-0`}
+              >
+                <TrashIcon className="relative" />
+              </button>
+            )}
+          </div>
+        ))}
+
+        {adding && (
+          <div className="flex flex-col gap-2">
+            <input
+              value={url}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                setError("");
+              }}
+              placeholder="Pegá el enlace de Instagram"
+              inputMode="url"
+              autoFocus
+              className="min-h-9 w-full rounded border border-line-2 bg-panel-2 px-3 text-[13px] text-brand-ink"
+            />
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Nombre (opcional)"
+              className="min-h-9 w-full rounded border border-line-2 bg-panel-2 px-3 text-[13px] text-brand-ink"
+            />
+            {error && (
+              <p className="text-[11px] leading-[1.4] text-[var(--color-brand-red-text)]">{error}</p>
+            )}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdding(false);
+                  setUrl("");
+                  setLabel("");
+                  setError("");
+                }}
+                className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleAdd}
+                disabled={busy || !url.trim()}
+                className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+              >
+                Agregar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -261,6 +720,25 @@ function PencilIcon({ className }: { className?: string }) {
       className={className}
     >
       <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
     </svg>
   );
 }

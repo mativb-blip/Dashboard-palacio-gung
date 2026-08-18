@@ -133,6 +133,10 @@ model Proposal {
   format    String
   status    String
   title     String
+  /// Caption vigente = espejo de la alternativa elegida en
+  /// ProposalCaptionOption (ver syncSelectedCaption). Se mantiene como campo
+  /// propio, y no derivado de la relación, porque es lo que consumen el
+  /// título, las versiones, el preview, el export y las notificaciones.
   caption   String   @db.Text
   hashtags  String   @db.Text
   artN      Int      @default(1)
@@ -170,6 +174,8 @@ model Proposal {
 
   comments ProposalComment[]
   versions ProposalVersion[]
+  captionOptions ProposalCaptionOption[]
+  musicOptions   ProposalMusicOption[]
 
   @@index([date])
 }
@@ -296,4 +302,43 @@ model PushSubscription {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
+}
+
+/// Alternativas de caption de una propuesta. El Editor/Admin puede cargar
+/// varias y Jun (Comentarista) elige UNA — esa elección es la que se refleja
+/// en Proposal.caption, que sigue siendo el caption "real" para el resto del
+/// sistema (título, versiones, preview, notificaciones, export). Invariante:
+/// como máximo una fila con selected = true por propuesta, y Proposal.caption
+/// siempre es el texto de esa fila (ver syncSelectedCaption()).
+model ProposalCaptionOption {
+  id         String   @id @default(cuid())
+  proposalId String
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  text       String   @db.Text
+  selected   Boolean  @default(false)
+  /// Orden de presentación; se asigna por antigüedad al agregar.
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([proposalId])
+}
+
+/// Músicas de Instagram propuestas para el post — mismo patrón de selección
+/// única que las alternativas de caption, pero acá "ninguna seleccionada" es
+/// un estado válido (un post puede no llevar música). No hay espejo en
+/// Proposal porque nada más en el sistema consume la música todavía.
+model ProposalMusicOption {
+  id         String   @id @default(cuid())
+  proposalId String
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  /// URL normalizada de instagram.com (ver normalizeInstagramMusicUrl).
+  url        String   @db.Text
+  /// Nombre opcional que escribe quien la carga; si viene vacío la UI arma
+  /// uno a partir de la URL.
+  label      String?
+  selected   Boolean  @default(false)
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([proposalId])
 }

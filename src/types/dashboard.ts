@@ -25,6 +25,24 @@ export interface ProposalComment {
   resolved?: boolean;
 }
 
+/** Alternativa de caption — el Editor carga varias y Jun elige una sola.
+ * La elegida (`selected`) es la que se refleja en `Proposal.caption`. */
+export interface ProposalCaptionOption {
+  id: string;
+  text: string;
+  selected: boolean;
+}
+
+/** Música de Instagram propuesta — misma selección única que el caption,
+ * pero acá "ninguna elegida" es un estado válido. */
+export interface ProposalMusicOption {
+  id: string;
+  url: string;
+  /** Nombre que le puso quien la cargó; vacío = la UI lo deriva de la URL. */
+  label?: string;
+  selected: boolean;
+}
+
 export interface Proposal {
   id: string;
   date: string; // ISO yyyy-mm-dd
@@ -33,7 +51,12 @@ export interface Proposal {
   format: ProposalFormat;
   status: ProposalStatus;
   title: string;
+  /** Caption vigente = el texto de la alternativa elegida en `captionOptions`. */
   caption: string;
+  /** Alternativas de caption, en orden de carga. Siempre trae al menos una. */
+  captionOptions?: ProposalCaptionOption[];
+  /** Músicas propuestas; vacío/undefined = el post no lleva música. */
+  musicOptions?: ProposalMusicOption[];
   hashtags: string;
   artN: number;
   comments: ProposalComment[];

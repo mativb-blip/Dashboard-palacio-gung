@@ -8,6 +8,12 @@ export const DEPARTMENT_CHECK_COUNT = 1;
  * (ver ProposalVersion) antes de podar las más viejas. */
 export const PROPOSAL_VERSION_LIMIT = 8;
 
+/** Techo de alternativas de caption y de músicas por propuesta — no es un
+ * límite técnico sino de lectura: Jun tiene que poder comparar las opciones
+ * de un vistazo para elegir una. */
+export const CAPTION_OPTIONS_LIMIT = 6;
+export const MUSIC_OPTIONS_LIMIT = 6;
+
 /** Con cuánta anticipación a la publicación se manda el recordatorio de
  * aprobación pendiente (ficha 3) — separado de los recordatorios de
  * publicación (schedule-time.ts), que son para el propio horario del post. */

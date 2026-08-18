@@ -3,15 +3,25 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { sendAlertEmail, sendCommentNotification } from "@/lib/dashboard/notify-email";
 import { sendPushToAdmins } from "@/lib/dashboard/notify-push";
-import { computeProposalStatus, deriveTitle, PROPOSAL_VERSION_LIMIT } from "@/lib/dashboard/proposals";
+import { normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
+import {
+  CAPTION_OPTIONS_LIMIT,
+  computeProposalStatus,
+  deriveTitle,
+  MUSIC_OPTIONS_LIMIT,
+  PROPOSAL_VERSION_LIMIT,
+} from "@/lib/dashboard/proposals";
 import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 import type {
   Proposal,
+  ProposalCaptionOption,
   ProposalComment,
   ProposalFormat,
+  ProposalMusicOption,
   ProposalStatus,
   ProposalVersionEntry,
 } from "@/types/dashboard";
@@ -40,9 +50,34 @@ async function requireEditor() {
   return session;
 }
 
+// Las alternativas de caption y las músicas se leen SIEMPRE junto con la
+// propuesta (van en el mismo panel) — un include compartido evita que alguna
+// de las tres consultas se olvide de una relación y devuelva un Proposal a
+// medias al cliente.
+const PROPOSAL_INCLUDE = {
+  comments: { orderBy: { createdAt: "asc" } },
+  captionOptions: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
+  musicOptions: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
+} satisfies Prisma.ProposalInclude;
+
 type ProposalRow = Awaited<ReturnType<typeof prisma.proposal.findMany>>[number] & {
   comments: Awaited<ReturnType<typeof prisma.proposalComment.findMany>>;
+  captionOptions: Awaited<ReturnType<typeof prisma.proposalCaptionOption.findMany>>;
+  musicOptions: Awaited<ReturnType<typeof prisma.proposalMusicOption.findMany>>;
 };
+
+function toCaptionOption(row: { id: string; text: string; selected: boolean }): ProposalCaptionOption {
+  return { id: row.id, text: row.text, selected: row.selected };
+}
+
+function toMusicOption(row: {
+  id: string;
+  url: string;
+  label: string | null;
+  selected: boolean;
+}): ProposalMusicOption {
+  return { id: row.id, url: row.url, label: row.label ?? undefined, selected: row.selected };
+}
 
 function toProposal(row: ProposalRow, now: Date): Proposal {
   return {
@@ -54,6 +89,8 @@ function toProposal(row: ProposalRow, now: Date): Proposal {
     status: row.status as ProposalStatus,
     title: row.title,
     caption: row.caption,
+    captionOptions: row.captionOptions.map(toCaptionOption),
+    musicOptions: row.musicOptions.map(toMusicOption),
     hashtags: row.hashtags,
     artN: row.artN,
     images: row.images.length ? row.images : undefined,
@@ -80,7 +117,7 @@ export async function getProposals(): Promise<Proposal[]> {
   await requireSession();
   const rows = await prisma.proposal.findMany({
     orderBy: { date: "asc" },
-    include: { comments: { orderBy: { createdAt: "asc" } } },
+    include: PROPOSAL_INCLUDE,
   });
   const now = new Date();
   return rows.map((row) => toProposal(row, now));
@@ -134,8 +171,13 @@ export async function createProposal(input: CreateProposalInput): Promise<Propos
       aspect: input.aspect,
       dim: input.dim,
       contentPillar,
+      // La propuesta nace con una sola alternativa de caption, ya elegida —
+      // así el panel nunca ve una propuesta sin opciones y `caption` y su
+      // alternativa arrancan sincronizados. Las demás se agregan desde la
+      // vista Post (ver addCaptionOption).
+      captionOptions: { create: { text: input.caption.trim(), selected: true, order: 0 } },
     },
-    include: { comments: true },
+    include: PROPOSAL_INCLUDE,
   });
 
   revalidatePath("/");
@@ -157,6 +199,39 @@ export interface UpdateProposalInput {
  * ver el caso borde de la ficha: mejor pedir de más que dejar pasar una
  * publicación distinta a la aprobada. */
 const CONTENT_FIELDS = ["date", "caption", "images", "video"] as const;
+
+/** Nombre legible de quien edita, para ProposalVersion.editedBy y para el
+ * texto de "aprobación invalidada". */
+function editorName(session: { user: { name?: string | null; email?: string | null } }): string {
+  return session.user.name || session.user.email || "Desconocido";
+}
+
+/** Guarda el estado anterior del caption/media antes de pisarlo (ficha 5) y
+ * poda a las últimas PROPOSAL_VERSION_LIMIT versiones de esa propuesta. */
+async function snapshotVersion(
+  proposalId: string,
+  previous: { caption: string; images: string[]; video: string | null },
+  editedBy: string,
+): Promise<void> {
+  await prisma.proposalVersion.create({
+    data: {
+      proposalId,
+      caption: previous.caption,
+      images: previous.images,
+      video: previous.video,
+      editedBy,
+    },
+  });
+  const overflow = await prisma.proposalVersion.findMany({
+    where: { proposalId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+    skip: PROPOSAL_VERSION_LIMIT,
+  });
+  if (overflow.length) {
+    await prisma.proposalVersion.deleteMany({ where: { id: { in: overflow.map((v) => v.id) } } });
+  }
+}
 
 export interface UpdateProposalResult {
   /** Solo viene seteado cuando el server pisó lo que pedía el patch (una
@@ -214,24 +289,7 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
   // en la creación... acá siempre hay `current`, así que aplica siempre que
   // se toque contenido).
   if (contentTouched) {
-    await prisma.proposalVersion.create({
-      data: {
-        proposalId: id,
-        caption: current.caption,
-        images: current.images,
-        video: current.video,
-        editedBy: session.user.name || session.user.email || "Desconocido",
-      },
-    });
-    const overflow = await prisma.proposalVersion.findMany({
-      where: { proposalId: id },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-      skip: PROPOSAL_VERSION_LIMIT,
-    });
-    if (overflow.length) {
-      await prisma.proposalVersion.deleteMany({ where: { id: { in: overflow.map((v) => v.id) } } });
-    }
+    await snapshotVersion(id, current, editorName(session));
   }
 
   await prisma.proposal.update({
@@ -372,7 +430,7 @@ export async function toggleCommentResolved(commentId: string): Promise<boolean>
   // updateProposal), acá lo que cambia es un comentario, no la aprobación.
   const proposalRow = await prisma.proposal.findUnique({
     where: { id: current.proposalId },
-    include: { comments: true },
+    include: PROPOSAL_INCLUDE,
   });
   const before = proposalRow ? toProposal(proposalRow, new Date()) : null;
   const statusBefore = before ? computeProposalStatus(before) : null;
@@ -403,4 +461,244 @@ export async function toggleCommentResolved(commentId: string): Promise<boolean>
   revalidatePath("/");
   revalidatePath("/calendario");
   return updated.resolved;
+}
+
+// ─── Alternativas de caption y músicas ──────────────────────────────────────
+//
+// El Editor/Admin carga varias alternativas de caption y Jun (Comentarista)
+// elige UNA. La elegida es la que vive en Proposal.caption, que sigue siendo
+// el caption "real" para el título, las versiones, el preview, el export y
+// las notificaciones — por eso cada cambio de la elegida pasa por
+// commitCaptionMirror(), que además arrastra el snapshot de versión y la
+// invalidación de la aprobación que ya tenía updateProposal().
+
+export interface CaptionOptionsResult extends UpdateProposalResult {
+  captionOptions: ProposalCaptionOption[];
+  /** Caption vigente después de la operación — el espejo de la elegida. */
+  caption: string;
+}
+
+async function listCaptionOptions(proposalId: string): Promise<ProposalCaptionOption[]> {
+  const rows = await prisma.proposalCaptionOption.findMany({
+    where: { proposalId },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+  });
+  return rows.map(toCaptionOption);
+}
+
+async function captionResult(
+  proposalId: string,
+  extra: UpdateProposalResult = {},
+): Promise<CaptionOptionsResult> {
+  const [captionOptions, row] = await Promise.all([
+    listCaptionOptions(proposalId),
+    prisma.proposal.findUniqueOrThrow({ where: { id: proposalId }, select: { caption: true } }),
+  ]);
+  revalidatePath("/");
+  revalidatePath("/calendario");
+  return { ...extra, captionOptions, caption: row.caption };
+}
+
+/** Sincroniza Proposal.caption con el texto de la alternativa elegida.
+ * Cambiar el caption vigente de una propuesta YA aprobada invalida esa
+ * aprobación, igual que editarlo directamente (ver CONTENT_FIELDS): lo que se
+ * va a publicar dejó de ser lo que Jun aprobó. Si todavía no estaba aprobada
+ * —el caso normal mientras Jun compara alternativas— no pasa nada. */
+async function commitCaptionMirror(
+  proposalId: string,
+  nextCaption: string,
+  editedBy: string,
+): Promise<UpdateProposalResult> {
+  const current = await prisma.proposal.findUnique({
+    where: { id: proposalId },
+    select: { caption: true, images: true, video: true, departmentApprovals: true },
+  });
+  if (!current) throw new Error("Propuesta no encontrada.");
+  if (current.caption === nextCaption) return {};
+
+  await snapshotVersion(proposalId, current, editedBy);
+
+  const wasApproved = current.departmentApprovals?.[0] ?? false;
+  if (!wasApproved) {
+    await prisma.proposal.update({ where: { id: proposalId }, data: { caption: nextCaption } });
+    return {};
+  }
+
+  const when = new Date().toLocaleString("es-DO", { dateStyle: "medium", timeStyle: "short" });
+  const invalidatedReason = `Aprobación invalidada: el contenido fue editado el ${when} por ${editedBy}.`;
+  await prisma.proposal.update({
+    where: { id: proposalId },
+    data: {
+      caption: nextCaption,
+      departmentApprovals: [false],
+      approvalInvalidatedReason: invalidatedReason,
+      approvalReminderSent: false,
+    },
+  });
+  return { departmentApprovals: [false], approvalInvalidatedReason: invalidatedReason };
+}
+
+export async function addCaptionOption(proposalId: string, text: string): Promise<CaptionOptionsResult> {
+  const session = await requireEditor();
+  const value = text.trim();
+  if (!value) throw new Error("Escribí el texto de la alternativa.");
+
+  const existing = await prisma.proposalCaptionOption.count({ where: { proposalId } });
+  if (existing >= CAPTION_OPTIONS_LIMIT) {
+    throw new Error(`No se pueden cargar más de ${CAPTION_OPTIONS_LIMIT} alternativas.`);
+  }
+
+  // `existing === 0` no debería pasar (toda propuesta nace con una), pero si
+  // pasara la primera que se cargue tiene que quedar elegida — si no, la
+  // propuesta se quedaría sin caption vigente.
+  await prisma.proposalCaptionOption.create({
+    data: { proposalId, text: value, selected: existing === 0, order: existing },
+  });
+
+  const extra = existing === 0
+    ? await commitCaptionMirror(proposalId, value, editorName(session))
+    : {};
+  return captionResult(proposalId, extra);
+}
+
+export async function updateCaptionOption(optionId: string, text: string): Promise<CaptionOptionsResult> {
+  const session = await requireEditor();
+  const value = text.trim();
+  if (!value) throw new Error("El caption no puede quedar vacío.");
+
+  const option = await prisma.proposalCaptionOption.findUnique({ where: { id: optionId } });
+  if (!option) throw new Error("Esa alternativa ya no existe.");
+
+  await prisma.proposalCaptionOption.update({ where: { id: optionId }, data: { text: value } });
+
+  const extra = option.selected
+    ? await commitCaptionMirror(option.proposalId, value, editorName(session))
+    : {};
+  return captionResult(option.proposalId, extra);
+}
+
+export async function deleteCaptionOption(optionId: string): Promise<CaptionOptionsResult> {
+  const session = await requireEditor();
+  const option = await prisma.proposalCaptionOption.findUnique({ where: { id: optionId } });
+  if (!option) throw new Error("Esa alternativa ya no existe.");
+
+  const siblings = await prisma.proposalCaptionOption.findMany({
+    where: { proposalId: option.proposalId },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+  });
+  if (siblings.length <= 1) throw new Error("Tiene que quedar al menos una alternativa de caption.");
+
+  await prisma.proposalCaptionOption.delete({ where: { id: optionId } });
+
+  // Si se borró la elegida, la propuesta se quedaría sin caption vigente:
+  // pasa a la primera que sobrevive (y eso, como cualquier cambio del caption
+  // vigente, invalida una aprobación previa).
+  let extra: UpdateProposalResult = {};
+  if (option.selected) {
+    const fallback = siblings.find((s) => s.id !== optionId);
+    if (fallback) {
+      await prisma.proposalCaptionOption.update({ where: { id: fallback.id }, data: { selected: true } });
+      extra = await commitCaptionMirror(option.proposalId, fallback.text, editorName(session));
+    }
+  }
+  return captionResult(option.proposalId, extra);
+}
+
+/** Elegir alternativa NO es "editar contenido" — es justamente lo que hace
+ * Jun, que es Comentarista, así que alcanza con sesión (mismo criterio que el
+ * checkbox de aprobación en updateProposal). */
+export async function selectCaptionOption(optionId: string): Promise<CaptionOptionsResult> {
+  const session = await requireSession();
+  const option = await prisma.proposalCaptionOption.findUnique({ where: { id: optionId } });
+  if (!option) throw new Error("Esa alternativa ya no existe.");
+  if (option.selected) return captionResult(option.proposalId);
+
+  // Selección única: primero se apaga la anterior y recién después se prende
+  // esta, en la misma transacción, para que nunca queden dos elegidas.
+  await prisma.$transaction([
+    prisma.proposalCaptionOption.updateMany({
+      where: { proposalId: option.proposalId, selected: true },
+      data: { selected: false },
+    }),
+    prisma.proposalCaptionOption.update({ where: { id: optionId }, data: { selected: true } }),
+  ]);
+
+  const extra = await commitCaptionMirror(option.proposalId, option.text, editorName(session));
+  return captionResult(option.proposalId, extra);
+}
+
+async function listMusicOptions(proposalId: string): Promise<ProposalMusicOption[]> {
+  const rows = await prisma.proposalMusicOption.findMany({
+    where: { proposalId },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+  });
+  revalidatePath("/");
+  revalidatePath("/calendario");
+  return rows.map(toMusicOption);
+}
+
+export async function addMusicOption(
+  proposalId: string,
+  url: string,
+  label?: string,
+): Promise<ProposalMusicOption[]> {
+  await requireEditor();
+  // Tira si no es un enlace de instagram.com (el cliente valida con la misma
+  // función antes de llamar, así el mensaje llega tal cual; esta es la que
+  // manda).
+  const normalized = normalizeInstagramMusicUrl(url);
+
+  const existing = await prisma.proposalMusicOption.findMany({
+    where: { proposalId },
+    select: { id: true, url: true },
+  });
+  if (existing.length >= MUSIC_OPTIONS_LIMIT) {
+    throw new Error(`No se pueden cargar más de ${MUSIC_OPTIONS_LIMIT} músicas.`);
+  }
+  if (existing.some((m) => m.url === normalized)) throw new Error("Esa música ya está en la lista.");
+
+  await prisma.proposalMusicOption.create({
+    data: {
+      proposalId,
+      url: normalized,
+      label: label?.trim() || null,
+      order: existing.length,
+    },
+  });
+  return listMusicOptions(proposalId);
+}
+
+export async function deleteMusicOption(optionId: string): Promise<ProposalMusicOption[]> {
+  await requireEditor();
+  const option = await prisma.proposalMusicOption.findUnique({ where: { id: optionId } });
+  if (!option) throw new Error("Esa música ya no existe.");
+  await prisma.proposalMusicOption.delete({ where: { id: optionId } });
+  return listMusicOptions(option.proposalId);
+}
+
+/** Selección única igual que el caption, pero acá "ninguna" es un estado
+ * válido: un post puede no llevar música, así que la casilla se puede
+ * desmarcar. No toca la aprobación — la música no es parte de lo que
+ * computeProposalStatus considera contenido publicable. */
+export async function setMusicOptionSelected(
+  optionId: string,
+  selected: boolean,
+): Promise<ProposalMusicOption[]> {
+  await requireSession();
+  const option = await prisma.proposalMusicOption.findUnique({ where: { id: optionId } });
+  if (!option) throw new Error("Esa música ya no existe.");
+
+  if (!selected) {
+    await prisma.proposalMusicOption.update({ where: { id: optionId }, data: { selected: false } });
+    return listMusicOptions(option.proposalId);
+  }
+
+  await prisma.$transaction([
+    prisma.proposalMusicOption.updateMany({
+      where: { proposalId: option.proposalId, selected: true },
+      data: { selected: false },
+    }),
+    prisma.proposalMusicOption.update({ where: { id: optionId }, data: { selected: true } }),
+  ]);
+  return listMusicOptions(option.proposalId);
 }
