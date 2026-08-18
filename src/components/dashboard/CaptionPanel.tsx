@@ -639,14 +639,21 @@ function MusicSection({
                 >
                   {option.selected && <CheckIcon className="check-pop-in h-2.5 w-2.5 text-[var(--bg)]" />}
                 </button>
+                {/* Toda música se escucha afuera (ver instagramEmbedSrc), así
+                    que el enlace se abre en una pestaña nueva y lo dice con el
+                    ícono: sin eso, en el celular parece que la app se fue a
+                    Instagram y se perdió lo que estaba mirando. */}
                 <a
                   href={option.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="min-w-0 flex-1 truncate text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue hover:underline"
-                  title={option.url}
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue [&:hover>span]:underline"
+                  title={`Abrir en Instagram (pestaña nueva) — ${option.url}`}
                 >
-                  {option.label || describeInstagramMusicUrl(option.url)}
+                  <span className="truncate">
+                    {option.label || describeInstagramMusicUrl(option.url)}
+                  </span>
+                  <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-60" />
                 </a>
                 {embedSrc && (
                   <button
@@ -904,6 +911,26 @@ function CloseIcon({ className }: { className?: string }) {
     >
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M14 4h6v6" />
+      <path d="M20 4 11 13" />
+      <path d="M18 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
     </svg>
   );
 }
