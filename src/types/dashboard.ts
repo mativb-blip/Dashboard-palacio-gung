@@ -94,3 +94,13 @@ export interface ProposalVersionEntry {
   editedBy: string;
   when: string;
 }
+
+/** Una foto de la galería (`/galeria`) — sin relación con propuestas, ver
+ * GalleryPhoto en el schema. */
+export interface GalleryPhoto {
+  id: string;
+  url: string;
+  filename?: string;
+  uploadedBy?: string;
+  when: string;
+}

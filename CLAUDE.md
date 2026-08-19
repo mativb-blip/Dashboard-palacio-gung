@@ -53,6 +53,15 @@ El Editor/Admin puede cargar **varias alternativas de caption** en la vista Post
 - **Guardado**: estas acciones **no** pasan por `updateProposal()` — tienen las suyas y devuelven el listado ya persistido, que `CaptionPanel` vuelca al estado con `onPatchProposal` (patch solo local). Un patch de `updateProposal()` con solo `captionOptions` sería un patch vacío para el server y encima le exigiría rol de Editor a Jun.
 - **También se cargan desde la ventana de "Cargar propuesta"** (`/nueva-propuesta`), no solo después de crear: `createProposal()` acepta `extraCaptions?: string[]` (alternativas además de la principal, que siempre nace elegida) y `music?: AddMusicOptionInput[]` (mismo shape y misma validación que `addMusicOption()`, ver `buildMusicCreateData()`). Si no se carga nada de esto, esos arrays llegan vacíos — ninguna fila placeholder — así que para Jun (que no tiene `canEdit`) la sección de música directamente no se renderiza (`canEdit || musicOptions.length > 0`); la de captions sí, porque siempre hay al menos la principal.
 
+## Galería de fotos
+Pestaña propia al lado de Feed (`/galeria`, `src/app/galeria/page.tsx`) — un depósito de fotos suelto, sin fecha ni caption ni relación con `Proposal`: solo para subir material de referencia rápido. `GalleryPhoto` en el schema, acciones en `src/lib/dashboard/gallery-actions.ts`.
+
+- **Permisos**: mismo criterio que el resto del contenido — **ve** la galería cualquiera con sesión (`requireSession()`), **sube/borra** solo Editor o Admin (`requireEditor()`). No hay gate especial de ruta: `src/proxy.ts` ya exige sesión para todo. El botón de subir y el de borrar por foto ni se montan para quien no puede editar — no es solo CSS oculto.
+- **Subida**: reutiliza `ArtUploadZone` (paste/drag/buscar, HEIC→JPEG, verificador de progreso) igual que los artes de una propuesta, con `proposalId="gallery"` fijo — no hay una propuesta real detrás, ese valor solo organiza la ruta en Blob (`gallery/...`), como dice el propio comentario del prop. La cola de miniaturas de `ArtUploadZone` se vacía apenas cada archivo se persiste como `GalleryPhoto`: la grilla de abajo es la única fuente de verdad, no hay dos listas mostrando lo mismo.
+- **Grilla y vista ampliada**: `grid-cols-3`/`grid-cols-5` en desktop, más recientes primero. Click en una foto abre una vista ampliada a pantalla completa (sin volver a pedir nada al server, es el mismo `url`); click afuera o la X la cierra.
+- **Borrar no borra el archivo de Blob** — mismo trade-off que `clearMusicOptionAudio()`: no hay forma barata de saber si algo más lo referencia, así que solo se borra la fila.
+- **assertBlobUrl compartido**: la validación de que una URL sea de nuestro storage (`*.blob.vercel-storage.com`) vivía duplicada dentro de `proposals-actions.ts` (para el audio de música) — se movió a `src/lib/dashboard/blob-url.ts` para que la galería la use también, en vez de reimplementarla.
+
 ## Moodboard
 Tablero de referencias del Administrador, previo al flujo de aprobación. Lo arma y lo edita solo él; el resto de los roles lo ve en modo lectura. Vive en `/moodboard` (`src/app/moodboard/`) y es un **canvas libre** tipo corcho — los elementos se posicionan en coordenadas x/y absolutas, se redimensionan, rotan y superponen; no es una grilla.
 
@@ -81,6 +90,7 @@ Proposal: { id, date, time, network, format, status, title, caption, hashtags, a
 ProposalVersion: { id, proposalId, caption, images[], video, editedBy, createdAt }
 ProposalCaptionOption: { id, proposalId, text, selected, order, createdAt }
 ProposalMusicOption:   { id, proposalId, url?, label?, selected, order, audioUrl?, audioName?, createdAt }
+GalleryPhoto: { id, url, filename?, uploadedBy?, createdAt }
 SiteSettings: { brandName, brandColorPrimary/Dark, brandColorAccent, instagramHandle,
                 senderEmail, commentNotifyTo/Cc, loginBackgroundUrl, loginLogoUrl,
                 contentPillars[] }

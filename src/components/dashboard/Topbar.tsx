@@ -20,11 +20,11 @@ const COMPACT_NAV_QUERY = "(min-width: 640px)";
  * navegan de vuelta al panel (`/?period=...`) en lugar de alternar in-place.
  * "estrategia" y "moodboard" son páginas propias, sin relación con
  * proposals/período: se comportan igual que "calendario" a efectos del nav. */
-type TopbarView = "month" | "grid" | "calendario" | "estrategia" | "moodboard";
+type TopbarView = "month" | "grid" | "calendario" | "estrategia" | "moodboard" | "galeria";
 
 /** Vistas que son una página aparte (no un período del panel): desde ellas
  * Post/Feed navegan por href en vez de alternar el período in-place. */
-const STANDALONE_VIEWS: TopbarView[] = ["calendario", "estrategia", "moodboard"];
+const STANDALONE_VIEWS: TopbarView[] = ["calendario", "estrategia", "moodboard", "galeria"];
 
 interface TopbarProps {
   view: TopbarView;
@@ -86,6 +86,7 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
     standalone
       ? { key: "grid", label: "Feed", active: false, href: "/?period=grid" }
       : { key: "grid", label: "Feed", active: view === "grid", onClick: () => onPeriodChange?.("grid") },
+    pageItem("galeria", "Galería", "/galeria"),
   ];
 
   return (
@@ -285,6 +286,8 @@ function NavIcon({ itemKey, className }: { itemKey: string; className?: string }
       return <CalendarIcon className={className} />;
     case "grid":
       return <GridIcon className={className} />;
+    case "galeria":
+      return <GalleryIcon className={className} />;
     default:
       return <PostIcon className={className} />;
   }
@@ -393,6 +396,28 @@ function GridIcon({ className }: { className?: string }) {
       <rect x="14" y="3" width="7" height="7" rx="1" />
       <rect x="3" y="14" width="7" height="7" rx="1" />
       <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+/** Fotos apiladas (dos marcos superpuestos) — un depósito de varias fotos,
+ * distinto del ícono de un solo post (PostIcon) o la grilla ordenada de Feed
+ * (GridIcon). */
+function GalleryIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="2.5" y="2.5" width="14" height="14" rx="2" />
+      <path d="M7.5 21.5h12a2 2 0 0 0 2-2v-12" />
     </svg>
   );
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
+import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { sendAlertEmail, sendCommentNotification } from "@/lib/dashboard/notify-email";
 import { sendPushToAdmins } from "@/lib/dashboard/notify-push";
@@ -783,7 +784,7 @@ export async function addMusicOption(
   // función antes de llamar, así el mensaje llega tal cual; esta es la que
   // manda).
   const normalized = rawUrl ? normalizeInstagramMusicUrl(rawUrl) : undefined;
-  const audioUrl = input.audioUrl ? assertBlobUrl(input.audioUrl) : undefined;
+  const audioUrl = input.audioUrl ? assertBlobUrl(input.audioUrl, "No se pudo subir el audio.") : undefined;
   if (!normalized && !audioUrl) {
     throw new Error("Hace falta un enlace de Instagram o un archivo de audio.");
   }
@@ -859,26 +860,6 @@ export async function setMusicOptionSelected(
   return result;
 }
 
-/** Hosts de Vercel Blob — el `audioUrl` llega del navegador (la subida va
- * directo del cliente a Blob, ver /api/blob/upload), así que el server no ve
- * el archivo y lo único que puede validar es que la URL sea de nuestro
- * storage. Sin esto, `audioUrl` sería un "pegá cualquier URL" que después se
- * carga como <audio src> en la pantalla de todos. */
-function assertBlobUrl(url: string): string {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("No se pudo subir el audio.");
-  }
-  const ok =
-    parsed.protocol === "https:" &&
-    (parsed.hostname.endsWith(".public.blob.vercel-storage.com") ||
-      parsed.hostname.endsWith(".blob.vercel-storage.com"));
-  if (!ok) throw new Error("No se pudo subir el audio.");
-  return parsed.toString();
-}
-
 /** Adjunta (o reemplaza) el archivo de audio de una música. Cargar contenido
  * es de Editor/Admin, igual que el resto de las alternativas — elegir es lo
  * único que alcanza con sesión. */
@@ -894,7 +875,7 @@ export async function setMusicOptionAudio(
   await prisma.proposalMusicOption.update({
     where: { id: optionId },
     data: {
-      audioUrl: assertBlobUrl(audioUrl),
+      audioUrl: assertBlobUrl(audioUrl, "No se pudo subir el audio."),
       audioName: audioName?.trim().slice(0, 200) || null,
     },
   });

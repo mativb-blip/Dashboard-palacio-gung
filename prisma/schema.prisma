@@ -352,3 +352,20 @@ model ProposalMusicOption {
 
   @@index([proposalId])
 }
+
+/// Galería de fotos independiente de las propuestas — pestaña propia al lado
+/// de Feed, solo para subir y ver fotos, sin caption/fecha/aprobación. No se
+/// relaciona con Proposal a propósito: es un depósito de material, no un
+/// paso del flujo de aprobación (ver /galeria).
+model GalleryPhoto {
+  id         String   @id @default(cuid())
+  url        String   @db.Text
+  /// Nombre original del archivo, solo para mostrarlo.
+  filename   String?
+  /// Nombre o email de quien la subió — texto libre, no una relación a User,
+  /// mismo criterio que ProposalComment.author (no hace falta más que eso).
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
