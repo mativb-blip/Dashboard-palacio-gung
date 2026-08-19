@@ -476,7 +476,9 @@ export default function CaptionPanel({
             canEdit={canEdit}
             busy={busy}
             proposalId={proposal.id}
-            onAdd={(url, label) => runMusicAction(() => addMusicOption(proposal.id, url, label))}
+            onAdd={(url, label, audioUrl, audioName) =>
+              runMusicAction(() => addMusicOption(proposal.id, { url, label, audioUrl, audioName }))
+            }
             onDelete={(optionId) => runMusicAction(() => deleteMusicOption(optionId))}
             onSetAudio={(optionId, audioUrl, audioName) =>
               runMusicAction(() => setMusicOptionAudio(optionId, audioUrl, audioName))
@@ -579,6 +581,12 @@ function resolveAudioContentType(file: File): string | undefined {
 /** Músicas de Instagram propuestas — misma mecánica de selección única que
  * las alternativas de caption, con la diferencia de que acá se puede
  * desmarcar: un post puede no llevar música. */
+/** Sentinel para el input de archivo compartido: distingue "el audio es para
+ * la música que se está armando en el formulario" (todavía sin fila en la
+ * base) de "el audio es para reemplazar el de una fila que ya existe" (un
+ * id real). Nunca puede colisionar con un cuid() de Prisma. */
+const NEW_MUSIC_TARGET = "__new__";
+
 function MusicSection({
   options,
   canEdit,
@@ -594,7 +602,7 @@ function MusicSection({
   canEdit: boolean;
   busy: boolean;
   proposalId: string;
-  onAdd: (url: string, label?: string) => void;
+  onAdd: (url: string | undefined, label?: string, audioUrl?: string, audioName?: string) => void;
   onDelete: (optionId: string) => void;
   onSelect: (optionId: string, selected: boolean) => void;
   onSetAudio: (optionId: string, audioUrl: string, audioName?: string) => void;
@@ -605,19 +613,29 @@ function MusicSection({
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
   const [uploadingId, setUploadingId] = useState("");
+  // Audio ya subido a Blob para la música que se está armando — todavía no
+  // hay fila en la base, así que se guarda acá hasta que se confirme
+  // "Agregar" (ver handleAdd). Si se cancela, el archivo queda huérfano en
+  // Blob — mismo trade-off que quitarle el audio a una fila existente.
+  const [newAudioUrl, setNewAudioUrl] = useState("");
+  const [newAudioName, setNewAudioName] = useState("");
   const audioInputRef = useRef<HTMLInputElement>(null);
-  const pendingOptionIdRef = useRef("");
+  const pendingTargetRef = useRef("");
+
+  async function uploadAudio(file: File): Promise<string> {
+    return uploadBlob(
+      `proposals/${proposalId}/music`,
+      file,
+      undefined,
+      undefined,
+      resolveAudioContentType(file),
+    );
+  }
 
   async function handleAudioFile(optionId: string, file: File) {
     setUploadingId(optionId);
     try {
-      const audioUrl = await uploadBlob(
-        `proposals/${proposalId}/music`,
-        file,
-        undefined,
-        undefined,
-        resolveAudioContentType(file),
-      );
+      const audioUrl = await uploadAudio(file);
       onSetAudio(optionId, audioUrl, file.name);
     } catch (e) {
       alert(e instanceof Error ? e.message : "No se pudo subir el audio.");
@@ -626,8 +644,22 @@ function MusicSection({
     }
   }
 
-  function openAudioPicker(optionId: string) {
-    pendingOptionIdRef.current = optionId;
+  async function handleNewAudioFile(file: File) {
+    setUploadingId(NEW_MUSIC_TARGET);
+    setError("");
+    try {
+      const audioUrl = await uploadAudio(file);
+      setNewAudioUrl(audioUrl);
+      setNewAudioName(file.name);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo subir el audio.");
+    } finally {
+      setUploadingId("");
+    }
+  }
+
+  function openAudioPicker(target: string) {
+    pendingTargetRef.current = target;
     audioInputRef.current?.click();
   }
   // Uno solo a la vez, y montado recién al abrirlo: cada reproductor es un
@@ -635,21 +667,39 @@ function MusicSection({
   // sirven a nadie.
   const [playingId, setPlayingId] = useState("");
 
-  function handleAdd() {
-    // La misma validación corre en el server (es la que manda); acá se repite
-    // para poder mostrar el motivo exacto sin esperar el round-trip.
-    let normalized: string;
-    try {
-      normalized = normalizeInstagramMusicUrl(url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Enlace inválido.");
-      return;
-    }
+  function resetAddForm() {
     setAdding(false);
     setUrl("");
     setLabel("");
     setError("");
-    onAdd(normalized, label.trim() || undefined);
+    setNewAudioUrl("");
+    setNewAudioName("");
+  }
+
+  function handleAdd() {
+    const trimmedUrl = url.trim();
+    // La misma validación corre en el server (es la que manda); acá se repite
+    // para poder mostrar el motivo exacto sin esperar el round-trip. Un
+    // enlace es opcional si ya hay un audio subido — la música puede cargarse
+    // solo con el archivo, sin pasar por Instagram para nada.
+    let normalized: string | undefined;
+    if (trimmedUrl) {
+      try {
+        normalized = normalizeInstagramMusicUrl(trimmedUrl);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Enlace inválido.");
+        return;
+      }
+    }
+    if (!normalized && !newAudioUrl) {
+      setError("Pegá un enlace o subí un archivo de audio.");
+      return;
+    }
+    const finalLabel = label.trim() || undefined;
+    const audioUrl = newAudioUrl || undefined;
+    const audioName = newAudioName || undefined;
+    resetAddForm();
+    onAdd(normalized, finalLabel, audioUrl, audioName);
   }
 
   return (
@@ -686,7 +736,7 @@ function MusicSection({
         )}
 
         {options.map((option) => {
-          const embedSrc = instagramEmbedSrc(option.url);
+          const embedSrc = option.url ? instagramEmbedSrc(option.url) : null;
           const playing = playingId === option.id;
           return (
             <div
@@ -708,22 +758,30 @@ function MusicSection({
                 >
                   {option.selected && <CheckIcon className="check-pop-in h-2.5 w-2.5 text-[var(--bg)]" />}
                 </button>
-                {/* Toda música se escucha afuera (ver instagramEmbedSrc), así
-                    que el enlace se abre en una pestaña nueva y lo dice con el
-                    ícono: sin eso, en el celular parece que la app se fue a
-                    Instagram y se perdió lo que estaba mirando. */}
-                <a
-                  href={option.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue [&:hover>span]:underline"
-                  title={`Abrir en Instagram (pestaña nueva) — ${option.url}`}
-                >
-                  <span className="truncate">
-                    {option.label || describeInstagramMusicUrl(option.url)}
+                {/* Toda música con enlace se escucha afuera (ver
+                    instagramEmbedSrc), así que se abre en una pestaña nueva y
+                    lo dice con el ícono: sin eso, en el celular parece que la
+                    app se fue a Instagram y se perdió lo que estaba mirando.
+                    Sin enlace (solo audio subido), no hay nada externo que
+                    abrir — el nombre es texto plano. */}
+                {option.url ? (
+                  <a
+                    href={option.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue [&:hover>span]:underline"
+                    title={`Abrir en Instagram (pestaña nueva) — ${option.url}`}
+                  >
+                    <span className="truncate">
+                      {option.label || describeInstagramMusicUrl(option.url)}
+                    </span>
+                    <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-60" />
+                  </a>
+                ) : (
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-brand-ink">
+                    {option.label || option.audioName || "Audio subido"}
                   </span>
-                  <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-60" />
-                </a>
+                )}
                 {embedSrc && (
                   <button
                     type="button"
@@ -823,9 +881,11 @@ function MusicSection({
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              const optionId = pendingOptionIdRef.current;
+              const target = pendingTargetRef.current;
               e.target.value = "";
-              if (file && optionId) void handleAudioFile(optionId, file);
+              if (!file || !target) return;
+              if (target === NEW_MUSIC_TARGET) void handleNewAudioFile(file);
+              else void handleAudioFile(target, file);
             }}
           />
         )}
@@ -846,16 +906,51 @@ function MusicSection({
                 setUrl(e.target.value);
                 setError("");
               }}
-              placeholder="Pegá el enlace del reel o del audio"
+              placeholder="Pegá el enlace del reel o del audio (opcional)"
               inputMode="url"
               autoFocus
               className="min-h-9 w-full rounded border border-line-2 bg-panel-2 px-3 text-[13px] text-brand-ink"
             />
             <p className="text-[11px] leading-[1.4] text-tx-3">
               Si pegás el reel que usa la canción, se ve la portada acá; la página de audio queda
-              solo como enlace. Para que se pueda escuchar en el panel, después subí el archivo de
-              audio con {"↑"}.
+              solo como enlace.
             </p>
+
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-line-2" />
+              <span className="text-[10px] font-bold tracking-label text-tx-3 uppercase">o</span>
+              <div className="h-px flex-1 bg-line-2" />
+            </div>
+
+            {newAudioUrl ? (
+              <div className="flex items-center gap-2 rounded border border-brand-blue bg-brand-blue/[0.05] px-3 py-2">
+                <UploadIcon className="h-3.5 w-3.5 shrink-0 text-brand-blue" />
+                <span className="min-w-0 flex-1 truncate text-[13px] text-brand-ink">{newAudioName}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewAudioUrl("");
+                    setNewAudioName("");
+                  }}
+                  title="Quitar el audio subido"
+                  aria-label="Quitar el audio subido"
+                  className={`${iconButtonClass} shrink-0`}
+                >
+                  <TrashIcon className="relative" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAudioPicker(NEW_MUSIC_TARGET)}
+                disabled={uploadingId === NEW_MUSIC_TARGET}
+                className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+              >
+                <UploadIcon className="h-3.5 w-3.5" />
+                {uploadingId === NEW_MUSIC_TARGET ? "Subiendo…" : "Subir un archivo de audio"}
+              </button>
+            )}
+
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
@@ -868,12 +963,7 @@ function MusicSection({
             <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setAdding(false);
-                  setUrl("");
-                  setLabel("");
-                  setError("");
-                }}
+                onClick={resetAddForm}
                 className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
               >
                 Cancelar
@@ -881,7 +971,7 @@ function MusicSection({
               <button
                 type="button"
                 onClick={handleAdd}
-                disabled={busy || !url.trim()}
+                disabled={busy || (!url.trim() && !newAudioUrl)}
                 className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
               >
                 Agregar

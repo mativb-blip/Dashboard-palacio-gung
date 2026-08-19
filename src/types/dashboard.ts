@@ -37,8 +37,11 @@ export interface ProposalCaptionOption {
  * pero acá "ninguna elegida" es un estado válido. */
 export interface ProposalMusicOption {
   id: string;
-  url: string;
-  /** Nombre que le puso quien la cargó; vacío = la UI lo deriva de la URL. */
+  /** undefined = se cargó solo con archivo de audio, sin enlace de
+   * Instagram. addMusicOption exige al menos uno de los dos. */
+  url?: string;
+  /** Nombre que le puso quien la cargó; vacío = la UI lo deriva de la URL
+   * (o del nombre del archivo, si no hay URL). */
   label?: string;
   selected: boolean;
   /** Audio subido para poder escucharla en el panel — Instagram no deja

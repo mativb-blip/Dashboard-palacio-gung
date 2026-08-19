@@ -75,7 +75,7 @@ function toCaptionOption(row: { id: string; text: string; selected: boolean }): 
 
 function toMusicOption(row: {
   id: string;
-  url: string;
+  url: string | null;
   label: string | null;
   selected: boolean;
   audioUrl: string | null;
@@ -83,7 +83,7 @@ function toMusicOption(row: {
 }): ProposalMusicOption {
   return {
     id: row.id,
-    url: row.url,
+    url: row.url ?? undefined,
     label: row.label ?? undefined,
     selected: row.selected,
     audioUrl: row.audioUrl ?? undefined,
@@ -700,16 +700,32 @@ async function listMusicOptions(proposalId: string): Promise<ProposalMusicOption
   return rows.map(toMusicOption);
 }
 
+export interface AddMusicOptionInput {
+  /** Enlace de instagram.com — opcional: una música puede cargarse solo con
+   * el archivo de audio, sin pasar por Instagram para nada. */
+  url?: string;
+  label?: string;
+  /** URL de Blob ya subida (ver uploadBlob() en el cliente) — opcional por la
+   * misma razón inversa: una música puede quedar solo como enlace, sin
+   * audio, y agregarlo después con setMusicOptionAudio(). */
+  audioUrl?: string;
+  audioName?: string;
+}
+
 export async function addMusicOption(
   proposalId: string,
-  url: string,
-  label?: string,
+  input: AddMusicOptionInput,
 ): Promise<ProposalMusicOption[]> {
   await requireEditor();
+  const rawUrl = input.url?.trim();
   // Tira si no es un enlace de instagram.com (el cliente valida con la misma
   // función antes de llamar, así el mensaje llega tal cual; esta es la que
   // manda).
-  const normalized = normalizeInstagramMusicUrl(url);
+  const normalized = rawUrl ? normalizeInstagramMusicUrl(rawUrl) : undefined;
+  const audioUrl = input.audioUrl ? assertBlobUrl(input.audioUrl) : undefined;
+  if (!normalized && !audioUrl) {
+    throw new Error("Hace falta un enlace de Instagram o un archivo de audio.");
+  }
 
   const existing = await prisma.proposalMusicOption.findMany({
     where: { proposalId },
@@ -718,13 +734,17 @@ export async function addMusicOption(
   if (existing.length >= MUSIC_OPTIONS_LIMIT) {
     throw new Error(`No se pueden cargar más de ${MUSIC_OPTIONS_LIMIT} músicas.`);
   }
-  if (existing.some((m) => m.url === normalized)) throw new Error("Esa música ya está en la lista.");
+  if (normalized && existing.some((m) => m.url === normalized)) {
+    throw new Error("Esa música ya está en la lista.");
+  }
 
   await prisma.proposalMusicOption.create({
     data: {
       proposalId,
       url: normalized,
-      label: label?.trim() || null,
+      label: input.label?.trim() || null,
+      audioUrl,
+      audioName: audioUrl ? input.audioName?.trim().slice(0, 200) || null : null,
       order: existing.length,
     },
   });
@@ -769,10 +789,11 @@ export async function setMusicOptionSelected(
   const result = await listMusicOptions(option.proposalId);
 
   const label = await proposalLabel(option.proposalId);
+  const musicName = option.label || (option.url ? describeInstagramMusicUrl(option.url) : "Audio subido");
   await notifyChoice(
     session,
     `${editorName(session)} eligió la música`,
-    `${label}: ${option.label || describeInstagramMusicUrl(option.url)} — ${option.url}`,
+    `${label}: ${musicName}${option.url ? ` — ${option.url}` : ""}`,
   );
   return result;
 }
