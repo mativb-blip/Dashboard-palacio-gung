@@ -105,12 +105,23 @@ export function safeBlobName(name: string): string {
 /** Sube el archivo directo a Vercel Blob desde el navegador — el SDK pide un
  * token de cliente a /api/blob/upload y hace el PUT él mismo; el archivo
  * nunca pasa por nuestro servidor. `folder` organiza la ruta y nada más: no
- * es un límite de seguridad (el gate real está en la ruta del token). */
+ * es un límite de seguridad (el gate real está en la ruta del token).
+ *
+ * `contentType` es un override opcional: sin él, se manda `file.type` tal
+ * cual lo puso el navegador — y ese valor depende de cómo el SO/navegador de
+ * quien sube tenga asociada la extensión, no del contenido real del archivo.
+ * Para audio esto falla en la práctica: un `.m4a` puede llegar con
+ * `file.type` vacío (Chrome en algunos Android/Linux sin asociación MIME), y
+ * un `""` no matchea el `audio/*` que exige /api/blob/upload — la subida se
+ * rechaza sin explicación visible más que "no se pudo subir". Pasar el
+ * override evita depender de esa adivinanza.
+ */
 export async function uploadBlob(
   folder: string,
   file: File,
   onProgress?: (percentage: number) => void,
   abortSignal?: AbortSignal,
+  contentType?: string,
 ): Promise<string> {
   const pathname = `${folder}/${makeFileId()}-${safeBlobName(file.name)}`;
 
@@ -121,6 +132,7 @@ export async function uploadBlob(
       multipart: file.size > MULTIPART_THRESHOLD_BYTES,
       abortSignal,
       onUploadProgress: onProgress ? ({ percentage }) => onProgress(percentage) : undefined,
+      ...(contentType ? { contentType } : {}),
     });
     return blob.url;
   } catch (e) {
