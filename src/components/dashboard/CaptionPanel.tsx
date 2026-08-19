@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import VersionHistoryModal from "./VersionHistoryModal";
 import { dateLong, statusPillStyle } from "@/lib/dashboard/format";
 import {
@@ -13,13 +13,16 @@ import {
 import {
   addCaptionOption,
   addMusicOption,
+  clearMusicOptionAudio,
   deleteCaptionOption,
   deleteMusicOption,
   selectCaptionOption,
+  setMusicOptionAudio,
   setMusicOptionSelected,
   updateCaptionOption,
   type CaptionOptionsResult,
 } from "@/lib/dashboard/proposals-actions";
+import { uploadBlob } from "@/components/dashboard/ArtUploadZone";
 import {
   describeInstagramMusicUrl,
   instagramEmbedSrc,
@@ -472,8 +475,13 @@ export default function CaptionPanel({
             options={musicOptions}
             canEdit={canEdit}
             busy={busy}
+            proposalId={proposal.id}
             onAdd={(url, label) => runMusicAction(() => addMusicOption(proposal.id, url, label))}
             onDelete={(optionId) => runMusicAction(() => deleteMusicOption(optionId))}
+            onSetAudio={(optionId, audioUrl, audioName) =>
+              runMusicAction(() => setMusicOptionAudio(optionId, audioUrl, audioName))
+            }
+            onClearAudio={(optionId) => runMusicAction(() => clearMusicOptionAudio(optionId))}
             onSelect={(optionId, selected) => {
               onPatchProposal(proposal.id, {
                 musicOptions: musicOptions.map((m) => ({
@@ -546,21 +554,47 @@ function MusicSection({
   options,
   canEdit,
   busy,
+  proposalId,
   onAdd,
   onDelete,
   onSelect,
+  onSetAudio,
+  onClearAudio,
 }: {
   options: ProposalMusicOption[];
   canEdit: boolean;
   busy: boolean;
+  proposalId: string;
   onAdd: (url: string, label?: string) => void;
   onDelete: (optionId: string) => void;
   onSelect: (optionId: string, selected: boolean) => void;
+  onSetAudio: (optionId: string, audioUrl: string, audioName?: string) => void;
+  onClearAudio: (optionId: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
+  const [uploadingId, setUploadingId] = useState("");
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const pendingOptionIdRef = useRef("");
+
+  async function handleAudioFile(optionId: string, file: File) {
+    setUploadingId(optionId);
+    try {
+      const audioUrl = await uploadBlob(`proposals/${proposalId}/music`, file);
+      onSetAudio(optionId, audioUrl, file.name);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo subir el audio.");
+    } finally {
+      setUploadingId("");
+    }
+  }
+
+  function openAudioPicker(optionId: string) {
+    pendingOptionIdRef.current = optionId;
+    audioInputRef.current?.click();
+  }
   // Uno solo a la vez, y montado recién al abrirlo: cada reproductor es un
   // iframe de Instagram (varios cientos de KB), y dos sonando juntos no le
   // sirven a nadie.
@@ -668,6 +702,19 @@ function MusicSection({
                     {playing ? <CloseIcon className="relative" /> : <EyeIcon className="relative" />}
                   </button>
                 )}
+                {canEdit && !option.audioUrl && (
+                  <button
+                    type="button"
+                    onClick={() => openAudioPicker(option.id)}
+                    onPointerEnter={handleLiquidPointerEnter}
+                    disabled={busy || uploadingId === option.id}
+                    title="Subir el archivo de audio (para escucharla acá)"
+                    aria-label="Subir el archivo de audio"
+                    className={`${iconButtonClass} shrink-0`}
+                  >
+                    <UploadIcon className="relative" />
+                  </button>
+                )}
                 {canEdit && (
                   <button
                     type="button"
@@ -682,6 +729,34 @@ function MusicSection({
                   </button>
                 )}
               </div>
+
+              {uploadingId === option.id && (
+                <div className="border-t border-line-2 px-3 py-2 text-[11px] text-tx-3">
+                  Subiendo audio…
+                </div>
+              )}
+
+              {option.audioUrl && (
+                <div className="flex items-center gap-2 border-t border-line-2 px-3 py-2">
+                  {/* El único reproductor real del panel: el archivo vive en
+                      nuestro Blob (ver assertBlobUrl), no en Instagram, así
+                      que sí puede sonar acá mismo. */}
+                  <audio controls preload="none" src={option.audioUrl} className="h-8 min-w-0 flex-1" />
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onClearAudio(option.id)}
+                      onPointerEnter={handleLiquidPointerEnter}
+                      disabled={busy}
+                      title="Quitar el audio subido"
+                      aria-label="Quitar el audio subido"
+                      className={`${iconButtonClass} shrink-0`}
+                    >
+                      <TrashIcon className="relative" />
+                    </button>
+                  )}
+                </div>
+              )}
 
               {embedSrc && playing && (
                 <div className="border-t border-line-2 px-3 py-3">
@@ -705,10 +780,26 @@ function MusicSection({
           );
         })}
 
+        {canEdit && (
+          <input
+            ref={audioInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              const optionId = pendingOptionIdRef.current;
+              e.target.value = "";
+              if (file && optionId) void handleAudioFile(optionId, file);
+            }}
+          />
+        )}
+
         {options.length > 0 && (
           <p className="text-[11px] leading-[1.4] text-tx-3">
             Instagram no deja reproducir su contenido fuera de Instagram: la vista previa muestra la
-            portada y el play abre la canción en una pestaña nueva.
+            portada y el play abre la canción en una pestaña nueva. Para escucharla acá, subí el
+            archivo de audio con {"↑"}.
           </p>
         )}
 
@@ -727,7 +818,8 @@ function MusicSection({
             />
             <p className="text-[11px] leading-[1.4] text-tx-3">
               Si pegás el reel que usa la canción, se ve la portada acá; la página de audio queda
-              solo como enlace.
+              solo como enlace. Para que se pueda escuchar en el panel, después subí el archivo de
+              audio con {"↑"}.
             </p>
             <input
               value={label}
@@ -931,6 +1023,26 @@ function ExternalLinkIcon({ className }: { className?: string }) {
       <path d="M14 4h6v6" />
       <path d="M20 4 11 13" />
       <path d="M18 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+    </svg>
+  );
+}
+
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 16V4" />
+      <path d="M7 9l5-5 5 5" />
+      <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
     </svg>
   );
 }

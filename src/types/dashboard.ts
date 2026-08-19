@@ -41,6 +41,11 @@ export interface ProposalMusicOption {
   /** Nombre que le puso quien la cargó; vacío = la UI lo deriva de la URL. */
   label?: string;
   selected: boolean;
+  /** Audio subido para poder escucharla en el panel — Instagram no deja
+   * reproducir lo suyo afuera, así que este es el único reproductor real.
+   * undefined = solo enlace. */
+  audioUrl?: string;
+  audioName?: string;
 }
 
 export interface Proposal {

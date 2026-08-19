@@ -38,7 +38,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       token: BLOB_TOKEN,
       onBeforeGenerateToken: async () => ({
-        allowedContentTypes: ["image/*", "video/*"],
+        // audio/* es para los archivos de canción del panel de música (ver
+        // MusicSection): Instagram no deja reproducir lo suyo afuera, así que
+        // el reproductor real se sirve desde este deployment.
+        allowedContentTypes: ["image/*", "video/*", "audio/*"],
         maximumSizeInBytes: MAX_UPLOAD_BYTES,
         // Los videos pueden pesar hasta 500MB; el token debe seguir vivo mientras dura el PUT.
         validUntil: Date.now() + 60 * 60 * 1000, // 1 hora de margen

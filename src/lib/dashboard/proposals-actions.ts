@@ -78,8 +78,17 @@ function toMusicOption(row: {
   url: string;
   label: string | null;
   selected: boolean;
+  audioUrl: string | null;
+  audioName: string | null;
 }): ProposalMusicOption {
-  return { id: row.id, url: row.url, label: row.label ?? undefined, selected: row.selected };
+  return {
+    id: row.id,
+    url: row.url,
+    label: row.label ?? undefined,
+    selected: row.selected,
+    audioUrl: row.audioUrl ?? undefined,
+    audioName: row.audioName ?? undefined,
+  };
 }
 
 function toProposal(row: ProposalRow, now: Date): Proposal {
@@ -766,4 +775,61 @@ export async function setMusicOptionSelected(
     `${label}: ${option.label || describeInstagramMusicUrl(option.url)} — ${option.url}`,
   );
   return result;
+}
+
+/** Hosts de Vercel Blob — el `audioUrl` llega del navegador (la subida va
+ * directo del cliente a Blob, ver /api/blob/upload), así que el server no ve
+ * el archivo y lo único que puede validar es que la URL sea de nuestro
+ * storage. Sin esto, `audioUrl` sería un "pegá cualquier URL" que después se
+ * carga como <audio src> en la pantalla de todos. */
+function assertBlobUrl(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("No se pudo subir el audio.");
+  }
+  const ok =
+    parsed.protocol === "https:" &&
+    (parsed.hostname.endsWith(".public.blob.vercel-storage.com") ||
+      parsed.hostname.endsWith(".blob.vercel-storage.com"));
+  if (!ok) throw new Error("No se pudo subir el audio.");
+  return parsed.toString();
+}
+
+/** Adjunta (o reemplaza) el archivo de audio de una música. Cargar contenido
+ * es de Editor/Admin, igual que el resto de las alternativas — elegir es lo
+ * único que alcanza con sesión. */
+export async function setMusicOptionAudio(
+  optionId: string,
+  audioUrl: string,
+  audioName?: string,
+): Promise<ProposalMusicOption[]> {
+  await requireEditor();
+  const option = await prisma.proposalMusicOption.findUnique({ where: { id: optionId } });
+  if (!option) throw new Error("Esa música ya no existe.");
+
+  await prisma.proposalMusicOption.update({
+    where: { id: optionId },
+    data: {
+      audioUrl: assertBlobUrl(audioUrl),
+      audioName: audioName?.trim().slice(0, 200) || null,
+    },
+  });
+  return listMusicOptions(option.proposalId);
+}
+
+/** Quita el audio y deja la música como enlace solo. El archivo queda en Blob
+ * a propósito: borrarlo desde acá dejaría rota cualquier otra referencia y no
+ * hay forma barata de saber si la hay. */
+export async function clearMusicOptionAudio(optionId: string): Promise<ProposalMusicOption[]> {
+  await requireEditor();
+  const option = await prisma.proposalMusicOption.findUnique({ where: { id: optionId } });
+  if (!option) throw new Error("Esa música ya no existe.");
+
+  await prisma.proposalMusicOption.update({
+    where: { id: optionId },
+    data: { audioUrl: null, audioName: null },
+  });
+  return listMusicOptions(option.proposalId);
 }

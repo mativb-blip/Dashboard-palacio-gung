@@ -338,6 +338,13 @@ model ProposalMusicOption {
   label      String?
   selected   Boolean  @default(false)
   order      Int      @default(0)
+  /// Archivo de audio subido a Blob para poder escuchar la canción en el
+  /// panel — Instagram no deja reproducir lo suyo afuera (ver
+  /// instagramEmbedSrc), así que el único reproductor posible es uno servido
+  /// desde acá. Opcional: la música vale igual con solo el enlace.
+  audioUrl   String?  @db.Text
+  /// Nombre original del archivo, para mostrarlo y para el botón de descarga.
+  audioName  String?
   createdAt  DateTime @default(now())
 
   @@index([proposalId])
