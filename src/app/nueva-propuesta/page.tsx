@@ -4,10 +4,13 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import ArtUploadZone, { type UploadedFile } from "@/components/dashboard/ArtUploadZone";
+import ArtUploadZone, { type UploadedFile, uploadBlob } from "@/components/dashboard/ArtUploadZone";
 import InstagramPreview from "@/components/dashboard/InstagramPreview";
+import { resolveAudioContentType } from "@/lib/dashboard/audio";
 import { useBrand } from "@/lib/dashboard/BrandContext";
-import { createProposal } from "@/lib/dashboard/proposals-actions";
+import { describeInstagramMusicUrl, normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
+import { CAPTION_OPTIONS_LIMIT, MUSIC_OPTIONS_LIMIT } from "@/lib/dashboard/proposals";
+import { createProposal, type AddMusicOptionInput } from "@/lib/dashboard/proposals-actions";
 import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { ProposalFormat } from "@/types/dashboard";
 
@@ -68,12 +71,30 @@ function NuevaPropuestaForm() {
   const [format, setFormat] = useState<ProposalFormat>("Carrusel");
   const [contentPillar, setContentPillar] = useState("");
   const [caption, setCaption] = useState("");
+  // Alternativas además de la principal — mismo tope y misma idea que
+  // agregarlas después desde la vista Post (ver CaptionPanel), solo que acá
+  // todavía no hay propuesta creada: viven en el estado local hasta el
+  // submit.
+  const [extraCaptions, setExtraCaptions] = useState<string[]>([]);
   const [artFiles, setArtFiles] = useState<UploadedFile[]>([]);
   const [coverFiles, setCoverFiles] = useState<UploadedFile[]>([]);
   const [videoFiles, setVideoFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Música cargada junto con la propuesta — mismo shape que
+  // AddMusicOptionInput (ver proposals-actions.ts); ninguna queda elegida al
+  // crear, igual que agregarlas después desde la vista Post.
+  const [musicDrafts, setMusicDrafts] = useState<AddMusicOptionInput[]>([]);
+  const [addingMusic, setAddingMusic] = useState(false);
+  const [musicUrl, setMusicUrl] = useState("");
+  const [musicLabel, setMusicLabel] = useState("");
+  const [musicError, setMusicError] = useState("");
+  const [musicAudioUrl, setMusicAudioUrl] = useState("");
+  const [musicAudioName, setMusicAudioName] = useState("");
+  const [uploadingMusicAudio, setUploadingMusicAudio] = useState(false);
+  const musicAudioInputRef = useRef<HTMLInputElement>(null);
 
   if (status !== "authenticated" || !canEdit) return null;
 
@@ -104,6 +125,78 @@ function NuevaPropuestaForm() {
     }
   }
 
+  function addExtraCaption() {
+    if (extraCaptions.length >= CAPTION_OPTIONS_LIMIT - 1) return;
+    setExtraCaptions((prev) => [...prev, ""]);
+  }
+
+  function updateExtraCaption(index: number, value: string) {
+    setExtraCaptions((prev) => prev.map((text, i) => (i === index ? value : text)));
+  }
+
+  function removeExtraCaption(index: number) {
+    setExtraCaptions((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleMusicAudioFile(file: File) {
+    setUploadingMusicAudio(true);
+    try {
+      const url = await uploadBlob(
+        `proposals/${draftId}/music`,
+        file,
+        undefined,
+        undefined,
+        resolveAudioContentType(file),
+      );
+      setMusicAudioUrl(url);
+      setMusicAudioName(file.name);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo subir el audio.");
+    } finally {
+      setUploadingMusicAudio(false);
+    }
+  }
+
+  function resetMusicComposer() {
+    setAddingMusic(false);
+    setMusicUrl("");
+    setMusicLabel("");
+    setMusicError("");
+    setMusicAudioUrl("");
+    setMusicAudioName("");
+  }
+
+  function handleAddMusicDraft() {
+    const trimmedUrl = musicUrl.trim();
+    let normalized: string | undefined;
+    if (trimmedUrl) {
+      try {
+        normalized = normalizeInstagramMusicUrl(trimmedUrl);
+      } catch (e) {
+        setMusicError(e instanceof Error ? e.message : "Enlace inválido.");
+        return;
+      }
+    }
+    if (!normalized && !musicAudioUrl) {
+      setMusicError("Pegá un enlace o subí un archivo de audio.");
+      return;
+    }
+    setMusicDrafts((prev) => [
+      ...prev,
+      {
+        url: normalized,
+        label: musicLabel.trim() || undefined,
+        audioUrl: musicAudioUrl || undefined,
+        audioName: musicAudioName || undefined,
+      },
+    ]);
+    resetMusicComposer();
+  }
+
+  function removeMusicDraft(index: number) {
+    setMusicDrafts((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!date || !time.trim() || !caption.trim()) {
@@ -128,6 +221,8 @@ function NuevaPropuestaForm() {
         artN: isReel ? 1 : Math.max(1, artFiles.length),
         images: isReel ? coverFiles.map((f) => f.url) : artFiles.map((f) => f.url),
         video: isReel ? videoFiles[0]?.url : undefined,
+        extraCaptions: extraCaptions.map((text) => text.trim()).filter(Boolean),
+        music: musicDrafts,
       });
 
       router.push("/");
@@ -261,6 +356,182 @@ function NuevaPropuestaForm() {
           />
         </div>
 
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] tracking-label text-tx-3 uppercase">
+              Alternativas de caption
+            </span>
+            {extraCaptions.length < CAPTION_OPTIONS_LIMIT - 1 && (
+              <button
+                type="button"
+                onClick={addExtraCaption}
+                className={`text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+              >
+                + Agregar otra alternativa
+              </button>
+            )}
+          </div>
+          {extraCaptions.length === 0 ? (
+            <p className="text-[11px] leading-[1.4] text-tx-3">
+              Opcional — Jun podrá elegir cuál de todas usar. La de arriba es la principal.
+            </p>
+          ) : (
+            extraCaptions.map((text, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <textarea
+                  value={text}
+                  onChange={(e) => updateExtraCaption(i, e.target.value)}
+                  placeholder={`Alternativa ${i + 2}`}
+                  className={`${inputClass} min-h-20 resize-y`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeExtraCaption(i)}
+                  title="Quitar esta alternativa"
+                  aria-label="Quitar esta alternativa"
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border border-line-2 bg-panel-2 text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] tracking-label text-tx-3 uppercase">Música de Instagram</span>
+            {!addingMusic && musicDrafts.length < MUSIC_OPTIONS_LIMIT && (
+              <button
+                type="button"
+                onClick={() => setAddingMusic(true)}
+                className={`text-xs font-bold text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+              >
+                + Agregar música
+              </button>
+            )}
+          </div>
+
+          {musicDrafts.length === 0 && !addingMusic && (
+            <p className="text-[11px] leading-[1.4] text-tx-3">
+              Opcional — Jun podrá elegir una. También se puede cargar después.
+            </p>
+          )}
+
+          {musicDrafts.map((draft, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2 rounded border border-line-2 bg-panel-2 px-3 py-2"
+            >
+              <span className="min-w-0 flex-1 truncate text-[13px] text-brand-ink">
+                {draft.label ||
+                  (draft.url ? describeInstagramMusicUrl(draft.url) : draft.audioName) ||
+                  "Música"}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeMusicDraft(i)}
+                title="Quitar esta música"
+                aria-label="Quitar esta música"
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded border border-line-2 bg-panel-2 text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          ))}
+
+          {addingMusic && (
+            <div className="flex flex-col gap-2 rounded border border-line-2 bg-panel-2 p-3">
+              <input
+                value={musicUrl}
+                onChange={(e) => {
+                  setMusicUrl(e.target.value);
+                  setMusicError("");
+                }}
+                placeholder="Pegá el enlace del reel o del audio (opcional)"
+                inputMode="url"
+                className={inputClass}
+              />
+
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-line-2" />
+                <span className="text-[10px] font-bold tracking-label text-tx-3 uppercase">o</span>
+                <div className="h-px flex-1 bg-line-2" />
+              </div>
+
+              {musicAudioUrl ? (
+                <div className="flex items-center gap-2 rounded border border-brand-blue bg-brand-blue/[0.05] px-3 py-2">
+                  <UploadIcon />
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-brand-ink">
+                    {musicAudioName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMusicAudioUrl("");
+                      setMusicAudioName("");
+                    }}
+                    title="Quitar el audio subido"
+                    aria-label="Quitar el audio subido"
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded border border-line-2 bg-panel-2 text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => musicAudioInputRef.current?.click()}
+                  disabled={uploadingMusicAudio}
+                  className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+                >
+                  <UploadIcon />
+                  {uploadingMusicAudio ? "Subiendo…" : "Subir un archivo de audio"}
+                </button>
+              )}
+
+              <input
+                value={musicLabel}
+                onChange={(e) => setMusicLabel(e.target.value)}
+                placeholder="Nombre (opcional)"
+                className={inputClass}
+              />
+
+              {musicError && <p className="text-xs text-brand-red">{musicError}</p>}
+
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={resetMusicComposer}
+                  className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-panel-2 px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddMusicDraft}
+                  disabled={!musicUrl.trim() && !musicAudioUrl}
+                  className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+                >
+                  Agregar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <input
+            ref={musicAudioInputRef}
+            type="file"
+            accept="audio/*,.m4a,.mp3,.wav,.ogg,.aac,.flac"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void handleMusicAudioFile(file);
+            }}
+          />
+        </div>
+
         <button
           type="button"
           onClick={() => setShowPreview(true)}
@@ -297,6 +568,28 @@ function ClipboardIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="8" y="2" width="8" height="4" rx="1" />
       <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 16V4" />
+      <path d="M7 9l5-5 5 5" />
+      <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
     </svg>
   );
 }

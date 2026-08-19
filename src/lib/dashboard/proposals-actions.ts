@@ -150,6 +150,55 @@ export interface CreateProposalInput {
   dim?: string;
   /** undefined/"" = sin categorizar, a propósito (ver ficha 2). */
   contentPillar?: string;
+  /** Alternativas de caption además de la principal (`caption`, que siempre
+   * nace elegida) — mismo límite que agregarlas después desde la vista Post
+   * (ver CAPTION_OPTIONS_LIMIT). Entradas vacías se ignoran. */
+  extraCaptions?: string[];
+  /** Músicas a cargar junto con la propuesta — mismo shape y misma validación
+   * que addMusicOption() (ver buildMusicCreateData), sin selected: ninguna
+   * queda elegida al nacer, igual que agregarlas después. */
+  music?: AddMusicOptionInput[];
+}
+
+/** Valida y normaliza entradas de música para crearlas junto con la
+ * propuesta — misma regla que addMusicOption() (al menos un enlace o un
+ * audio por entrada), pero silenciosa en vez de tirar: una entrada vacía en
+ * la ventana de carga es "no se llenó este campo", no un error para el
+ * usuario. */
+function buildMusicCreateData(
+  entries: AddMusicOptionInput[] | undefined,
+): { url: string | null; label: string | null; audioUrl: string | null; audioName: string | null; order: number }[] {
+  if (!entries?.length) return [];
+  return entries
+    .map((entry) => {
+      const rawUrl = entry.url?.trim();
+      let normalized: string | undefined;
+      if (rawUrl) {
+        try {
+          normalized = normalizeInstagramMusicUrl(rawUrl);
+        } catch {
+          normalized = undefined;
+        }
+      }
+      let audioUrl: string | undefined;
+      if (entry.audioUrl) {
+        try {
+          audioUrl = assertBlobUrl(entry.audioUrl);
+        } catch {
+          audioUrl = undefined;
+        }
+      }
+      if (!normalized && !audioUrl) return null;
+      return {
+        url: normalized ?? null,
+        label: entry.label?.trim() || null,
+        audioUrl: audioUrl ?? null,
+        audioName: audioUrl ? entry.audioName?.trim().slice(0, 200) || null : null,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .slice(0, MUSIC_OPTIONS_LIMIT)
+    .map((entry, order) => ({ ...entry, order }));
 }
 
 export async function createProposal(input: CreateProposalInput): Promise<Proposal> {
@@ -167,6 +216,11 @@ export async function createProposal(input: CreateProposalInput): Promise<Propos
     ? input.contentPillar
     : null;
 
+  const extraCaptions = (input.extraCaptions ?? [])
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .slice(0, CAPTION_OPTIONS_LIMIT - 1);
+
   const row = await prisma.proposal.create({
     data: {
       date: input.date,
@@ -183,11 +237,18 @@ export async function createProposal(input: CreateProposalInput): Promise<Propos
       aspect: input.aspect,
       dim: input.dim,
       contentPillar,
-      // La propuesta nace con una sola alternativa de caption, ya elegida —
-      // así el panel nunca ve una propuesta sin opciones y `caption` y su
-      // alternativa arrancan sincronizados. Las demás se agregan desde la
-      // vista Post (ver addCaptionOption).
-      captionOptions: { create: { text: input.caption.trim(), selected: true, order: 0 } },
+      // La propuesta nace con la alternativa principal ya elegida — así el
+      // panel nunca ve una propuesta sin opciones y `caption` y su
+      // alternativa arrancan sincronizados. Las de `extraCaptions` (cargadas
+      // desde la misma ventana) nacen sin elegir, igual que agregarlas
+      // después desde la vista Post (ver addCaptionOption).
+      captionOptions: {
+        create: [
+          { text: input.caption.trim(), selected: true, order: 0 },
+          ...extraCaptions.map((text, i) => ({ text, selected: false, order: i + 1 })),
+        ],
+      },
+      musicOptions: { create: buildMusicCreateData(input.music) },
     },
     include: PROPOSAL_INCLUDE,
   });
