@@ -29,9 +29,10 @@ export default function InspiracionPage() {
   const canEdit = canEditContent(session?.user.role);
 
   // El visor ampliado vive a nivel de página (es un overlay fijo) y lo
-  // comparten las dos secciones.
-  const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
-  const expandedEmbedSrc = expandedUrl ? instagramEmbedSrc(expandedUrl) : null;
+  // comparten las dos secciones. Se guarda el ítem entero y no solo la URL
+  // porque el alto del recuadro depende de si es reel o foto.
+  const [expanded, setExpanded] = useState<InspirationItem | null>(null);
+  const expandedEmbedSrc = expanded ? instagramEmbedSrc(expanded.url) : null;
 
   return (
     <div className="flex min-h-screen flex-col font-sans text-brand-ink">
@@ -65,7 +66,7 @@ export default function InspiracionPage() {
           title="Reels"
           description="Pegá un link de Instagram y quedan todos juntos para mirar."
           canEdit={canEdit}
-          onExpand={setExpandedUrl}
+          onExpand={setExpanded}
         />
 
         <InspirationSection
@@ -73,31 +74,46 @@ export default function InspiracionPage() {
           title="Posts con foto"
           description="Referencias de encuadre, montaje, luz y estilo de plato — el post se ve y se puede usar acá mismo."
           canEdit={canEdit}
-          onExpand={setExpandedUrl}
+          onExpand={setExpanded}
         />
       </div>
 
       {/* Visor ampliado: el mismo embed pero grande, para cuando la celda de
           la grilla queda chica (sobre todo en el teléfono, a dos columnas). */}
-      {expandedEmbedSrc && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-lg"
-          onClick={() => setExpandedUrl(null)}
-        >
-          <div className="w-full max-w-[380px]" onClick={(e) => e.stopPropagation()}>
-            <iframe
-              src={expandedEmbedSrc}
-              className="aspect-[2/3] w-full rounded"
-              style={{ border: 0 }}
-              allow="autoplay; encrypted-media; fullscreen"
-              allowFullScreen
-              scrolling="no"
-              title="Post de Instagram"
-            />
+      {expanded && expandedEmbedSrc && (
+        <div className="fixed inset-0 z-50" onClick={() => setExpanded(null)}>
+          {/* El fondo oscuro y desenfocado va en su PROPIA capa, hermana del
+              iframe y no ancestro suyo. Con backdrop-filter en un ancestro,
+              Safari de iPhone/iPad pinta en blanco los iframes de otro
+              origen — que es exactamente el reel quedándose vacío al
+              maximizar. Sobre un <img> no pasa, por eso la Galería sí puede
+              llevar el blur en el mismo nodo. */}
+          <div className="absolute inset-0 bg-black/75 backdrop-blur-lg" />
+
+          <div className="relative flex h-full items-center justify-center p-4">
+            <div
+              className="w-full max-w-[380px]"
+              onClick={(e) => e.stopPropagation()}
+              // Alto según el tipo: un reel es mucho más alto que un post con
+              // foto, y forzar los dos a la misma proporción recortaba el
+              // video.
+              style={{ aspectRatio: ASPECT[expanded.kind] }}
+            >
+              <iframe
+                src={expandedEmbedSrc}
+                className="h-full w-full rounded"
+                style={{ border: 0 }}
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+                scrolling="no"
+                title="Post de Instagram"
+              />
+            </div>
           </div>
+
           <button
             type="button"
-            onClick={() => setExpandedUrl(null)}
+            onClick={() => setExpanded(null)}
             aria-label="Cerrar"
             className={`absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
           >
@@ -123,7 +139,7 @@ function InspirationSection({
   title: string;
   description: string;
   canEdit: boolean;
-  onExpand: (url: string) => void;
+  onExpand: (item: InspirationItem) => void;
 }) {
   const [items, setItems] = useState<InspirationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -280,7 +296,7 @@ function InspirationSection({
                 <div className="flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => onExpand(item.url)}
+                    onClick={() => onExpand(item)}
                     onPointerEnter={handleLiquidPointerEnter}
                     aria-label="Ampliar"
                     title="Ampliar"

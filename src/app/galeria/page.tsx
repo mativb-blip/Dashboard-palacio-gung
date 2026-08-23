@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useState } from "react";
 import ArtUploadZone, { type UploadedFile } from "@/components/dashboard/ArtUploadZone";
 import Topbar from "@/components/dashboard/Topbar";
 import { useBrand } from "@/lib/dashboard/BrandContext";
@@ -14,20 +14,6 @@ import type { GalleryPhoto } from "@/types/dashboard";
  * galería es su propio depósito de fotos (ver comentario en el schema). */
 const GALLERY_FOLDER = "gallery";
 
-/** Recorrido mínimo (px) para que un arrastre cuente como swipe. */
-const SWIPE_MIN_PX = 45;
-
-/** Un "flick" corto pero rápido también tiene que pasar — exigir solo
- * distancia hace que el gesto se sienta pesado. */
-const SWIPE_MIN_VELOCITY = 0.35;
-
-/** Piso de distancia para el atajo por velocidad. Sin esto, un toque que
- * mueve 2-3px (lo normal al tocar con el dedo) sale con una velocidad
- * altísima porque el tiempo transcurrido es ~0, y cambiaba de foto en vez
- * de cerrar el visor. La velocidad decide entre gestos que ya son un
- * desplazamiento, no convierte un toque en uno. */
-const SWIPE_FLICK_MIN_PX = 12;
-
 export default function GaleriaPage() {
   const { brandName } = useBrand();
   const { data: session } = useSession();
@@ -35,10 +21,9 @@ export default function GaleriaPage() {
 
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [loading, setLoading] = useState(true);
-  // Por id y no por URL: para pasar de una foto a la siguiente con el swipe
-  // hace falta saber en qué posición de `photos` estamos parados. Además, si
-  // la foto abierta se borra, el find() de abajo deja de encontrarla y el
-  // visor se cierra solo.
+  // Por id y no por URL: para pasar a la foto siguiente hace falta saber en
+  // qué posición de `photos` estamos parados. Además, si la foto abierta se
+  // borra, el find() de abajo deja de encontrarla y el visor se cierra solo.
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   // Cola transitoria del selector de subida (ArtUploadZone): se vacía apenas
   // cada archivo se persiste como GalleryPhoto — la grilla de abajo es la
@@ -92,48 +77,6 @@ export default function GaleriaPage() {
     if (lightboxIndex < 0) return;
     const next = photos[lightboxIndex + step];
     if (next) setLightboxId(next.id);
-  }
-
-  // Punto donde arrancó el gesto; null cuando no hay ninguno en curso.
-  const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
-  // El overlay cierra al hacer click, y un swipe termina disparando también
-  // un click — sin esta bandera, pasar de foto cerraría el visor.
-  const swipeHandledRef = useRef(false);
-
-  function handleLightboxPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    swipeStartRef.current = { x: e.clientX, y: e.clientY, at: e.timeStamp };
-  }
-
-  function handleLightboxPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
-    const start = swipeStartRef.current;
-    swipeStartRef.current = null;
-    if (!start) return;
-
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    // Gesto vertical (scroll, o el reflejo de arrastrar para cerrar): no es
-    // navegación entre fotos, se ignora.
-    if (Math.abs(dx) <= Math.abs(dy)) return;
-
-    const distance = Math.abs(dx);
-    const elapsed = Math.max(e.timeStamp - start.at, 1);
-    const velocity = distance / elapsed;
-    const arrastre = distance >= SWIPE_MIN_PX;
-    const flick = distance >= SWIPE_FLICK_MIN_PX && velocity >= SWIPE_MIN_VELOCITY;
-    if (!arrastre && !flick) return;
-
-    swipeHandledRef.current = true;
-    // Arrastrar hacia la izquierda trae la siguiente, como en cualquier
-    // galería del teléfono.
-    stepPhoto(dx < 0 ? 1 : -1);
-  }
-
-  function handleLightboxClick() {
-    if (swipeHandledRef.current) {
-      swipeHandledRef.current = false;
-      return;
-    }
-    setLightboxId(null);
   }
 
   return (
@@ -221,21 +164,15 @@ export default function GaleriaPage() {
       {lightboxPhoto && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-lg"
-          onClick={handleLightboxClick}
-          onPointerDown={handleLightboxPointerDown}
-          onPointerUp={handleLightboxPointerUp}
-          // pan-y deja el scroll vertical y el pinch al navegador (hacer zoom
-          // sobre una foto es lo esperable) y nos reserva el eje horizontal,
-          // que es el del swipe.
-          style={{ touchAction: "pan-y pinch-zoom" }}
+          onClick={() => setLightboxId(null)}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- vista ampliada, mismo asset del usuario */}
           <img
             src={lightboxPhoto.url}
             alt={lightboxPhoto.filename ?? "Foto de la galería en tamaño completo"}
             className="max-h-full max-w-full rounded object-contain select-none"
-            // Sin esto, en desktop arrastrar la foto inicia el drag&drop
-            // nativo del navegador y el swipe nunca llega a completarse.
+            // Arrastrar la foto en desktop iniciaría el drag&drop nativo del
+            // navegador, que acá no lleva a nada.
             draggable={false}
           />
           <button
@@ -261,6 +198,39 @@ export default function GaleriaPage() {
               <PostIcon />
               Usar como post
             </Link>
+          )}
+
+          {/* Flechas en vez de swipe: el gesto resultaba poco fiable en el
+              teléfono (cambiaba de foto o cerraba el visor cuando no se
+              quería), y un control que se ve y se toca no tiene ese problema.
+              stopPropagation porque el overlay cierra al hacer click. */}
+          {lightboxIndex > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                stepPhoto(-1);
+              }}
+              aria-label="Foto anterior"
+              title="Foto anterior"
+              className={`absolute top-1/2 left-2 flex h-12 w-12 -translate-y-1/2 items-center justify-center text-white/70 transition-colors duration-[250ms] hover:text-white ${PRESS_SCALE_CLASS}`}
+            >
+              <ChevronLeftIcon />
+            </button>
+          )}
+          {lightboxIndex < photos.length - 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                stepPhoto(1);
+              }}
+              aria-label="Foto siguiente"
+              title="Foto siguiente"
+              className={`absolute top-1/2 right-2 flex h-12 w-12 -translate-y-1/2 items-center justify-center text-white/70 transition-colors duration-[250ms] hover:text-white ${PRESS_SCALE_CLASS}`}
+            >
+              <ChevronRightIcon />
+            </button>
           )}
 
           {photos.length > 1 && (
@@ -303,6 +273,25 @@ function PostIcon() {
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <circle cx="9" cy="9" r="2" />
       <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </svg>
+  );
+}
+
+/** Flechas de navegación del visor: trazo fino, sin círculo de fondo — la
+ * foto es lo que importa, el control tiene que estar y no pesar. El área
+ * táctil (48px) es más grande que el glifo. */
+function ChevronLeftIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 5-7 7 7 7" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 5 7 7-7 7" />
     </svg>
   );
 }
