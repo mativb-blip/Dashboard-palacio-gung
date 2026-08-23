@@ -114,3 +114,14 @@ export interface InspirationReel {
   addedBy?: string;
   when: string;
 }
+
+/** Una foto de referencia (segunda sección de `/inspiracion`) — ver
+ * InspirationPhoto en el schema. Distinta de GalleryPhoto: ésta es
+ * referencia ajena, la otra es material propio. */
+export interface InspirationPhoto {
+  id: string;
+  url: string;
+  filename?: string;
+  addedBy?: string;
+  when: string;
+}

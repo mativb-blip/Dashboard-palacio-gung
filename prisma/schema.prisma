@@ -385,3 +385,22 @@ model InspirationReel {
 
   @@index([createdAt])
 }
+
+/// Fotos de referencia, segunda sección de /inspiracion. Modelo aparte de
+/// GalleryPhoto a propósito: la Galería es el depósito de material PROPIO
+/// (fotos del restaurante), esto es referencia ajena que se mira para
+/// inspirarse. Mezclarlas en una sola tabla obligaría a un discriminador y
+/// a filtrar en cada consulta para separar dos cosas que nunca se listan
+/// juntas.
+model InspirationPhoto {
+  id        String   @id @default(cuid())
+  /// URL de Vercel Blob (ver assertBlobUrl) — la subida va directo del
+  /// navegador a Blob, igual que los artes y la Galería.
+  url       String   @db.Text
+  /// Nombre original del archivo, solo para mostrarlo y para el alt.
+  filename  String?
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

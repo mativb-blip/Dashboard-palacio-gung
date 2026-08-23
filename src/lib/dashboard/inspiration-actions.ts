@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { instagramEmbedSrc, normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
-import type { InspirationReel } from "@/types/dashboard";
+import type { InspirationPhoto, InspirationReel } from "@/types/dashboard";
 
 // Cualquier usuario con sesión puede ver el repositorio — mismo criterio que
 // getGalleryPhotos(); el gate real de ruta vive en src/proxy.ts.
@@ -73,5 +74,46 @@ export async function addInspirationReel(url: string): Promise<InspirationReel> 
 export async function deleteInspirationReel(id: string): Promise<void> {
   await requireEditor();
   await prisma.inspirationReel.delete({ where: { id } });
+  revalidatePath("/inspiracion");
+}
+
+function toInspirationPhoto(
+  row: { id: string; url: string; filename: string | null; addedBy: string | null; createdAt: Date },
+  now: Date,
+): InspirationPhoto {
+  return {
+    id: row.id,
+    url: row.url,
+    filename: row.filename ?? undefined,
+    addedBy: row.addedBy ?? undefined,
+    when: formatCommentWhen(row.createdAt, now),
+  };
+}
+
+export async function getInspirationPhotos(): Promise<InspirationPhoto[]> {
+  await requireSession();
+  const rows = await prisma.inspirationPhoto.findMany({ orderBy: { createdAt: "desc" } });
+  const now = new Date();
+  return rows.map((row) => toInspirationPhoto(row, now));
+}
+
+export async function addInspirationPhoto(url: string, filename?: string): Promise<InspirationPhoto> {
+  const session = await requireEditor();
+  const row = await prisma.inspirationPhoto.create({
+    data: {
+      url: assertBlobUrl(url, "No se pudo subir la foto."),
+      filename: filename?.trim().slice(0, 200) || null,
+      addedBy: session.user.name || session.user.email || null,
+    },
+  });
+  revalidatePath("/inspiracion");
+  return toInspirationPhoto(row, new Date());
+}
+
+/** Igual que la Galería: se borra la fila, no el archivo en Blob — no hay
+ * forma barata de saber si algo más lo referencia. */
+export async function deleteInspirationPhoto(id: string): Promise<void> {
+  await requireEditor();
+  await prisma.inspirationPhoto.delete({ where: { id } });
   revalidatePath("/inspiracion");
 }

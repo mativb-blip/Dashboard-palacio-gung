@@ -3,16 +3,20 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import ArtUploadZone, { type UploadedFile } from "@/components/dashboard/ArtUploadZone";
 import Topbar from "@/components/dashboard/Topbar";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import {
+  addInspirationPhoto,
   addInspirationReel,
+  deleteInspirationPhoto,
   deleteInspirationReel,
+  getInspirationPhotos,
   getInspirationReels,
 } from "@/lib/dashboard/inspiration-actions";
 import { instagramEmbedSrc } from "@/lib/dashboard/instagram-music";
 import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
-import type { InspirationReel } from "@/types/dashboard";
+import type { InspirationPhoto, InspirationReel } from "@/types/dashboard";
 
 /** Mismo breakpoint que el resto del dashboard (ver --breakpoint-desktop en
  * globals.css). Hace falta en JS y no solo en CSS: en mobile las celdas NO
@@ -20,6 +24,11 @@ import type { InspirationReel } from "@/types/dashboard";
  * iframe cargando de fondo, que es justo el costo que se quiere evitar en
  * una grilla de dos columnas con potencialmente muchos reels. */
 const DESKTOP_QUERY = "(min-width: 861px)";
+
+/** Carpeta fija en Blob Storage para las fotos de inspiración — no hay un id
+ * de propuesta real detrás, ese prop de ArtUploadZone solo organiza la ruta
+ * (mismo criterio que GALLERY_FOLDER en /galeria). */
+const PHOTO_FOLDER = "inspiration";
 
 function subscribeToDesktopQuery(callback: () => void): () => void {
   const mql = window.matchMedia(DESKTOP_QUERY);
@@ -58,6 +67,14 @@ export default function InspiracionPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [photos, setPhotos] = useState<InspirationPhoto[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(true);
+  const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
+  // Cola transitoria del selector de subida (ArtUploadZone): se vacía apenas
+  // cada archivo se persiste como InspirationPhoto — la grilla de abajo es la
+  // única fuente de verdad, esto es solo las miniaturas mientras sube.
+  const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
+
   useEffect(() => {
     let cancelled = false;
     getInspirationReels().then((data) => {
@@ -69,6 +86,42 @@ export default function InspiracionPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getInspirationPhotos().then((data) => {
+      if (cancelled) return;
+      setPhotos(data);
+      setPhotosLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handlePhotoFilesChange(next: UploadedFile[]) {
+    setPendingFiles([]);
+    for (const file of next) {
+      try {
+        const saved = await addInspirationPhoto(file.url, file.name);
+        setPhotos((prev) => [saved, ...prev]);
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "No se pudo subir la foto.");
+      }
+    }
+  }
+
+  async function handleDeletePhoto(photo: InspirationPhoto) {
+    if (!window.confirm("¿Borrar esta foto de inspiración?")) return;
+    setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+    if (openPhotoId === photo.id) setOpenPhotoId(null);
+    try {
+      await deleteInspirationPhoto(photo.id);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo borrar la foto.");
+      setPhotos((prev) => [photo, ...prev]);
+    }
+  }
 
   function resetComposer() {
     setAdding(false);
@@ -109,6 +162,7 @@ export default function InspiracionPage() {
 
   const openReel = reels.find((r) => r.id === openReelId) ?? null;
   const openEmbedSrc = openReel ? instagramEmbedSrc(openReel.url) : null;
+  const openPhoto = photos.find((p) => p.id === openPhotoId) ?? null;
 
   return (
     <div className="flex min-h-screen flex-col font-sans text-brand-ink">
@@ -129,12 +183,19 @@ export default function InspiracionPage() {
       <div className="h-px shrink-0 bg-line" />
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 desktop:px-8">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[11px] tracking-label text-tx-3 uppercase">Plan de contenido</div>
+          <h1 className="text-2xl font-bold">Inspiración</h1>
+          <p className="mt-1 text-sm text-tx-2">
+            Repositorio de referencias para mirar antes de producir: reels y fotos.
+          </p>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3 border-t border-line pt-5">
           <div>
-            <div className="text-[11px] tracking-label text-tx-3 uppercase">Plan de contenido</div>
-            <h1 className="text-2xl font-bold">Reels de inspiración</h1>
+            <h2 className="text-lg font-bold">Reels</h2>
             <p className="mt-1 text-sm text-tx-2">
-              Repositorio de referencias — pegá un link de Instagram y quedan todas juntas para mirar.
+              Pegá un link de Instagram y quedan todos juntos para mirar.
             </p>
           </div>
           {canEdit && !adding && (
@@ -245,6 +306,69 @@ export default function InspiracionPage() {
             })}
           </div>
         )}
+
+        <div className="mt-6 border-t border-line pt-5">
+          <h2 className="text-lg font-bold">Fotos de inspiración</h2>
+          <p className="mt-1 text-sm text-tx-2">
+            Referencias visuales sueltas — encuadres, montajes, luz, estilos de plato.
+          </p>
+        </div>
+
+        {canEdit && (
+          <ArtUploadZone
+            label="Subir fotos"
+            accept="image/*"
+            multiple
+            files={pendingFiles}
+            onFilesChange={handlePhotoFilesChange}
+            proposalId={PHOTO_FOLDER}
+          />
+        )}
+
+        {photosLoading ? (
+          <p className="text-sm text-tx-3">Cargando…</p>
+        ) : photos.length === 0 ? (
+          <p className="text-sm text-tx-3">
+            {canEdit ? "Todavía no se subió ninguna foto." : "Todavía no hay fotos de inspiración."}
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 desktop:grid-cols-3 desktop:gap-4">
+            {photos.map((photo) => (
+              <div
+                key={photo.id}
+                className="group relative aspect-square overflow-hidden rounded border border-line-2 bg-panel-2"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenPhotoId(photo.id)}
+                  className={`absolute inset-0 h-full w-full transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+                  aria-label={photo.filename ? `Ver ${photo.filename}` : "Ver foto"}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- miniatura de contenido cargado por el usuario */}
+                  <img
+                    src={photo.url}
+                    alt={photo.filename ?? "Foto de inspiración"}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePhoto(photo)}
+                    aria-label="Quitar esta foto"
+                    title="Quitar esta foto"
+                    className={`absolute top-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-brand-ink/70 text-[var(--bg)] transition-opacity duration-[250ms] ${PRESS_SCALE_CLASS} ${
+                      isDesktop ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+                    }`}
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Pop de mobile: el iframe recién se monta acá, al tocar un reel —
@@ -270,6 +394,31 @@ export default function InspiracionPage() {
           <button
             type="button"
             onClick={() => setOpenReelId(null)}
+            aria-label="Cerrar"
+            className={`absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      )}
+
+      {/* Vista ampliada de una foto — a diferencia del pop de reels, ésta sí
+          se usa en desktop también: la miniatura está recortada a cuadrado
+          (object-cover) y la referencia se mira entera. */}
+      {openPhoto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setOpenPhotoId(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- vista ampliada, mismo asset del usuario */}
+          <img
+            src={openPhoto.url}
+            alt={openPhoto.filename ?? "Foto de inspiración en tamaño completo"}
+            className="max-h-full max-w-full rounded object-contain"
+          />
+          <button
+            type="button"
+            onClick={() => setOpenPhotoId(null)}
             aria-label="Cerrar"
             className={`absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
           >
