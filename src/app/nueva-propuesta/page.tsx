@@ -4,7 +4,8 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import ArtUploadZone, { type UploadedFile, uploadBlob } from "@/components/dashboard/ArtUploadZone";
+import ArtUploadZone, { makeFileId, type UploadedFile, uploadBlob } from "@/components/dashboard/ArtUploadZone";
+import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import InstagramPreview from "@/components/dashboard/InstagramPreview";
 import { resolveAudioContentType } from "@/lib/dashboard/audio";
 import { useBrand } from "@/lib/dashboard/BrandContext";
@@ -76,7 +77,21 @@ function NuevaPropuestaForm() {
   // todavía no hay propuesta creada: viven en el estado local hasta el
   // submit.
   const [extraCaptions, setExtraCaptions] = useState<string[]>([]);
-  const [artFiles, setArtFiles] = useState<UploadedFile[]>([]);
+  // ?photo= lo pone el botón "Usar como post" de la Galería: la foto ya está
+  // en Blob, así que no se vuelve a subir — entra directo como arte cargado.
+  // Se valida igual (assertBlobUrl) porque un query param lo escribe
+  // cualquiera, y sin eso sería un "cargá la imagen que quieras" en la
+  // propuesta. Un valor inválido simplemente se ignora.
+  const [artFiles, setArtFiles] = useState<UploadedFile[]>(() => {
+    const photo = searchParams.get("photo");
+    if (!photo) return [];
+    try {
+      const url = assertBlobUrl(photo);
+      return [{ id: makeFileId(), url, name: decodeURIComponent(url.split("/").pop() || "Foto") }];
+    } catch {
+      return [];
+    }
+  });
   const [coverFiles, setCoverFiles] = useState<UploadedFile[]>([]);
   const [videoFiles, setVideoFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState("");
