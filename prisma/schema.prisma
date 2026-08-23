@@ -369,3 +369,19 @@ model GalleryPhoto {
 
   @@index([createdAt])
 }
+
+/// Repositorio de reels de Instagram para inspiración — pestaña propia a la
+/// izquierda de Moodboard. Solo el permalink (post/reel); embedSrc se
+/// deriva en el cliente con instagramEmbedSrc(), no se persiste (ver
+/// /inspiracion).
+model InspirationReel {
+  id        String   @id @default(cuid())
+  /// Permalink normalizado de instagram.com (ver normalizeInstagramMusicUrl)
+  /// que además pasó instagramEmbedSrc() — un reel que no se puede embeber
+  /// (página de audio, perfil) no se guarda acá, no serviría para nada.
+  url       String   @db.Text
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

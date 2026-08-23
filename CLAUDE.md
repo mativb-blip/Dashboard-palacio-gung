@@ -53,6 +53,15 @@ El Editor/Admin puede cargar **varias alternativas de caption** en la vista Post
 - **Guardado**: estas acciones **no** pasan por `updateProposal()` — tienen las suyas y devuelven el listado ya persistido, que `CaptionPanel` vuelca al estado con `onPatchProposal` (patch solo local). Un patch de `updateProposal()` con solo `captionOptions` sería un patch vacío para el server y encima le exigiría rol de Editor a Jun.
 - **También se cargan desde la ventana de "Cargar propuesta"** (`/nueva-propuesta`), no solo después de crear: `createProposal()` acepta `extraCaptions?: string[]` (alternativas además de la principal, que siempre nace elegida) y `music?: AddMusicOptionInput[]` (mismo shape y misma validación que `addMusicOption()`, ver `buildMusicCreateData()`). Si no se carga nada de esto, esos arrays llegan vacíos — ninguna fila placeholder — así que para Jun (que no tiene `canEdit`) la sección de música directamente no se renderiza (`canEdit || musicOptions.length > 0`); la de captions sí, porque siempre hay al menos la principal.
 
+## Reels de inspiración
+Repositorio de reels de Instagram, pestaña propia a la **izquierda** de Moodboard (`/inspiracion`, `src/app/inspiracion/page.tsx`). `InspirationReel` en el schema (solo `url` — el embed se deriva en el cliente con `instagramEmbedSrc()`, no se persiste), acciones en `src/lib/dashboard/inspiration-actions.ts`.
+
+- **Permisos**: mismo criterio que Galería — ver con sesión, agregar/borrar solo Editor o Admin. El botón de agregar y el de borrar por reel no se montan para quien no puede editar.
+- **Agregar**: se pega cualquier link de post/reel de Instagram; `normalizeInstagramMusicUrl()` lo valida y normaliza, y además tiene que pasar `instagramEmbedSrc()` — un link que no se puede embeber (página de audio, perfil) no se guarda, no serviría para nada en un repositorio que existe solo para mirar.
+  > **La dedupe compara por el embed derivado, no por el string crudo** — bug real encontrado probando: el mismo reel pegado como `/p/`, `/reel/`, `/reels/` o `/tv/` da cuatro URLs normalizadas distintas (`normalizeInstagramMusicUrl` no las unifica, a propósito, porque también la usan enlaces que no son post/reel) que igual apuntan al mismo embed. Comparar por `url` tal cual dejaba pasar duplicados visualmente idénticos; se corrigió comparando `instagramEmbedSrc(existing.url) === instagramEmbedSrc(nuevo)` contra todas las filas.
+- **Grilla responsive con dos comportamientos distintos, no solo CSS**: `grid-cols-2 desktop:grid-cols-3` (861px, mismo breakpoint que el resto del dashboard). En **desktop** cada celda monta el iframe de Instagram directo, igual que `/estrategia`. En **mobile NO se monta ningún iframe en la grilla** — cada celda es una tarjeta liviana (sin costo de red) y tocarla abre un pop a pantalla completa que recién ahí monta el iframe real. Ocultar el iframe por CSS en mobile no alcanzaba: un iframe con `display:none` igual dispara su carga. La distinción desktop/mobile se resuelve con `useSyncExternalStore` sobre `matchMedia`, no con `useState`+`useEffect` a mano — evita tanto el lint de "setState directo en un effect" como el flash de layout que da corregir el valor recién en un effect posterior al primer render.
+- Mismo trade-off de borrado que Galería: quitar un reel del repositorio no toca nada de Instagram, solo la fila propia.
+
 ## Galería de fotos
 Pestaña propia al lado de Feed (`/galeria`, `src/app/galeria/page.tsx`) — un depósito de fotos suelto, sin fecha ni caption ni relación con `Proposal`: solo para subir material de referencia rápido. `GalleryPhoto` en el schema, acciones en `src/lib/dashboard/gallery-actions.ts`.
 
@@ -91,6 +100,7 @@ ProposalVersion: { id, proposalId, caption, images[], video, editedBy, createdAt
 ProposalCaptionOption: { id, proposalId, text, selected, order, createdAt }
 ProposalMusicOption:   { id, proposalId, url?, label?, selected, order, audioUrl?, audioName?, createdAt }
 GalleryPhoto: { id, url, filename?, uploadedBy?, createdAt }
+InspirationReel: { id, url, addedBy?, createdAt }
 SiteSettings: { brandName, brandColorPrimary/Dark, brandColorAccent, instagramHandle,
                 senderEmail, commentNotifyTo/Cc, loginBackgroundUrl, loginLogoUrl,
                 contentPillars[] }

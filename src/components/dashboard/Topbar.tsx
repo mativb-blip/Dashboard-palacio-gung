@@ -20,11 +20,11 @@ const COMPACT_NAV_QUERY = "(min-width: 640px)";
  * navegan de vuelta al panel (`/?period=...`) en lugar de alternar in-place.
  * "estrategia" y "moodboard" son páginas propias, sin relación con
  * proposals/período: se comportan igual que "calendario" a efectos del nav. */
-type TopbarView = "month" | "grid" | "calendario" | "estrategia" | "moodboard" | "galeria";
+type TopbarView = "month" | "grid" | "calendario" | "estrategia" | "moodboard" | "galeria" | "inspiracion";
 
 /** Vistas que son una página aparte (no un período del panel): desde ellas
  * Post/Feed navegan por href en vez de alternar el período in-place. */
-const STANDALONE_VIEWS: TopbarView[] = ["calendario", "estrategia", "moodboard", "galeria"];
+const STANDALONE_VIEWS: TopbarView[] = ["calendario", "estrategia", "moodboard", "galeria", "inspiracion"];
 
 interface TopbarProps {
   view: TopbarView;
@@ -77,6 +77,7 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
   const items: SegmentedItem[] = [
     // El Moodboard lo ven todos los roles; editarlo, solo el Admin (el gate
     // de escritura vive en moodboard/actions.ts).
+    pageItem("inspiracion", "Inspiración", "/inspiracion"),
     pageItem("moodboard", "Moodboard", "/moodboard"),
     pageItem("estrategia", "Estrategia", "/estrategia"),
     pageItem("calendario", "Calendario", "/calendario"),
@@ -278,6 +279,8 @@ function CompactNav({ items }: { items: SegmentedItem[] }) {
 
 function NavIcon({ itemKey, className }: { itemKey: string; className?: string }) {
   switch (itemKey) {
+    case "inspiracion":
+      return <InspirationIcon className={className} />;
     case "moodboard":
       return <MoodboardIcon className={className} />;
     case "estrategia":
@@ -291,6 +294,34 @@ function NavIcon({ itemKey, className }: { itemKey: string; className?: string }
     default:
       return <PostIcon className={className} />;
   }
+}
+
+/** Destello — repositorio de referencias sueltas, distinto del corcho
+ * organizado del Moodboard. */
+function InspirationIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 3v3" />
+      <path d="M12 18v3" />
+      <path d="M3 12h3" />
+      <path d="M18 12h3" />
+      <path d="m5.6 5.6 2.1 2.1" />
+      <path d="m16.3 16.3 2.1 2.1" />
+      <path d="m18.4 5.6-2.1 2.1" />
+      <path d="m7.7 16.3-2.1 2.1" />
+      <circle cx="12" cy="12" r="3.2" />
+    </svg>
+  );
 }
 
 /** Chinches sobre un tablero — el Moodboard es el corcho de referencias,

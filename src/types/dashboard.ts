@@ -104,3 +104,13 @@ export interface GalleryPhoto {
   uploadedBy?: string;
   when: string;
 }
+
+/** Un reel de Instagram guardado como referencia (`/inspiracion`) — ver
+ * InspirationReel en el schema. El embed se deriva de `url` en el cliente
+ * con instagramEmbedSrc(), no viaja por separado. */
+export interface InspirationReel {
+  id: string;
+  url: string;
+  addedBy?: string;
+  when: string;
+}
