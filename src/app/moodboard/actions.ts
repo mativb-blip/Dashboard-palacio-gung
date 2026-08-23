@@ -373,6 +373,12 @@ export async function createProposalFromElement(
       // acá todavía no hay) — ver Proposal.video en schema.prisma.
       images: isVideo ? [] : [element.url],
       video: isVideo ? element.url : undefined,
+      // Igual que createProposal(): toda propuesta nace con su alternativa de
+      // caption ya elegida. Sin esto, una propuesta creada desde el tablero
+      // quedaba sin ninguna fila en ProposalCaptionOption y rompía la
+      // invariante que asume el panel (ver "Alternativas de caption" en
+      // CLAUDE.md).
+      captionOptions: { create: { text: caption, selected: true, order: 0 } },
     },
   });
 
