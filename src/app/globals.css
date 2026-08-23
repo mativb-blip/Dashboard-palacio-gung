@@ -321,3 +321,45 @@ input[type="text"]:focus {
     transition: none;
   }
 }
+
+/* Frameworks de contenido (/estrategia, ver FrameworkStack): las tarjetas
+   se apilan al hacer scroll — cada una queda pegada arriba y la siguiente
+   la va tapando de abajo hacia arriba, mientras el scroll le baja el brillo.
+   El brillo lo anima ScrollTrigger escribiendo --brightness (ver
+   FrameworkStack en estrategia/page.tsx); acá solo se declara el valor de
+   arranque y cómo se consume.
+
+   El fondo de la tarjeta tiene que ser OPACO (--bg, no --panel-2, que es
+   translúcido desde el rediseño glass): si no, la tarjeta de abajo se ve a
+   través de la de arriba y el apilado deja de leerse. */
+.manifesto-card {
+  --brightness: 1;
+  filter: brightness(var(--brightness));
+  position: sticky;
+  top: 0;
+}
+
+/* Los títulos van en la columna de 5 y algunos son largos ("Redefinición
+   cultural", "Reto o pregunta con respuesta incluida") — cortar por sílaba
+   evita el desborde sin tener que acortar el texto. */
+.manifesto-card-heading {
+  hyphens: auto;
+}
+
+/* Bajo 991px la fila de 12 columnas colapsa a una sola, así que reservarle
+   1/12 del ancho al número deja de tener sentido: sale del flujo y se ancla
+   al borde derecho de la tarjeta (que es sticky, o sea un elemento
+   posicionado — el absolute ancla contra ella, no contra la página). */
+@media screen and (max-width: 991px) {
+  .manifesto-card-number {
+    position: absolute;
+    top: 1.75rem;
+    right: 2.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manifesto-card {
+    filter: none;
+  }
+}

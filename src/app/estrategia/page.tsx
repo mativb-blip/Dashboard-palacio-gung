@@ -260,6 +260,145 @@ const LEVELS = [
   },
 ];
 
+/** Los 7 frameworks de copy: 1 principal para el día a día y 6 alternativos
+ * para cubrir otros registros (evento, relleno, marca, engagement, premium)
+ * sin que la cuenta se vuelva monótona. `example` es un caption real de
+ * muestra, no una descripción — por eso se muestra citado. */
+const CONTENT_FRAMEWORKS = [
+  {
+    icon: "🍽️",
+    kind: "Principal",
+    title: "Nombre / Historia y técnica / Cierre",
+    body: "El formato base para el día a día. Nombra el plato (español + coreano + pronunciación), dos o tres frases de contexto cultural + una técnica real de GUNG, cierra con una acción y el hashtag.",
+    example:
+      "Samgyeopsal · 삼겹살 (se pronuncia «sam-gyop-sal»). La panceta más pedida en Corea, servida recién dorada en la plancha de tu propia mesa. Ideal para compartir en grupo. Pídela en tu próxima visita 🔥 #PalacioGung",
+  },
+  {
+    icon: "🌱",
+    kind: "Alternativo A",
+    title: "Redefinición cultural",
+    body: "Abre negando lo obvio para dar contexto. Funciona muy bien para conceptos coreanos sin equivalente directo en la cultura dominicana (ssam, banchan, jeongol).",
+    example: "El Ssam no es un plato, es la forma en que en Corea se come en grupo, un bocado a la vez.",
+  },
+  {
+    icon: "🗓️",
+    kind: "Alternativo B",
+    title: "Ficha técnica corta (solo eventos/especiales)",
+    body: "La versión más comercial: nombre, ingredientes concretos, precio o fecha, cierre tipo «reserva ya». Exclusiva de lanzamientos o menús por tiempo limitado — nunca para el post de todos los días.",
+    example:
+      "Cena de Bossam para compartir, este viernes. Panceta hervida con especias + kimchi añejo + guarniciones tradicionales. RD$1,900 por persona, cupos limitados — reserva por DM.",
+  },
+  {
+    icon: "⚡",
+    kind: "Alternativo C",
+    title: "Sensorial en dos líneas",
+    body: "Nombre + una frase corta y evocadora de textura, sonido o temperatura. El formato más rápido de escribir y el más fotogénico — bueno para contenido de relleno.",
+    example: "Tteokbokki · 떡볶이. Picante, pegajoso, recién salido del sartén #PalacioGung",
+  },
+  {
+    icon: "🏮",
+    kind: "Alternativo D",
+    title: "Historia de marca / pilares",
+    body: "Sin plato protagonista. Un párrafo sobre la trayectoria de Palacio Gung, el equipo o un valor (tradición, familia, hospitalidad). Se usa con moderación — quizá una vez al mes.",
+    example:
+      "Detrás de cada plato hay una cocina que no improvisa: las mismas recetas, el mismo cuidado, desde el primer día que abrimos las puertas.",
+  },
+  {
+    icon: "❓",
+    kind: "Alternativo E",
+    title: "Reto o pregunta con respuesta incluida",
+    body: "Hace una pregunta a la audiencia, pero revela la respuesta en el mismo caption o en el primer comentario. Mantiene el engagement sin dejar a nadie con la duda.",
+    example:
+      "¿Sabes qué hace que este kimchi sepa distinto a todos los demás? Lleva más de seis meses fermentando — por eso se llama mugeunji, «el añejo».",
+  },
+  {
+    icon: "✨",
+    kind: "Alternativo F",
+    title: "Alta cocina / tesis sensorial",
+    body: "Abre con el ingrediente protagonista, no con el nombre popular del plato. Sin precio, sin emojis, cierre como invitación a la experiencia. Reservado para 1-2 platos «insignia» al mes.",
+    example:
+      "El kimchi que fermenta más de seis meses gana un carácter distinto: más ácido, más profundo, casi terroso.",
+  },
+];
+
+/** Pila de tarjetas que se tapan entre sí al hacer scroll (ver
+ * `.manifesto-card` en globals.css): cada tarjeta queda pegada arriba y la
+ * siguiente sube por encima, y mientras eso pasa el scroll le baja el brillo
+ * a la que está quedando atrás.
+ *
+ * Cada tarjeta es una fila de 12 columnas: ícono + título (5), las dos
+ * columnas de texto (3 + 3) y el número al borde (1). */
+function FrameworkStack() {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    // Sin animación de brillo si se pidió menos movimiento — el apilado en sí
+    // se conserva (es comportamiento de layout, no un desplazamiento
+    // inesperado), y el CSS ya anula el filter en ese caso.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const cards = Array.from(root.querySelectorAll<HTMLElement>(".manifesto-card"));
+    // La última no se atenúa nunca: no hay ninguna tarjeta que la tape.
+    const tweens = cards.slice(0, -1).map((card) =>
+      gsap.to(card, {
+        "--brightness": 0.32,
+        ease: "none",
+        scrollTrigger: {
+          trigger: card,
+          // Arranca justo cuando la tarjeta se pega arriba y termina un alto
+          // de tarjeta después — que es exactamente cuando la siguiente
+          // terminó de taparla. Medido en vivo (función) y no con un número
+          // fijo porque las tarjetas no miden todas lo mismo, y el alto
+          // cambia al redimensionar.
+          start: "top top",
+          end: () => `+=${card.offsetHeight}`,
+          scrub: true,
+        },
+      }),
+    );
+
+    return () => {
+      tweens.forEach((tween) => {
+        tween.scrollTrigger?.kill();
+        tween.kill();
+      });
+    };
+  }, []);
+
+  return (
+    <div ref={rootRef}>
+      {CONTENT_FRAMEWORKS.map((framework, i) => (
+        <article
+          key={framework.kind}
+          className="manifesto-card grid grid-cols-1 items-start gap-x-6 gap-y-6 border-t border-line bg-[var(--bg)] py-10 min-[992px]:min-h-[62vh] min-[992px]:grid-cols-12 min-[992px]:gap-x-8 min-[992px]:py-14"
+        >
+          <div className="min-[992px]:col-span-5">
+            <div className="mb-4 text-2xl leading-none" aria-hidden="true">
+              {framework.icon}
+            </div>
+            <div className="mb-3 text-xs tracking-label text-tx-3 uppercase">{framework.kind}</div>
+            <h3 className="manifesto-card-heading text-2xl leading-[1.15] font-bold text-balance text-brand-ink desktop:text-3xl">
+              {framework.title}
+            </h3>
+          </div>
+
+          <p className="text-[15px] leading-relaxed text-tx-2 min-[992px]:col-span-3">{framework.body}</p>
+
+          <blockquote className="border-l-2 border-brand-blue pl-4 text-[15px] leading-relaxed text-tx-2 italic min-[992px]:col-span-3">
+            {framework.example}
+          </blockquote>
+
+          <div className="manifesto-card-number text-xs text-tx-3 tabular-nums min-[992px]:col-span-1 min-[992px]:text-right">
+            {String(i + 1).padStart(2, "0")}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 /** Botón flotante para volver al inicio — la página es larga (varias
  * pantallas de scroll) y no tiene un nav fijo que lo compense. Aparece
  * recién a partir de cierto scroll (inútil, y visualmente ruidoso, arriba
@@ -638,6 +777,28 @@ export default function EstrategiaPage() {
                 </Reveal>
               ))}
             </div>
+          </div>
+
+          <div className="mt-20 border-t border-line pt-12 desktop:mt-28 desktop:pt-16">
+            <SplitReveal
+              text="Frameworks de contenido"
+              className="mb-6 font-thin text-[28px] leading-[1.15] font-light text-balance text-brand-ink desktop:text-[36px]"
+            />
+            <SplitReveal
+              as="p"
+              unit="blur"
+              text="El proceso, en breve."
+              className="mb-6 text-[15px] leading-relaxed text-tx-2"
+            />
+            <SplitReveal
+              as="p"
+              unit="blur"
+              delay={80}
+              text="Auditamos la cuenta propia (@palaciogung) y 4 referencias externas (AVIA, Samurai RD, Atomix, Jungsik), cruzamos el resultado contra la carta completa de GUNG para ver qué platos nunca se habían publicado, y diagnosticamos que el copy actual no nombraba los platos ni cerraba con una acción. De ahí salieron 7 estructuras: 1 framework principal para el día a día, y 6 alternativos para cubrir otros registros (evento, relleno rápido, marca, engagement, premium) sin que la cuenta se vuelva monótona."
+              className="mb-12 max-w-3xl text-[15px] leading-relaxed text-tx-2 desktop:mb-16"
+            />
+
+            <FrameworkStack />
           </div>
         </div>
       </div>
