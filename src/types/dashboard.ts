@@ -108,20 +108,18 @@ export interface GalleryPhoto {
 /** Un reel de Instagram guardado como referencia (`/inspiracion`) — ver
  * InspirationReel en el schema. El embed se deriva de `url` en el cliente
  * con instagramEmbedSrc(), no viaja por separado. */
-export interface InspirationReel {
-  id: string;
-  url: string;
-  addedBy?: string;
-  when: string;
-}
+/** Las dos secciones de `/inspiracion`. Un reel y un post con foto son lo
+ * mismo estructuralmente (un permalink de Instagram embebible) — solo
+ * cambia dónde se lista. */
+export type InspirationKind = "reel" | "photo";
 
-/** Una foto de referencia (segunda sección de `/inspiracion`) — ver
- * InspirationPhoto en el schema. Distinta de GalleryPhoto: ésta es
- * referencia ajena, la otra es material propio. */
-export interface InspirationPhoto {
+/** Una referencia guardada en `/inspiracion` — ver InspirationReel en el
+ * schema (el modelo guarda las dos secciones, discriminadas por `kind`). El
+ * embed se deriva de `url` en el cliente con `instagramEmbedSrc()`. */
+export interface InspirationItem {
   id: string;
   url: string;
-  filename?: string;
+  kind: InspirationKind;
   addedBy?: string;
   when: string;
 }

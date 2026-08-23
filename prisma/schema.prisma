@@ -374,24 +374,34 @@ model GalleryPhoto {
 /// izquierda de Moodboard. Solo el permalink (post/reel); embedSrc se
 /// deriva en el cliente con instagramEmbedSrc(), no se persiste (ver
 /// /inspiracion).
+/// Guarda las DOS secciones de /inspiracion (reels y posts con foto): las
+/// dos son lo mismo estructuralmente — un permalink de Instagram que se
+/// embebe — y solo cambia en qué sección se lista, de ahí `kind` en vez de
+/// dos modelos idénticos. El nombre quedó de cuando solo había reels; se
+/// conserva para no renombrar la tabla y arriesgar los datos ya cargados.
 model InspirationReel {
   id        String   @id @default(cuid())
   /// Permalink normalizado de instagram.com (ver normalizeInstagramMusicUrl)
-  /// que además pasó instagramEmbedSrc() — un reel que no se puede embeber
+  /// que además pasó instagramEmbedSrc() — un link que no se puede embeber
   /// (página de audio, perfil) no se guarda acá, no serviría para nada.
   url       String   @db.Text
+  /// "reel" | "photo" — en qué sección se muestra. Sin enum a propósito:
+  /// mismo criterio que Proposal.format/status, que también son strings
+  /// validados en el server contra una lista.
+  kind      String   @default("reel")
   addedBy   String?
   createdAt DateTime @default(now())
 
   @@index([createdAt])
 }
 
-/// Fotos de referencia, segunda sección de /inspiracion. Modelo aparte de
-/// GalleryPhoto a propósito: la Galería es el depósito de material PROPIO
-/// (fotos del restaurante), esto es referencia ajena que se mira para
-/// inspirarse. Mezclarlas en una sola tabla obligaría a un discriminador y
-/// a filtrar en cada consulta para separar dos cosas que nunca se listan
-/// juntas.
+/// EN DESUSO — ya no lo lee ni lo escribe nada. Nació para la segunda
+/// sección de /inspiracion cuando esa sección eran fotos SUBIDAS; ahora son
+/// posts de Instagram enlazados, y viven en InspirationReel con kind =
+/// "photo". La tabla se deja en pie a propósito y no se dropea: si alguien
+/// alcanzó a subir fotos en producción entre un deploy y el otro, borrarla
+/// se las llevaría puestas. Eliminar recién cuando se confirme que está
+/// vacía en producción.
 model InspirationPhoto {
   id        String   @id @default(cuid())
   /// URL de Vercel Blob (ver assertBlobUrl) — la subida va directo del
