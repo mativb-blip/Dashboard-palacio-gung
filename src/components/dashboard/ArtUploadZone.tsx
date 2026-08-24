@@ -4,6 +4,8 @@ import { upload } from "@vercel/blob/client";
 import { useCallback, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { isSupportedMedia, toDisplayableFile } from "@/lib/dashboard/media-file";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import type { GalleryPhoto } from "@/types/dashboard";
+import GalleryPickerModal from "./GalleryPickerModal";
 
 export interface UploadedFile {
   id: string;
@@ -155,7 +157,21 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
   const [dragOver, setDragOver] = useState(false);
   const [statuses, setStatuses] = useState<UploadStatus[]>([]);
   const [error, setError] = useState("");
+  const [pickingFromGallery, setPickingFromGallery] = useState(false);
   const isImage = accept.startsWith("image");
+
+  /** Fotos elegidas de la Galería: ya están en Blob, así que no se suben ni
+   * pasan por el verificador de progreso — se reusa la URL tal cual. */
+  function handlePickFromGallery(picked: GalleryPhoto[]) {
+    if (!picked.length) return;
+    const chosen: UploadedFile[] = picked.map((photo) => ({
+      id: makeFileId(),
+      url: photo.url,
+      name: photo.filename ?? "Foto de la galería",
+    }));
+    onFilesChange(multiple ? [...files, ...chosen] : chosen.slice(0, 1));
+    setError("");
+  }
 
   const uploading = statuses.filter((s) => s.stage === "subiendo" || s.stage === "verificando").length;
 
@@ -309,9 +325,25 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
           >
             <UploadIcon />
           </button>
+          {/* Solo en zonas de imagen: la Galería guarda fotos, así que en el
+              recuadro de video no habría nada para elegir. */}
+          {isImage && (
+            <button
+              type="button"
+              onClick={() => setPickingFromGallery(true)}
+              title="Elegir de la galería"
+              className={`flex h-9 w-9 items-center justify-center rounded border border-line-2 bg-panel-2 text-brand-blue transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+            >
+              <GalleryIcon />
+            </button>
+          )}
         </div>
         <p className="text-xs text-tx-3">
-          {uploading > 0 ? `Subiendo ${uploading === 1 ? "archivo" : `${uploading} archivos`}…` : "Pegar (⌘V), arrastrar, o buscar en Finder"}
+          {uploading > 0
+            ? `Subiendo ${uploading === 1 ? "archivo" : `${uploading} archivos`}…`
+            : isImage
+              ? "Pegar (⌘V), arrastrar, buscar en Finder, o elegir de la galería"
+              : "Pegar (⌘V), arrastrar, o buscar en Finder"}
         </p>
         <input
           ref={inputRef}
@@ -359,6 +391,14 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
       )}
 
       {error && <p className="text-xs text-brand-red">{error}</p>}
+
+      {pickingFromGallery && (
+        <GalleryPickerModal
+          multiple={multiple}
+          onClose={() => setPickingFromGallery(false)}
+          onPick={handlePickFromGallery}
+        />
+      )}
 
       {files.length > 0 && (
         <div className="flex gap-2 overflow-x-auto">
@@ -415,6 +455,17 @@ function PlayIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
       <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+/** Fotos apiladas — mismo glifo que la pestaña Galería en el Topbar, que es
+ * de donde salen las fotos que ofrece este botón. */
+function GalleryIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="2.5" width="14" height="14" rx="2" />
+      <path d="M7.5 21.5h12a2 2 0 0 0 2-2v-12" />
     </svg>
   );
 }
