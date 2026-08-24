@@ -168,12 +168,7 @@ export default function GaleriaPage() {
             {photos.map((photo) => (
               <div
                 key={photo.id}
-                // Recuadro rojo cuando alguien la comentó — la marca de hoja
-                // de contacto. Va como `ring` y no como borde más grueso para
-                // que la celda no cambie de tamaño al aparecer la marca.
-                className={`group relative aspect-square overflow-hidden rounded border border-line-2 bg-panel-2 ${
-                  photo.comments.length > 0 ? "ring-2 ring-brand-red ring-inset" : ""
-                }`}
+                className="group relative aspect-square overflow-hidden rounded border border-line-2 bg-panel-2"
               >
                 <button
                   type="button"
@@ -189,6 +184,21 @@ export default function GaleriaPage() {
                     loading="lazy"
                   />
                 </button>
+
+                {/* Recuadro rojo cuando alguien la comentó — la marca de hoja
+                    de contacto. Va como CAPA APARTE encima de la foto, no como
+                    `ring` en la celda: un ring es un box-shadow `inset`, y un
+                    inset se pinta debajo del contenido hijo, así que la <img>
+                    (que cubre la celda entera) lo tapaba por completo. El bug
+                    no se veía con URLs de prueba rotas, justamente porque no
+                    había imagen que lo tapara. */}
+                {photo.comments.length > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded ring-2 ring-brand-red ring-inset"
+                  />
+                )}
+
                 {canEdit && (
                   <button
                     type="button"
