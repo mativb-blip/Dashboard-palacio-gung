@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { parseProposalDateTime } from "@/lib/dashboard/schedule-time";
 import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { Proposal } from "@/types/dashboard";
 import ArtTile from "./ArtTile";
@@ -12,12 +13,30 @@ interface PostsGridProps {
   onDeleteProposal: (id: string) => void;
 }
 
+/** Momento programado de una propuesta, para ordenar el feed.
+ *
+ * Ordenar solo por `date` (como se hacía antes) deja los posts del MISMO día
+ * en el orden en que vinieron de la base, que no es ninguno en particular.
+ * `parseProposalDateTime` es el mismo parser que usan los recordatorios, así
+ * que el feed y el cron coinciden en qué significa "6:30 PM".
+ *
+ * Si la hora no se puede parsear (texto libre, cargado a mano) se cae a la
+ * medianoche de ese día: una hora mal tipeada desordena su propio día, no la
+ * lista entera. */
+function scheduledAt(proposal: Proposal): number {
+  const exact = parseProposalDateTime(proposal.date, proposal.time);
+  if (exact) return exact.getTime();
+  const startOfDay = new Date(`${proposal.date}T00:00:00-04:00`).getTime();
+  return Number.isNaN(startOfDay) ? 0 : startOfDay;
+}
+
 /** Feed estilo Instagram: 3 columnas, todos los posts sin importar el mes,
- * más recientes arriba. */
+ * ordenados por cuándo están programados — el más reciente arriba y los más
+ * viejos hacia abajo. */
 export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposal }: PostsGridProps) {
   const { data: session } = useSession();
   const canEdit = canEditContent(session?.user.role);
-  const sorted = [...proposals].sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
+  const sorted = [...proposals].sort((a, b) => scheduledAt(b) - scheduledAt(a));
 
   function handleDelete(proposal: Proposal) {
     if (window.confirm(`¿Borrar "${proposal.title}"? Esta acción no se puede deshacer.`)) {
