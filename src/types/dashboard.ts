@@ -97,12 +97,27 @@ export interface ProposalVersionEntry {
 
 /** Una foto de la galería (`/galeria`) — sin relación con propuestas, ver
  * GalleryPhoto en el schema. */
+/** Nota de alguien sobre una foto de la Galería — ver GalleryPhotoComment. */
+export interface GalleryPhotoCommentEntry {
+  id: string;
+  author: string;
+  text: string;
+  when: string;
+  /** true si la sesión actual puede borrarlo: su propio comentario, o
+   * cualquiera si es Editor/Admin. Lo decide el server (ver
+   * getGalleryPhotos) para que el cliente no tenga que replicar la regla. */
+  canDelete: boolean;
+}
+
 export interface GalleryPhoto {
   id: string;
   url: string;
   filename?: string;
   uploadedBy?: string;
   when: string;
+  /** Notas sobre la foto. Con al menos una, la grilla la marca con recuadro
+   * rojo (ver /galeria). */
+  comments: GalleryPhotoCommentEntry[];
 }
 
 /** Un reel de Instagram guardado como referencia (`/inspiracion`) — ver

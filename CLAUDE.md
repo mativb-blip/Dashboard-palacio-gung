@@ -22,6 +22,8 @@ Vista única, responsive, alta fidelidad. Idioma: español (RD).
 
 Scripts: `npm run dev`, `npm run build` (migra primero, ver abajo), `npm start`, `npm run lint`, `npm run db:migrate`, `npm run db:seed`.
 
+> **Después de `prisma migrate dev`, reiniciá `npm run dev`.** El server de desarrollo se queda con el cliente de Prisma que cargó al arrancar, así que un modelo o columna recién creados le llegan como `undefined` (`prisma.loQueSea` sin definir, o `PrismaClientValidationError` en un `include` nuevo) y la pantalla se cuelga en "Cargando…". No es un bug del código — pasó tres veces en este proyecto antes de anotarlo.
+
 > **El build migra antes de compilar**, pero vía `scripts/migrate-deploy.mjs` y no llamando a `prisma migrate deploy` directo. Prisma toma un advisory lock de Postgres antes de migrar; si dos deploys de Vercel se solapan (alcanza con pushear dos veces seguidas) el segundo espera el lock y aborta a los 10s con `P1002`, tirando abajo un build que no tenía nada malo. El script reintenta **solo** ante ese error, con espera creciente; cualquier otra falla corta en el primer intento. No se desactiva el lock: existe para que dos migraciones simultáneas no dejen el esquema a medio aplicar.
 
 > Ver [AGENTS.md](AGENTS.md): esta versión de Next.js tiene breaking changes respecto al conocimiento de entrenamiento — consultar `node_modules/next/dist/docs/` antes de escribir código nuevo.
@@ -84,6 +86,7 @@ Pestaña propia al lado de Feed (`/galeria`, `src/app/galeria/page.tsx`) — un 
 - **Borrar no borra el archivo de Blob** — mismo trade-off que `clearMusicOptionAudio()`: no hay forma barata de saber si algo más lo referencia, así que solo se borra la fila.
 - **El visor ampliado navega con swipe** (`SWIPE_MIN_PX` / `SWIPE_MIN_VELOCITY` / `SWIPE_FLICK_MIN_PX`): arrastrar a la izquierda trae la siguiente. Pasa por distancia larga **o** por flick corto y rápido, pero el flick exige un piso de 12px — sin ese piso, un toque que mueve 2-3px (lo normal con el dedo) sale con velocidad altísima porque el tiempo transcurrido es ~0, y cambiaba de foto en vez de cerrar. El overlay cierra al hacer click y un swipe también dispara un click, así que hay una bandera (`swipeHandledRef`) que se lo come; sin eso, pasar de foto cerraba el visor. El estado es el **id** de la foto y no su URL: hace falta la posición en el array para moverse, y de paso si la foto abierta se borra el visor se cierra solo.
 - **"Usar como post"** (solo Editor/Admin) lleva a `/nueva-propuesta?photo=<url>` y el formulario la toma como arte ya cargado — la foto ya está en Blob, no se vuelve a subir. El param se valida con `assertBlobUrl` porque un query string lo escribe cualquiera; un valor inválido se ignora. Se reusa el formulario completo en vez de crear la propuesta ahí para no tener un tercer camino que arme `Proposal` por su cuenta (ver el bug que eso ya causó en `createProposalFromElement`).
+- **Comentarios sobre una foto = la marca de hoja de contacto.** Jun señala las que le gustan comentándolas: **comentar alcanza con sesión** (`requireSession`, igual que comentar una propuesta — es justo lo que hace un Comentarista), y una foto con al menos un comentario se muestra en la grilla con recuadro rojo. La marca va como `ring` y no como borde más grueso, para que la celda no cambie de tamaño al aparecer. `GalleryPhotoComment` guarda `authorId` además del nombre visible: es lo que decide quién puede borrar, y comparar por nombre sería frágil (se edita, y dos personas pueden llamarse igual). **Borrar** puede el autor o un Editor/Admin — la regla la calcula el server y viaja como `canDelete` por comentario, y `deleteGalleryPhotoComment()` la vuelve a chequear: esconder el botón no es el permiso.
 - **assertBlobUrl compartido**: la validación de que una URL sea de nuestro storage (`*.blob.vercel-storage.com`) vivía duplicada dentro de `proposals-actions.ts` (para el audio de música) — se movió a `src/lib/dashboard/blob-url.ts` para que la galería la use también, en vez de reimplementarla.
 
 ## Moodboard
@@ -114,7 +117,8 @@ Proposal: { id, date, time, network, format, status, title, caption, hashtags, a
 ProposalVersion: { id, proposalId, caption, images[], video, editedBy, createdAt }
 ProposalCaptionOption: { id, proposalId, text, selected, order, createdAt }
 ProposalMusicOption:   { id, proposalId, url?, label?, selected, order, audioUrl?, audioName?, createdAt }
-GalleryPhoto: { id, url, filename?, uploadedBy?, createdAt }
+GalleryPhoto: { id, url, filename?, uploadedBy?, createdAt, comments[] }
+GalleryPhotoComment: { id, photoId, author, authorId?, text, createdAt }
 InspirationReel: { id, url, kind: "reel"|"photo", addedBy?, createdAt }
 InspirationPhoto: { … }  // EN DESUSO, ver schema
 SiteSettings: { brandName, brandColorPrimary/Dark, brandColorAccent, instagramHandle,

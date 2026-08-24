@@ -6,7 +6,13 @@ import { useEffect, useState } from "react";
 import ArtUploadZone, { type UploadedFile } from "@/components/dashboard/ArtUploadZone";
 import Topbar from "@/components/dashboard/Topbar";
 import { useBrand } from "@/lib/dashboard/BrandContext";
-import { addGalleryPhoto, deleteGalleryPhoto, getGalleryPhotos } from "@/lib/dashboard/gallery-actions";
+import {
+  addGalleryPhoto,
+  addGalleryPhotoComment,
+  deleteGalleryPhoto,
+  deleteGalleryPhotoComment,
+  getGalleryPhotos,
+} from "@/lib/dashboard/gallery-actions";
 import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { GalleryPhoto } from "@/types/dashboard";
 
@@ -29,6 +35,8 @@ export default function GaleriaPage() {
   // cada archivo se persiste como GalleryPhoto — la grilla de abajo es la
   // única fuente de verdad, esto es solo la tira de miniaturas mientras sube.
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +85,38 @@ export default function GaleriaPage() {
     if (lightboxIndex < 0) return;
     const next = photos[lightboxIndex + step];
     if (next) setLightboxId(next.id);
+  }
+
+  async function handleAddComment() {
+    if (!lightboxPhoto) return;
+    const text = commentDraft.trim();
+    if (!text) return;
+    setSavingComment(true);
+    try {
+      const saved = await addGalleryPhotoComment(lightboxPhoto.id, text);
+      setPhotos((prev) =>
+        prev.map((p) => (p.id === lightboxPhoto.id ? { ...p, comments: [...p.comments, saved] } : p)),
+      );
+      setCommentDraft("");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo guardar el comentario.");
+    } finally {
+      setSavingComment(false);
+    }
+  }
+
+  async function handleDeleteComment(photoId: string, commentId: string) {
+    setPhotos((prev) =>
+      prev.map((p) => (p.id === photoId ? { ...p, comments: p.comments.filter((c) => c.id !== commentId) } : p)),
+    );
+    try {
+      await deleteGalleryPhotoComment(commentId);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo borrar el comentario.");
+      // Se recarga en vez de reponer a mano: si el borrado falló no sabemos
+      // en qué quedó el server, y la lista de la base es la verdad.
+      getGalleryPhotos().then(setPhotos).catch(() => {});
+    }
   }
 
   return (
@@ -128,7 +168,12 @@ export default function GaleriaPage() {
             {photos.map((photo) => (
               <div
                 key={photo.id}
-                className="group relative aspect-square overflow-hidden rounded border border-line-2 bg-panel-2"
+                // Recuadro rojo cuando alguien la comentó — la marca de hoja
+                // de contacto. Va como `ring` y no como borde más grueso para
+                // que la celda no cambie de tamaño al aparecer la marca.
+                className={`group relative aspect-square overflow-hidden rounded border border-line-2 bg-panel-2 ${
+                  photo.comments.length > 0 ? "ring-2 ring-brand-red ring-inset" : ""
+                }`}
               >
                 <button
                   type="button"
@@ -163,18 +208,24 @@ export default function GaleriaPage() {
 
       {lightboxPhoto && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-lg"
+          className="fixed inset-0 z-50 flex flex-col bg-black/75 backdrop-blur-lg"
           onClick={() => setLightboxId(null)}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element -- vista ampliada, mismo asset del usuario */}
-          <img
-            src={lightboxPhoto.url}
-            alt={lightboxPhoto.filename ?? "Foto de la galería en tamaño completo"}
-            className="max-h-full max-w-full rounded object-contain select-none"
-            // Arrastrar la foto en desktop iniciaría el drag&drop nativo del
-            // navegador, que acá no lleva a nada.
-            draggable={false}
-          />
+          {/* La foto ocupa lo que sobra y el panel de comentarios se queda
+              con su franja abajo — en columna y no con el panel flotando
+              encima, para que en el teléfono nunca le tape la imagen. */}
+          <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">
+            {/* eslint-disable-next-line @next/next/no-img-element -- vista ampliada, mismo asset del usuario */}
+            <img
+              src={lightboxPhoto.url}
+              alt={lightboxPhoto.filename ?? "Foto de la galería en tamaño completo"}
+              className="max-h-full max-w-full rounded object-contain select-none"
+              // Arrastrar la foto en desktop iniciaría el drag&drop nativo del
+              // navegador, que acá no lleva a nada.
+              draggable={false}
+            />
+          </div>
+
           <button
             type="button"
             onClick={() => setLightboxId(null)}
@@ -233,11 +284,75 @@ export default function GaleriaPage() {
             </button>
           )}
 
-          {photos.length > 1 && (
-            <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white tabular-nums">
-              {lightboxIndex + 1} / {photos.length}
+          {/* Notas sobre la foto. Comentar alcanza con sesión — es lo que
+              hace Jun para marcar las que le gustan, y una foto con al menos
+              una nota queda con recuadro rojo en la grilla. */}
+          <div
+            className="max-h-[45vh] shrink-0 overflow-y-auto border-t border-white/15 bg-black/60 px-4 py-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] tracking-label text-white/50 uppercase">
+                  {lightboxPhoto.comments.length === 0
+                    ? "Sin comentarios"
+                    : `${lightboxPhoto.comments.length} ${lightboxPhoto.comments.length === 1 ? "comentario" : "comentarios"}`}
+                </span>
+                {photos.length > 1 && (
+                  <span className="text-xs text-white/50 tabular-nums">
+                    {lightboxIndex + 1} / {photos.length}
+                  </span>
+                )}
+              </div>
+
+              {lightboxPhoto.comments.length > 0 && (
+                <ul className="flex flex-col gap-2">
+                  {lightboxPhoto.comments.map((comment) => (
+                    <li key={comment.id} className="flex items-start gap-2 rounded bg-white/[0.06] px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2">
+                          <span className="text-xs font-bold text-white">{comment.author}</span>
+                          <span className="text-[11px] text-white/40">{comment.when}</span>
+                        </div>
+                        <p className="mt-0.5 text-[13px] leading-[1.5] whitespace-pre-line text-white/85">
+                          {comment.text}
+                        </p>
+                      </div>
+                      {comment.canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteComment(lightboxPhoto.id, comment.id)}
+                          aria-label="Borrar comentario"
+                          title="Borrar comentario"
+                          className={`shrink-0 text-white/40 transition-colors duration-[250ms] hover:text-white ${PRESS_SCALE_CLASS}`}
+                        >
+                          <TrashIcon />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  placeholder="Escribí un comentario sobre esta foto…"
+                  rows={2}
+                  className="min-h-10 w-full flex-1 resize-y rounded border border-white/20 bg-white/[0.06] px-3 py-2 text-[13px] text-white placeholder:text-white/40"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddComment}
+                  disabled={savingComment || !commentDraft.trim()}
+                  className={`inline-flex min-h-10 shrink-0 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+                >
+                  {savingComment ? "Guardando…" : "Comentar"}
+                </button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

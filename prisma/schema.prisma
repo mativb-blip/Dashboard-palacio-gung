@@ -367,7 +367,29 @@ model GalleryPhoto {
   uploadedBy String?
   createdAt  DateTime @default(now())
 
+  comments GalleryPhotoComment[]
+
   @@index([createdAt])
+}
+
+/// Notas sobre una foto de la Galería — es como Jun marca las que le
+/// gustan. Una foto con al menos un comentario se muestra con recuadro rojo
+/// en la grilla, como el trazo de lápiz graso en una hoja de contacto.
+model GalleryPhotoComment {
+  id      String       @id @default(cuid())
+  photoId String
+  photo   GalleryPhoto @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  /// Nombre visible de quien comentó, igual que ProposalComment.author.
+  author  String
+  /// Id del User, aparte del nombre: es lo que decide si alguien puede
+  /// borrar su propio comentario. Comparar por el nombre sería frágil (se
+  /// puede editar, y dos personas pueden llamarse igual). Opcional porque el
+  /// nombre es lo que se muestra y el id solo se usa para ese permiso.
+  authorId String?
+  text    String       @db.Text
+  createdAt DateTime   @default(now())
+
+  @@index([photoId])
 }
 
 /// Repositorio de reels de Instagram para inspiración — pestaña propia a la

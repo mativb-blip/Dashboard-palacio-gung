@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import { formatCommentWhen } from "@/lib/dashboard/format";
-import type { GalleryPhoto } from "@/types/dashboard";
+import type { GalleryPhoto, GalleryPhotoCommentEntry } from "@/types/dashboard";
 
 // Cualquier usuario con sesión puede ver la galería — mismo criterio que
 // getProposals(); el gate real de ruta vive en src/proxy.ts.
@@ -25,9 +25,37 @@ async function requireEditor() {
   return session;
 }
 
+type CommentRow = {
+  id: string;
+  author: string;
+  authorId: string | null;
+  text: string;
+  createdAt: Date;
+};
+
+/** Quién puede borrar un comentario: su autor, o un Editor/Admin. Se calcula
+ * en el server y viaja como booleano — el cliente no tiene que replicar la
+ * regla, y ocultar un botón nunca es el permiso (el borrado la vuelve a
+ * chequear). */
+function canDeleteComment(
+  row: CommentRow,
+  viewer: { id?: string; role?: string },
+): boolean {
+  if (viewer.role === "ADMIN" || viewer.role === "EDITOR") return true;
+  return Boolean(row.authorId && viewer.id && row.authorId === viewer.id);
+}
+
 function toGalleryPhoto(
-  row: { id: string; url: string; filename: string | null; uploadedBy: string | null; createdAt: Date },
+  row: {
+    id: string;
+    url: string;
+    filename: string | null;
+    uploadedBy: string | null;
+    createdAt: Date;
+    comments?: CommentRow[];
+  },
   now: Date,
+  viewer: { id?: string; role?: string },
 ): GalleryPhoto {
   return {
     id: row.id,
@@ -35,14 +63,27 @@ function toGalleryPhoto(
     filename: row.filename ?? undefined,
     uploadedBy: row.uploadedBy ?? undefined,
     when: formatCommentWhen(row.createdAt, now),
+    comments: (row.comments ?? []).map(
+      (c): GalleryPhotoCommentEntry => ({
+        id: c.id,
+        author: c.author,
+        text: c.text,
+        when: formatCommentWhen(c.createdAt, now),
+        canDelete: canDeleteComment(c, viewer),
+      }),
+    ),
   };
 }
 
 export async function getGalleryPhotos(): Promise<GalleryPhoto[]> {
-  await requireSession();
-  const rows = await prisma.galleryPhoto.findMany({ orderBy: { createdAt: "desc" } });
+  const session = await requireSession();
+  const rows = await prisma.galleryPhoto.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { comments: { orderBy: { createdAt: "asc" } } },
+  });
   const now = new Date();
-  return rows.map((row) => toGalleryPhoto(row, now));
+  const viewer = { id: session.user.id, role: session.user.role };
+  return rows.map((row) => toGalleryPhoto(row, now, viewer));
 }
 
 export async function addGalleryPhoto(url: string, filename?: string): Promise<GalleryPhoto> {
@@ -53,13 +94,59 @@ export async function addGalleryPhoto(url: string, filename?: string): Promise<G
       filename: filename?.trim().slice(0, 200) || null,
       uploadedBy: session.user.name || session.user.email || null,
     },
+    include: { comments: true },
   });
   revalidatePath("/galeria");
-  return toGalleryPhoto(row, new Date());
+  return toGalleryPhoto(row, new Date(), { id: session.user.id, role: session.user.role });
 }
 
 export async function deleteGalleryPhoto(id: string): Promise<void> {
   await requireEditor();
   await prisma.galleryPhoto.delete({ where: { id } });
+  revalidatePath("/galeria");
+}
+
+/** Comentar una foto alcanza con sesión: es justamente lo que hace Jun, que
+ * es Comentarista — mismo criterio que addComment() sobre una propuesta. */
+export async function addGalleryPhotoComment(
+  photoId: string,
+  text: string,
+): Promise<GalleryPhotoCommentEntry> {
+  const session = await requireSession();
+  const value = text.trim();
+  if (!value) throw new Error("Escribí un comentario.");
+
+  const row = await prisma.galleryPhotoComment.create({
+    data: {
+      photoId,
+      author: session.user.name || session.user.email || "Desconocido",
+      authorId: session.user.id ?? null,
+      text: value.slice(0, 2000),
+    },
+  });
+
+  revalidatePath("/galeria");
+  return {
+    id: row.id,
+    author: row.author,
+    text: row.text,
+    when: formatCommentWhen(row.createdAt, new Date()),
+    // Quien acaba de escribirlo siempre puede borrarlo.
+    canDelete: true,
+  };
+}
+
+export async function deleteGalleryPhotoComment(commentId: string): Promise<void> {
+  const session = await requireSession();
+  const row = await prisma.galleryPhotoComment.findUnique({ where: { id: commentId } });
+  if (!row) throw new Error("Ese comentario ya no existe.");
+
+  // Se vuelve a chequear acá y no solo en la UI: esconder el botón no es un
+  // permiso.
+  if (!canDeleteComment(row, { id: session.user.id, role: session.user.role })) {
+    throw new Error("Solo podés borrar tus propios comentarios.");
+  }
+
+  await prisma.galleryPhotoComment.delete({ where: { id: commentId } });
   revalidatePath("/galeria");
 }
