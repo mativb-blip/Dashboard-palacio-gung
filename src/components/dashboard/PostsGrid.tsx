@@ -32,11 +32,17 @@ function scheduledAt(proposal: Proposal): number {
 
 /** Feed estilo Instagram: 3 columnas, todos los posts sin importar el mes,
  * ordenados por cuándo están programados — el más reciente arriba y los más
- * viejos hacia abajo. */
+ * viejos hacia abajo.
+ *
+ * Las Historias quedan fuera: en Instagram no viven en la grilla del perfil,
+ * desaparecen a las 24 horas. Se siguen viendo (y editando) desde el
+ * calendario, que sí las lista — acá solo no ensucian el feed. */
 export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposal }: PostsGridProps) {
   const { data: session } = useSession();
   const canEdit = canEditContent(session?.user.role);
-  const sorted = [...proposals].sort((a, b) => scheduledAt(b) - scheduledAt(a));
+  const sorted = proposals
+    .filter((p) => p.format !== "Historia")
+    .sort((a, b) => scheduledAt(b) - scheduledAt(a));
 
   function handleDelete(proposal: Proposal) {
     if (window.confirm(`¿Borrar "${proposal.title}"? Esta acción no se puede deshacer.`)) {
@@ -47,7 +53,7 @@ export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposa
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-4 py-[18px] desktop:mx-auto desktop:w-full desktop:max-w-[60%] desktop:px-8 desktop:py-[26px]">
       {sorted.length === 0 ? (
-        <p className="text-sm text-tx-3">No hay propuestas cargadas todavía.</p>
+        <p className="text-sm text-tx-3">No hay posts en el feed todavía.</p>
       ) : (
         <div className="grid grid-cols-3 gap-1">
           {sorted.map((proposal) => {
