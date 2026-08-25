@@ -437,3 +437,35 @@ model InspirationPhoto {
 
   @@index([createdAt])
 }
+
+/// Respalda las secciones **Canciones** y **Enlaces** de /inspiracion, igual
+/// que InspirationReel respalda Reels y Posts con foto: un solo modelo con un
+/// discriminador, porque las dos son lo mismo — una URL con un título.
+///
+/// La validación de `url` SÍ cambia según `kind` y eso vive en el server (ver
+/// inspiration-actions.ts): una canción se restringe a servicios de música
+/// conocidos, un enlace acepta cualquier host pero solo esquema http/https.
+model InspirationLink {
+  id        String   @id @default(cuid())
+  /// "song" | "link" — en qué sección se muestra. Sin enum a propósito,
+  /// mismo criterio que InspirationReel.kind y Proposal.format.
+  kind      String   @default("link")
+  /// Enlace normalizado (ver normalizeSongUrl / normalizeExternalUrl).
+  /// Opcional SOLO para las canciones: una canción puede cargarse con el
+  /// archivo de audio y nada más, sin enlace a ningún lado. Para kind
+  /// "link" el server lo exige.
+  url       String?  @db.Text
+  /// Título que escribe quien la carga; si viene vacío la UI arma uno con el
+  /// servicio (Spotify, YouTube) o el host.
+  title     String?
+  /// Solo para canciones: archivo subido a Blob para poder escucharla acá
+  /// mismo. Instagram y Spotify no dejan reproducir lo suyo afuera, así que
+  /// un archivo propio es el único reproductor real posible.
+  audioUrl  String?  @db.Text
+  /// Nombre original del archivo de audio, para mostrarlo.
+  audioName String?
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  @@index([kind, createdAt])
+}

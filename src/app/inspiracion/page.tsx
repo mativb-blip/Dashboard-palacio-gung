@@ -2,26 +2,40 @@
 
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import ArtUploadZone, { type UploadedFile } from "@/components/dashboard/ArtUploadZone";
+import { useEffect, useRef, useState } from "react";
+import ArtUploadZone, { type UploadedFile, uploadBlob } from "@/components/dashboard/ArtUploadZone";
 import Topbar from "@/components/dashboard/Topbar";
 import { useBrand } from "@/lib/dashboard/BrandContext";
+import { resolveAudioContentType } from "@/lib/dashboard/audio";
 import {
   addInspirationItem,
+  addInspirationLink,
   addInspirationStory,
   deleteInspirationItem,
+  deleteInspirationLink,
   deleteInspirationStory,
   getInspirationItems,
+  getInspirationLinks,
   getInspirationStories,
 } from "@/lib/dashboard/inspiration-actions";
 import { instagramEmbedSrc } from "@/lib/dashboard/instagram-music";
+import { describeSongUrl, hostOf } from "@/lib/dashboard/link-url";
 import { isVideoUrl } from "@/lib/dashboard/media-file";
 import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
-import type { InspirationItem, InspirationKind, InspirationStory } from "@/types/dashboard";
+import type {
+  InspirationItem,
+  InspirationKind,
+  InspirationLinkItem,
+  InspirationLinkKind,
+  InspirationStory,
+} from "@/types/dashboard";
 
 /** Carpeta fija en Blob para las historias — no hay propuesta detrás, ese
  * prop de ArtUploadZone solo organiza la ruta. */
 const STORY_FOLDER = "inspiration-stories";
+
+/** Carpeta fija en Blob para los audios de las canciones. */
+const SONG_FOLDER = "inspiration-songs";
 
 /** Proporción del recuadro por sección. El embed de Instagram no es solo el
  * medio: arriba lleva el encabezado de la cuenta y abajo la barra de
@@ -89,6 +103,22 @@ export default function InspiracionPage() {
         />
 
         <StoriesSection canEdit={canEdit} onExpandFile={setExpandedFile} />
+
+        <LinkListSection
+          kind="song"
+          title="Canciones"
+          description="Subí el audio para escucharla acá mismo, o pegá el enlace de Spotify, YouTube, Instagram, TikTok, Apple Music o SoundCloud."
+          placeholder="Pegá el enlace de la canción (opcional si subís el audio)"
+          canEdit={canEdit}
+        />
+
+        <LinkListSection
+          kind="link"
+          title="Enlaces"
+          description="Cualquier referencia que valga la pena tener a mano: un artículo, una cuenta, una carta, un menú."
+          placeholder="Pegá el enlace"
+          canEdit={canEdit}
+        />
       </div>
 
       {/* Visor ampliado: el mismo embed pero grande, para cuando la celda de
@@ -393,8 +423,13 @@ function InspirationSection({
 
   return (
     <>
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-3 border-t border-line pt-5">
-        <div>
+      {/* `min-w-0 flex-1` en el bloque de texto: sin eso el párrafo reclama
+          su ancho natural y empuja el "+" a una línea propia abajo a la
+          izquierda, que es justo donde no se lo busca. Con esto el texto se
+          encoge y el botón se queda arriba a la derecha, como en las otras
+          secciones. */}
+      <div className="mt-2 flex items-start justify-between gap-3 border-t border-line pt-5">
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold">{title}</h2>
           <p className="mt-1 text-sm text-tx-2">{description}</p>
         </div>
@@ -521,6 +556,319 @@ function InspirationSection({
   );
 }
 
+/** Canciones y Enlaces. Un mismo componente para las dos, como
+ * InspirationSection lo es para Reels y Posts con foto: las dos secciones son
+ * una lista de URLs con título, y lo único que cambia es qué se acepta como
+ * URL (lo decide el server) y si se puede adjuntar un audio.
+ *
+ * Es una lista y no una grilla a propósito: no hay nada que mirar, hay algo
+ * que leer y abrir — una miniatura cuadrada de un enlace es espacio gastado. */
+function LinkListSection({
+  kind,
+  title,
+  description,
+  placeholder,
+  canEdit,
+}: {
+  kind: InspirationLinkKind;
+  title: string;
+  description: string;
+  placeholder: string;
+  canEdit: boolean;
+}) {
+  const isSong = kind === "song";
+  const [items, setItems] = useState<InspirationLinkItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [url, setUrl] = useState("");
+  const [name, setName] = useState("");
+  // Audio ya subido a Blob para la canción que se está armando: todavía no
+  // hay fila, así que espera acá hasta que se confirme "Agregar". Si se
+  // cancela queda huérfano en Blob — mismo trade-off que el panel de música.
+  const [audio, setAudio] = useState<{ url: string; name: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  // Una vista previa a la vez: cada una es un iframe de varios cientos de KB.
+  const [previewId, setPreviewId] = useState("");
+  const audioInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getInspirationLinks(kind).then((data) => {
+      if (cancelled) return;
+      setItems(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [kind]);
+
+  function resetComposer() {
+    setAdding(false);
+    setUrl("");
+    setName("");
+    setAudio(null);
+    setError("");
+  }
+
+  async function handleAudioFile(file: File) {
+    setUploading(true);
+    setError("");
+    try {
+      // resolveAudioContentType fuerza el MIME por extensión: en .m4a el
+      // navegador manda `file.type` vacío y Blob rechaza la subida.
+      const uploaded = await uploadBlob(SONG_FOLDER, file, undefined, undefined, resolveAudioContentType(file));
+      setAudio({ url: uploaded, name: file.name });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir el audio.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleAdd() {
+    const trimmedUrl = url.trim();
+    // La validación que manda es la del server; se adelanta acá nada más que
+    // para no gastar un round-trip en el caso obvio de dejar todo vacío.
+    if (!trimmedUrl && !audio) {
+      setError(isSong ? "Pegá un enlace o subí un archivo de audio." : "Pegá un enlace.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const saved = await addInspirationLink(kind, {
+        url: trimmedUrl || undefined,
+        title: name.trim() || undefined,
+        audioUrl: audio?.url,
+        audioName: audio?.name,
+      });
+      setItems((prev) => [saved, ...prev]);
+      resetComposer();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo agregar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(item: InspirationLinkItem) {
+    if (!window.confirm("¿Borrar esto del repositorio?")) return;
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
+    try {
+      await deleteInspirationLink(item.id);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo borrar.");
+      setItems((prev) => [item, ...prev]);
+    }
+  }
+
+  /** Qué mostrar como nombre cuando quien lo cargó no escribió uno. */
+  function displayName(item: InspirationLinkItem): string {
+    if (item.title) return item.title;
+    if (item.url) return isSong ? describeSongUrl(item.url) : hostOf(item.url) || "Enlace";
+    return item.audioName || "Audio subido";
+  }
+
+  return (
+    <>
+      {/* `min-w-0 flex-1` en el bloque de texto: sin eso el párrafo reclama
+          su ancho natural y empuja el "+" a una línea propia abajo a la
+          izquierda, que es justo donde no se lo busca. Con esto el texto se
+          encoge y el botón se queda arriba a la derecha, como en las otras
+          secciones. */}
+      <div className="mt-2 flex items-start justify-between gap-3 border-t border-line pt-5">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold">{title}</h2>
+          <p className="mt-1 text-sm text-tx-2">{description}</p>
+        </div>
+        {canEdit && !adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            onPointerEnter={handleLiquidPointerEnter}
+            className={`${iconButtonClass} shrink-0`}
+            title={`Agregar a ${title}`}
+            aria-label={`Agregar a ${title}`}
+          >
+            <PlusIcon className="relative" />
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="flex flex-col gap-2 rounded border border-line-2 bg-panel-2 p-3 desktop:max-w-md">
+          <input
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setError("");
+            }}
+            placeholder={placeholder}
+            inputMode="url"
+            autoFocus
+            className="min-h-9 w-full rounded border border-line-2 bg-[var(--bg)] px-3 text-[13px] text-brand-ink"
+          />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={isSong ? "Nombre de la canción (opcional)" : "Título (opcional)"}
+            className="min-h-9 w-full rounded border border-line-2 bg-[var(--bg)] px-3 text-[13px] text-brand-ink"
+          />
+
+          {isSong && (
+            <>
+              {/* El archivo es lo único que se puede REPRODUCIR acá: ni
+                  Instagram ni Spotify dejan sonar lo suyo en otra página, así
+                  que un enlace solo alcanza para abrir la pestaña. */}
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void handleAudioFile(file);
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => audioInputRef.current?.click()}
+                  disabled={uploading}
+                  className={`inline-flex min-h-9 items-center gap-1.5 rounded border border-line-2 bg-[var(--bg)] px-3 text-xs leading-none font-bold text-brand-ink transition-transform duration-[400ms] disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+                >
+                  <UploadIcon className="h-3.5 w-3.5" />
+                  {uploading ? "Subiendo…" : audio ? "Cambiar audio" : "Subir audio"}
+                </button>
+                {audio && <span className="min-w-0 truncate text-[11px] text-tx-3">{audio.name}</span>}
+              </div>
+            </>
+          )}
+
+          {error && <p className="text-[11px] leading-[1.4] text-[var(--color-brand-red-text)]">{error}</p>}
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={resetComposer}
+              className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-[var(--bg)] px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={saving || uploading || (!url.trim() && !audio)}
+              className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+            >
+              {saving ? "Agregando…" : "Agregar"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-tx-3">Cargando…</p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-tx-3">
+          {canEdit ? "Todavía no se agregó nada acá." : "Todavía no hay nada acá."}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {items.map((item) => {
+            const embedSrc = item.url ? instagramEmbedSrc(item.url) : null;
+            const showingPreview = previewId === item.id;
+            return (
+              <div key={item.id} className="rounded border border-line-2 bg-panel-2">
+                <div className="flex items-center gap-2 px-3 py-2.5">
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    {item.url ? (
+                      // Pestaña nueva y avisado con el ícono: sin eso, en el
+                      // teléfono parece que la app se fue y se perdió lo que
+                      // se estaba mirando.
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex min-w-0 items-center gap-1.5 text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue [&:hover>span]:underline"
+                        title={`Abrir en pestaña nueva — ${item.url}`}
+                      >
+                        <span className="truncate">{displayName(item)}</span>
+                        <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-60" />
+                      </a>
+                    ) : (
+                      <span className="truncate text-[13px] text-brand-ink">{displayName(item)}</span>
+                    )}
+                    {/* El host va SIEMPRE a la vista. La sección Enlaces
+                        acepta cualquier dominio, así que un título puede
+                        decir una cosa y el enlace ir a otra: mostrar a dónde
+                        lleva de verdad es lo que evita esa sorpresa. */}
+                    {item.url && <span className="truncate text-[11px] text-tx-3">{hostOf(item.url)}</span>}
+                  </div>
+
+                  {embedSrc && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewId(showingPreview ? "" : item.id)}
+                      onPointerEnter={handleLiquidPointerEnter}
+                      aria-expanded={showingPreview}
+                      title={showingPreview ? "Cerrar la vista previa" : "Ver la vista previa"}
+                      aria-label={showingPreview ? "Cerrar la vista previa" : "Ver la vista previa"}
+                      className={`${iconButtonClass} shrink-0${showingPreview ? " border-brand-blue bg-brand-blue/[0.06] text-brand-blue" : ""}`}
+                    >
+                      {showingPreview ? <CloseIcon className="relative" /> : <EyeIcon className="relative" />}
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item)}
+                      onPointerEnter={handleLiquidPointerEnter}
+                      aria-label="Quitar"
+                      title="Quitar"
+                      className={`${iconButtonClass} shrink-0`}
+                    >
+                      <TrashIcon className="relative" />
+                    </button>
+                  )}
+                </div>
+
+                {item.audioUrl && (
+                  <div className="border-t border-line-2 px-3 py-2">
+                    {/* El único reproductor real: el archivo vive en nuestro
+                        Blob, no en Instagram ni en Spotify. */}
+                    <audio controls preload="none" src={item.audioUrl} className="h-8 w-full" />
+                  </div>
+                )}
+
+                {embedSrc && showingPreview && (
+                  <div className="border-t border-line-2 px-3 py-3">
+                    {/* Vista previa, no reproductor: el play del embed abre
+                        Instagram en una pestaña nueva (ver instagramEmbedSrc). */}
+                    <iframe
+                      src={embedSrc}
+                      className="mx-auto aspect-[9/16] w-full max-w-[240px] rounded"
+                      style={{ border: 0 }}
+                      allow="autoplay; encrypted-media; fullscreen"
+                      allowFullScreen
+                      scrolling="no"
+                      title={displayName(item)}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
 function PlusIcon({ className }: { className?: string }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -553,11 +901,40 @@ function ExpandIcon({ className }: { className?: string }) {
   );
 }
 
-function CloseIcon() {
+function CloseIcon({ className }: { className?: string } = {}) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 4h6v6" />
+      <path d="M20 4 11 13" />
+      <path d="M18 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+    </svg>
+  );
+}
+
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 16V4" />
+      <path d="M7 9l5-5 5 5" />
+      <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
+function EyeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }

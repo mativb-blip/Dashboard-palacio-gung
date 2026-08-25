@@ -6,7 +6,14 @@ import { prisma } from "@/lib/db";
 import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { instagramEmbedSrc, normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
-import type { InspirationItem, InspirationKind, InspirationStory } from "@/types/dashboard";
+import { normalizeExternalUrl, normalizeSongUrl } from "@/lib/dashboard/link-url";
+import type {
+  InspirationItem,
+  InspirationKind,
+  InspirationLinkItem,
+  InspirationLinkKind,
+  InspirationStory,
+} from "@/types/dashboard";
 
 /** Las dos secciones de /inspiracion que van por ENLACE de Instagram
  * (Historias es aparte: son archivos subidos, ver más abajo). Validado en el
@@ -135,5 +142,116 @@ export async function addInspirationStory(url: string, filename?: string): Promi
 export async function deleteInspirationStory(id: string): Promise<void> {
   await requireEditor();
   await prisma.inspirationPhoto.delete({ where: { id } });
+  revalidatePath("/inspiracion");
+}
+
+// --- Canciones y Enlaces (cuarta y quinta sección) ----------------------
+// Un solo modelo con discriminador, igual que Reels/Fotos — ver
+// InspirationLink en el schema. Lo que cambia entre las dos es qué se acepta
+// como URL, y eso se decide acá, en el server.
+
+const LINK_KINDS: InspirationLinkKind[] = ["song", "link"];
+
+function toInspirationLinkItem(
+  row: {
+    id: string;
+    kind: string;
+    url: string | null;
+    title: string | null;
+    audioUrl: string | null;
+    audioName: string | null;
+    addedBy: string | null;
+    createdAt: Date;
+  },
+  now: Date,
+): InspirationLinkItem {
+  return {
+    id: row.id,
+    kind: LINK_KINDS.includes(row.kind as InspirationLinkKind) ? (row.kind as InspirationLinkKind) : "link",
+    url: row.url ?? undefined,
+    title: row.title ?? undefined,
+    audioUrl: row.audioUrl ?? undefined,
+    audioName: row.audioName ?? undefined,
+    addedBy: row.addedBy ?? undefined,
+    when: formatCommentWhen(row.createdAt, now),
+  };
+}
+
+export async function getInspirationLinks(kind: InspirationLinkKind): Promise<InspirationLinkItem[]> {
+  await requireSession();
+  const rows = await prisma.inspirationLink.findMany({
+    where: { kind },
+    orderBy: { createdAt: "desc" },
+  });
+  const now = new Date();
+  return rows.map((row) => toInspirationLinkItem(row, now));
+}
+
+export interface AddInspirationLinkInput {
+  url?: string;
+  title?: string;
+  /** Solo se guarda en las canciones — un enlace no lleva audio. */
+  audioUrl?: string;
+  audioName?: string;
+}
+
+export async function addInspirationLink(
+  kind: InspirationLinkKind,
+  input: AddInspirationLinkInput,
+): Promise<InspirationLinkItem> {
+  const session = await requireEditor();
+  const safeKind: InspirationLinkKind = LINK_KINDS.includes(kind) ? kind : "link";
+  const rawUrl = input.url?.trim();
+
+  // El audio es exclusivo de las canciones. No se rechaza el pedido si viene
+  // en un enlace, se ignora: lo que importa es que no quede guardado donde no
+  // corresponde, y la UI de Enlaces ni siquiera ofrece subirlo.
+  const audioUrl =
+    safeKind === "song" && input.audioUrl
+      ? assertBlobUrl(input.audioUrl, "No se pudo subir el audio.")
+      : null;
+
+  // Una canción vale con el enlace, con el archivo, o con los dos — pero no
+  // vacía. Un enlace, en cambio, es nada más que la URL: sin ella no hay nada
+  // que guardar.
+  let url: string | null = null;
+  if (rawUrl) {
+    url = safeKind === "song" ? normalizeSongUrl(rawUrl) : normalizeExternalUrl(rawUrl);
+  } else if (safeKind === "song" && !audioUrl) {
+    throw new Error("Pegá un enlace o subí un archivo de audio.");
+  } else if (safeKind === "link") {
+    throw new Error("Pegá un enlace.");
+  }
+
+  // Se compara contra la URL ya normalizada, que es lo que hace que dos
+  // formas de pegar el mismo link cuenten como repetidas. Las canciones sin
+  // enlace (solo audio) no se comparan: dos archivos distintos de la misma
+  // canción son dos entradas legítimas.
+  if (url) {
+    const duplicate = await prisma.inspirationLink.findFirst({
+      where: { kind: safeKind, url },
+      select: { id: true },
+    });
+    if (duplicate) throw new Error("Ese enlace ya está en esta sección.");
+  }
+
+  const row = await prisma.inspirationLink.create({
+    data: {
+      kind: safeKind,
+      url,
+      title: input.title?.trim().slice(0, 200) || null,
+      audioUrl,
+      audioName: audioUrl ? input.audioName?.trim().slice(0, 200) || null : null,
+      addedBy: session.user.name || session.user.email || null,
+    },
+  });
+  revalidatePath("/inspiracion");
+  return toInspirationLinkItem(row, new Date());
+}
+
+/** Igual que el resto: se borra la fila, no el archivo en Blob. */
+export async function deleteInspirationLink(id: string): Promise<void> {
+  await requireEditor();
+  await prisma.inspirationLink.delete({ where: { id } });
   revalidatePath("/inspiracion");
 }

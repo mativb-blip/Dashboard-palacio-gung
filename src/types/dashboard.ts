@@ -152,3 +152,22 @@ export interface InspirationStory {
   addedBy?: string;
   when: string;
 }
+
+/** Las dos secciones de `/inspiracion` respaldadas por `InspirationLink`. */
+export type InspirationLinkKind = "song" | "link";
+
+/** Una canción o un enlace guardado en `/inspiracion`.
+ *
+ * `url` es opcional porque una canción puede ser solo el archivo de audio
+ * subido, sin enlace a ningún servicio. Para `kind: "link"` el server siempre
+ * exige una URL, así que ahí viene. */
+export interface InspirationLinkItem {
+  id: string;
+  kind: InspirationLinkKind;
+  url?: string;
+  title?: string;
+  audioUrl?: string;
+  audioName?: string;
+  addedBy?: string;
+  when: string;
+}
