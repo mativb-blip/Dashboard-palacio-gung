@@ -417,13 +417,14 @@ model InspirationReel {
   @@index([createdAt])
 }
 
-/// EN DESUSO — ya no lo lee ni lo escribe nada. Nació para la segunda
-/// sección de /inspiracion cuando esa sección eran fotos SUBIDAS; ahora son
-/// posts de Instagram enlazados, y viven en InspirationReel con kind =
-/// "photo". La tabla se deja en pie a propósito y no se dropea: si alguien
-/// alcanzó a subir fotos en producción entre un deploy y el otro, borrarla
-/// se las llevaría puestas. Eliminar recién cuando se confirme que está
-/// vacía en producción.
+/// Respalda la sección **Historias** de /inspiracion: capturas de pantalla y
+/// videos de historias, subidos a Blob. Van por archivo y no por enlace
+/// porque una historia expira y no tiene permalink embebible.
+///
+/// El nombre es histórico: nació para la segunda sección cuando esa sección
+/// eran fotos subidas (hoy son posts de Instagram enlazados, en
+/// InspirationReel con kind="photo"). Se conserva el nombre para no
+/// renombrar la tabla y arriesgar lo que ya tenga cargado.
 model InspirationPhoto {
   id        String   @id @default(cuid())
   /// URL de Vercel Blob (ver assertBlobUrl) — la subida va directo del

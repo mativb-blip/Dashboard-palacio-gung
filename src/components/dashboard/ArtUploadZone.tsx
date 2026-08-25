@@ -2,7 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import { useCallback, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
-import { isSupportedMedia, toDisplayableFile } from "@/lib/dashboard/media-file";
+import { isSupportedMedia, isVideoUrl, type MediaKind, toDisplayableFile } from "@/lib/dashboard/media-file";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { GalleryPhoto } from "@/types/dashboard";
 import GalleryPickerModal from "./GalleryPickerModal";
@@ -158,7 +158,14 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
   const [statuses, setStatuses] = useState<UploadStatus[]>([]);
   const [error, setError] = useState("");
   const [pickingFromGallery, setPickingFromGallery] = useState(false);
-  const isImage = accept.startsWith("image");
+  // `accept` puede pedir imagen, video, o los dos (Historias en
+  // /inspiracion). `isImage` se conserva para lo que solo aplica a imágenes
+  // (el atajo de la Galería, el hint de HEIC), y `mediaKind` es lo que
+  // realmente decide qué archivos se aceptan.
+  const acceptsImage = accept.includes("image");
+  const acceptsVideo = accept.includes("video");
+  const mediaKind: MediaKind = acceptsImage && acceptsVideo ? "media" : acceptsImage ? "image" : "video";
+  const isImage = acceptsImage;
 
   /** Fotos elegidas de la Galería: ya están en Blob, así que no se suben ni
    * pasan por el verificador de progreso — se reusa la URL tal cual. */
@@ -184,7 +191,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
   }
 
   async function addFiles(incoming: File[] | FileList) {
-    const valid = Array.from(incoming).filter((f) => isSupportedMedia(f, isImage ? "image" : "video"));
+    const valid = Array.from(incoming).filter((f) => isSupportedMedia(f, mediaKind));
     if (!valid.length) return;
 
     const oversized = valid.find((f) => f.size > MAX_FILE_SIZE_BYTES);
@@ -264,7 +271,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
     if (!items) return;
     const found: File[] = [];
     for (const item of Array.from(items)) {
-      if (isImage ? item.type.startsWith("image/") : item.type.startsWith("video/")) {
+      if ((acceptsImage && item.type.startsWith("image/")) || (acceptsVideo && item.type.startsWith("video/"))) {
         const file = item.getAsFile();
         if (file) found.push(file);
       }
@@ -277,7 +284,9 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
       const clipboardItems = await navigator.clipboard.read();
       const found: File[] = [];
       for (const item of clipboardItems) {
-        const type = item.types.find((t) => (isImage ? t.startsWith("image/") : t.startsWith("video/")));
+        const type = item.types.find(
+          (t) => (acceptsImage && t.startsWith("image/")) || (acceptsVideo && t.startsWith("video/")),
+        );
         if (!type) continue;
         const blob = await item.getType(type);
         found.push(new File([blob], `pegado.${type.split("/")[1] || "bin"}`, { type }));
@@ -407,7 +416,7 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
               key={f.id}
               className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-line-2 bg-panel-2"
             >
-              {isImage ? (
+              {!isVideoUrl(f.url) ? (
                 // eslint-disable-next-line @next/next/no-img-element -- preview local del arte cargado, no un asset del sitio
                 <img src={f.url} alt={f.name} className="h-full w-full object-cover" />
               ) : (

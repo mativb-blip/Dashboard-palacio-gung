@@ -3,16 +3,25 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ArtUploadZone, { type UploadedFile } from "@/components/dashboard/ArtUploadZone";
 import Topbar from "@/components/dashboard/Topbar";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import {
   addInspirationItem,
+  addInspirationStory,
   deleteInspirationItem,
+  deleteInspirationStory,
   getInspirationItems,
+  getInspirationStories,
 } from "@/lib/dashboard/inspiration-actions";
 import { instagramEmbedSrc } from "@/lib/dashboard/instagram-music";
+import { isVideoUrl } from "@/lib/dashboard/media-file";
 import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
-import type { InspirationItem, InspirationKind } from "@/types/dashboard";
+import type { InspirationItem, InspirationKind, InspirationStory } from "@/types/dashboard";
+
+/** Carpeta fija en Blob para las historias — no hay propuesta detrás, ese
+ * prop de ArtUploadZone solo organiza la ruta. */
+const STORY_FOLDER = "inspiration-stories";
 
 /** Proporción del recuadro por sección. El embed de Instagram no es solo el
  * medio: arriba lleva el encabezado de la cuenta y abajo la barra de
@@ -33,6 +42,8 @@ export default function InspiracionPage() {
   // porque el alto del recuadro depende de si es reel o foto.
   const [expanded, setExpanded] = useState<InspirationItem | null>(null);
   const expandedEmbedSrc = expanded ? instagramEmbedSrc(expanded.url) : null;
+  // Las historias son archivos propios, no embeds — visor aparte.
+  const [expandedFile, setExpandedFile] = useState<InspirationStory | null>(null);
 
   return (
     <div className="flex min-h-screen flex-col font-sans text-brand-ink">
@@ -76,6 +87,8 @@ export default function InspiracionPage() {
           canEdit={canEdit}
           onExpand={setExpanded}
         />
+
+        <StoriesSection canEdit={canEdit} onExpandFile={setExpandedFile} />
       </div>
 
       {/* Visor ampliado: el mismo embed pero grande, para cuando la celda de
@@ -121,7 +134,189 @@ export default function InspiracionPage() {
           </button>
         </div>
       )}
+      {/* Visor de una historia. El fondo desenfocado va en capa aparte por
+          la misma razón que el de embeds: con backdrop-filter en un ancestro,
+          Safari de iPhone/iPad puede dejar el medio en blanco. */}
+      {expandedFile && (
+        <div className="fixed inset-0 z-50" onClick={() => setExpandedFile(null)}>
+          <div className="absolute inset-0 bg-black/75 backdrop-blur-lg" />
+
+          <div className="relative flex h-full items-center justify-center p-4">
+            <div onClick={(e) => e.stopPropagation()} className="flex max-h-full items-center">
+              {isVideoUrl(expandedFile.url) ? (
+                <video
+                  src={expandedFile.url}
+                  controls
+                  autoPlay
+                  className="max-h-[85vh] max-w-full rounded"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- archivo del usuario
+                <img
+                  src={expandedFile.url}
+                  alt={expandedFile.filename ?? "Historia de referencia"}
+                  className="max-h-[85vh] max-w-full rounded object-contain"
+                />
+              )}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setExpandedFile(null)}
+            aria-label="Cerrar"
+            className={`absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Historias: capturas de pantalla y videos subidos. A diferencia de las
+ * otras dos secciones no son enlaces — una historia expira y no tiene
+ * permalink embebible, así que el archivo es la única forma de guardarla. */
+function StoriesSection({
+  canEdit,
+  onExpandFile,
+}: {
+  canEdit: boolean;
+  onExpandFile: (story: InspirationStory) => void;
+}) {
+  const [stories, setStories] = useState<InspirationStory[]>([]);
+  const [loading, setLoading] = useState(true);
+  // Cola transitoria del selector: se vacía apenas cada archivo se persiste
+  // — la grilla de abajo es la única fuente de verdad.
+  const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getInspirationStories().then((data) => {
+      if (cancelled) return;
+      setStories(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleFilesChange(next: UploadedFile[]) {
+    setPendingFiles([]);
+    for (const file of next) {
+      try {
+        const saved = await addInspirationStory(file.url, file.name);
+        setStories((prev) => [saved, ...prev]);
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "No se pudo subir el archivo.");
+      }
+    }
+  }
+
+  async function handleDelete(story: InspirationStory) {
+    if (!window.confirm("¿Borrar esta historia del repositorio?")) return;
+    setStories((prev) => prev.filter((s) => s.id !== story.id));
+    try {
+      await deleteInspirationStory(story.id);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo borrar.");
+      setStories((prev) => [story, ...prev]);
+    }
+  }
+
+  return (
+    <>
+      <div className="mt-2 border-t border-line pt-5">
+        <h2 className="text-lg font-bold">Historias</h2>
+        <p className="mt-1 text-sm text-tx-2">
+          Capturas de pantalla y videos de historias. Van como archivo y no como enlace: una historia
+          expira y no se puede embeber.
+        </p>
+      </div>
+
+      {canEdit && (
+        <ArtUploadZone
+          label="Subir capturas o videos"
+          accept="image/*,video/*"
+          multiple
+          files={pendingFiles}
+          onFilesChange={handleFilesChange}
+          proposalId={STORY_FOLDER}
+        />
+      )}
+
+      {loading ? (
+        <p className="text-sm text-tx-3">Cargando…</p>
+      ) : stories.length === 0 ? (
+        <p className="text-sm text-tx-3">
+          {canEdit ? "Todavía no se subió ninguna historia." : "Todavía no hay historias."}
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 desktop:grid-cols-3 desktop:gap-4">
+          {stories.map((story) => (
+            <div
+              key={story.id}
+              className="group relative overflow-hidden rounded border border-line-2 bg-panel-2"
+              style={{ aspectRatio: "9 / 16" }}
+            >
+              <button
+                type="button"
+                onClick={() => onExpandFile(story)}
+                className={`absolute inset-0 h-full w-full transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+                aria-label={story.filename ? `Ver ${story.filename}` : "Ver historia"}
+              >
+                {isVideoUrl(story.url) ? (
+                  // Sin controles ni sonido: es una miniatura, el video se
+                  // mira en el visor. `preload="metadata"` trae solo la
+                  // cabecera, no el archivo entero.
+                  //
+                  // El `#t=0.1` no es decorativo: sin ese fragmento el
+                  // recuadro queda NEGRO, porque con preload="metadata" el
+                  // navegador no se compromete a pintar ningún cuadro.
+                  // Pedirle un instante concreto lo obliga a buscar ahí y
+                  // dibujarlo, que es lo que hace las veces de portada.
+                  <video
+                    src={`${story.url}#t=0.1`}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element -- archivo del usuario
+                  <img
+                    src={story.url}
+                    alt={story.filename ?? "Historia de referencia"}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+              </button>
+
+              {isVideoUrl(story.url) && (
+                <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  VIDEO
+                </span>
+              )}
+
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(story)}
+                  aria-label="Quitar esta historia"
+                  title="Quitar esta historia"
+                  className={`absolute top-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-brand-ink/70 text-[var(--bg)] transition-opacity duration-[250ms] ${PRESS_SCALE_CLASS}`}
+                >
+                  <TrashIcon />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

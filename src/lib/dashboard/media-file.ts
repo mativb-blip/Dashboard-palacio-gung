@@ -17,9 +17,25 @@ export function isHeic(file: File): boolean {
 }
 
 /** ¿Es algo que podemos subir como arte? Contempla el HEIC de tipo vacío. */
-export function isSupportedMedia(file: File, kind: "image" | "video"): boolean {
-  if (kind === "video") return file.type.startsWith("video/");
-  return file.type.startsWith("image/") || isHeic(file);
+/** "media" = imagen O video en la misma zona. Lo usa Historias en
+ * /inspiracion, donde una referencia puede ser una captura o un video de la
+ * historia, y no tiene sentido pedir dos recuadros separados. */
+export type MediaKind = "image" | "video" | "media";
+
+export function isSupportedMedia(file: File, kind: MediaKind): boolean {
+  const esVideo = file.type.startsWith("video/");
+  const esImagen = file.type.startsWith("image/") || isHeic(file);
+  if (kind === "video") return esVideo;
+  if (kind === "image") return esImagen;
+  return esImagen || esVideo;
+}
+
+/** ¿La URL apunta a un video? Se decide por extensión porque es lo único que
+ * queda: el archivo ya está en Blob y no se vuelve a leer, pero la ruta
+ * conserva el nombre original (ver safeBlobName). Sirve para elegir entre
+ * <img> y <video> al listar lo ya subido. */
+export function isVideoUrl(url: string): boolean {
+  return /\.(mp4|mov|m4v|webm|ogv|avi)(\?|#|$)/i.test(url);
 }
 
 /** Pasa a JPEG lo que el navegador pueda decodificar pero no mostrar.

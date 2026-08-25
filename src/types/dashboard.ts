@@ -138,3 +138,17 @@ export interface InspirationItem {
   addedBy?: string;
   when: string;
 }
+
+/** Una historia de referencia (tercera sección de `/inspiracion`): captura
+ * de pantalla o video subido a Blob. No es un enlace de Instagram como las
+ * otras dos secciones — las historias expiran y no tienen embed, así que la
+ * única forma de guardarlas es el archivo. Respaldado por
+ * `InspirationPhoto` en el schema (nombre histórico, ver el comentario
+ * ahí). */
+export interface InspirationStory {
+  id: string;
+  url: string;
+  filename?: string;
+  addedBy?: string;
+  when: string;
+}

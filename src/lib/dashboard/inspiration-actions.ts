@@ -3,13 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { instagramEmbedSrc, normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
-import type { InspirationItem, InspirationKind } from "@/types/dashboard";
+import type { InspirationItem, InspirationKind, InspirationStory } from "@/types/dashboard";
 
-/** Las dos secciones de /inspiracion. Validado en el server contra esta
- * lista, no confiando en lo que mande el cliente — mismo criterio que
- * FORMATS/STATUSES en proposals-actions.ts. */
+/** Las dos secciones de /inspiracion que van por ENLACE de Instagram
+ * (Historias es aparte: son archivos subidos, ver más abajo). Validado en el
+ * server contra esta lista, no confiando en lo que mande el cliente — mismo
+ * criterio que FORMATS/STATUSES en proposals-actions.ts. */
 const KINDS: InspirationKind[] = ["reel", "photo"];
 
 // Cualquier usuario con sesión puede ver el repositorio — mismo criterio que
@@ -88,5 +90,50 @@ export async function addInspirationItem(url: string, kind: InspirationKind): Pr
 export async function deleteInspirationItem(id: string): Promise<void> {
   await requireEditor();
   await prisma.inspirationReel.delete({ where: { id } });
+  revalidatePath("/inspiracion");
+}
+
+// --- Historias (tercera sección) ---------------------------------------
+// Capturas de pantalla y videos subidos, no enlaces: una historia expira y
+// no tiene permalink embebible, así que el archivo es la única forma de
+// guardarla. Respaldado por InspirationPhoto (nombre histórico, ver schema).
+
+function toInspirationStory(
+  row: { id: string; url: string; filename: string | null; addedBy: string | null; createdAt: Date },
+  now: Date,
+): InspirationStory {
+  return {
+    id: row.id,
+    url: row.url,
+    filename: row.filename ?? undefined,
+    addedBy: row.addedBy ?? undefined,
+    when: formatCommentWhen(row.createdAt, now),
+  };
+}
+
+export async function getInspirationStories(): Promise<InspirationStory[]> {
+  await requireSession();
+  const rows = await prisma.inspirationPhoto.findMany({ orderBy: { createdAt: "desc" } });
+  const now = new Date();
+  return rows.map((row) => toInspirationStory(row, now));
+}
+
+export async function addInspirationStory(url: string, filename?: string): Promise<InspirationStory> {
+  const session = await requireEditor();
+  const row = await prisma.inspirationPhoto.create({
+    data: {
+      url: assertBlobUrl(url, "No se pudo subir el archivo."),
+      filename: filename?.trim().slice(0, 200) || null,
+      addedBy: session.user.name || session.user.email || null,
+    },
+  });
+  revalidatePath("/inspiracion");
+  return toInspirationStory(row, new Date());
+}
+
+/** Igual que la Galería: se borra la fila, no el archivo en Blob. */
+export async function deleteInspirationStory(id: string): Promise<void> {
+  await requireEditor();
+  await prisma.inspirationPhoto.delete({ where: { id } });
   revalidatePath("/inspiracion");
 }
