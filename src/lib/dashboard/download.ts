@@ -1,4 +1,4 @@
-import { artLabel, isVerticalFormat } from "@/lib/dashboard/format";
+import { artLabel, isVerticalFormat, supportsVideo } from "@/lib/dashboard/format";
 import type { Proposal } from "@/types/dashboard";
 
 /** Wordmark + colores de marca para el placeholder dibujado en <canvas>
@@ -120,9 +120,10 @@ interface ArtFile {
 /** Trae el arte (imagen real por fetch, o el placeholder de ArtTile
  * generado en <canvas>) sin todavía disparar ninguna descarga. */
 async function getProposalArtFile(proposal: Proposal, index: number, brand: DownloadBrand): Promise<ArtFile | null> {
-  // Un Reel solo tiene un slot (la portada, índice 0) — pero lo que hay que
-  // bajar de verdad es el video, no la imagen de portada.
-  if (proposal.format === "Reel" && proposal.video && index === 0) {
+  // En los formatos que llevan video (Reel siempre, Historia si se cargó
+  // uno) el slot 0 muestra el video: lo que hay que bajar es ese archivo, no
+  // la imagen de portada.
+  if (supportsVideo(proposal.format) && proposal.video && index === 0) {
     try {
       const res = await fetch(proposal.video);
       const blob = await res.blob();

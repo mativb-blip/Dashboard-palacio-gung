@@ -12,6 +12,7 @@ import { useBrand } from "@/lib/dashboard/BrandContext";
 import { describeInstagramMusicUrl, normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
 import { CAPTION_OPTIONS_LIMIT, MUSIC_OPTIONS_LIMIT } from "@/lib/dashboard/proposals";
 import { createProposal, type AddMusicOptionInput } from "@/lib/dashboard/proposals-actions";
+import { supportsVideo } from "@/lib/dashboard/format";
 import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { ProposalFormat } from "@/types/dashboard";
 
@@ -114,6 +115,10 @@ function NuevaPropuestaForm() {
   if (status !== "authenticated" || !canEdit) return null;
 
   const isReel = format === "Reel";
+  // Historia también puede llevar video, pero opcional: puede ser una imagen
+  // o un video. Ver supportsVideo() — de ese helper dependen además el visor,
+  // la edición y la descarga.
+  const carriesVideo = supportsVideo(format);
   const previewImages = isReel
     ? coverFiles.map((f) => f.url)
     : artFiles.map((f) => f.url);
@@ -235,7 +240,7 @@ function NuevaPropuestaForm() {
         hashtags: "",
         artN: isReel ? 1 : Math.max(1, artFiles.length),
         images: isReel ? coverFiles.map((f) => f.url) : artFiles.map((f) => f.url),
-        video: isReel ? videoFiles[0]?.url : undefined,
+        video: carriesVideo ? videoFiles[0]?.url : undefined,
         extraCaptions: extraCaptions.map((text) => text.trim()).filter(Boolean),
         music: musicDrafts,
       });
@@ -340,14 +345,29 @@ function NuevaPropuestaForm() {
             />
           </div>
         ) : (
-          <ArtUploadZone
-            label="Artes"
-            accept="image/*"
-            multiple
-            files={artFiles}
-            onFilesChange={setArtFiles}
-            proposalId={draftId}
-          />
+          <div className={carriesVideo ? "grid gap-3 desktop:grid-cols-2" : ""}>
+            <ArtUploadZone
+              label="Artes"
+              accept="image/*"
+              multiple
+              files={artFiles}
+              onFilesChange={setArtFiles}
+              proposalId={draftId}
+            />
+            {/* Una Historia puede ser una imagen o un video, así que este
+                recuadro aparece pero no es obligatorio — a diferencia del
+                Reel, que siempre es video + portada. */}
+            {carriesVideo && (
+              <ArtUploadZone
+                label="Video (opcional)"
+                accept="video/*"
+                multiple={false}
+                files={videoFiles}
+                onFilesChange={setVideoFiles}
+                proposalId={draftId}
+              />
+            )}
+          </div>
         )}
 
         <div>

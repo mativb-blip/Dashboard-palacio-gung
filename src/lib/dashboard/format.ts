@@ -135,6 +135,20 @@ export function isVerticalFormat(format: ProposalFormat): boolean {
   return format === "Historia" || format === "Reel";
 }
 
+/** Formatos que pueden llevar un video en `Proposal.video`.
+ *
+ * Un Reel SIEMPRE es un video (con portada aparte); una Historia puede ser
+ * una imagen o un video, así que su recuadro de video es opcional. El resto
+ * (Carrusel, Post simple) no lleva video.
+ *
+ * Existe como helper y no como `format === "Reel"` suelto porque de eso
+ * dependen cuatro lugares — el formulario de carga, la edición, el visor y
+ * la descarga — y tenerlo en uno solo evita que habilitar un formato nuevo
+ * quede a medias en alguno. */
+export function supportsVideo(format: ProposalFormat): boolean {
+  return format === "Reel" || format === "Historia";
+}
+
 const ART_LABELS = ["Portada", "Beneficio", "Detalle", "Cierre", "Modelo"];
 
 export function artLabel(index: number, total: number): string {

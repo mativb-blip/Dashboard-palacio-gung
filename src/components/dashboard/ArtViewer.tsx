@@ -8,7 +8,7 @@ import PhotoLightbox from "./PhotoLightbox";
 import SegmentedGroup from "./SegmentedGroup";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import { downloadProposalArts } from "@/lib/dashboard/download";
-import { artLabel, fmtShort, isVerticalFormat, toneHex } from "@/lib/dashboard/format";
+import { artLabel, fmtShort, isVerticalFormat, supportsVideo, toneHex } from "@/lib/dashboard/format";
 import {
   canEditContent,
   handleLiquidPointerEnter,
@@ -68,6 +68,9 @@ export default function ArtViewer({
   const [selecting, setSelecting] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const isReel = proposal.format === "Reel";
+  // Historia puede llevar video o no; Reel siempre lo lleva. De esto depende
+  // que aparezca el recuadro de video al editar y que el slot 0 lo muestre.
+  const carriesVideo = supportsVideo(proposal.format);
   const [editArtFiles, setEditArtFiles] = useState<UploadedFile[]>([]);
   const [editCoverFiles, setEditCoverFiles] = useState<UploadedFile[]>([]);
   const [editVideoFiles, setEditVideoFiles] = useState<UploadedFile[]>([]);
@@ -78,6 +81,9 @@ export default function ArtViewer({
       setEditVideoFiles(proposal.video ? filesFromUrls([proposal.video]) : []);
     } else {
       setEditArtFiles(filesFromUrls(proposal.images ?? []));
+      // Historia: el video es opcional y va en su propio recuadro, aparte de
+      // los artes. En los formatos que no llevan video queda vacío.
+      setEditVideoFiles(carriesVideo && proposal.video ? filesFromUrls([proposal.video]) : []);
     }
     setEditing(true);
   }
@@ -96,7 +102,10 @@ export default function ArtViewer({
     } else {
       onUpdateProposal(proposal.id, {
         images: editArtFiles.length ? editArtFiles.map((f) => f.url) : undefined,
-        video: undefined,
+        // `video` va siempre en el patch (aunque sea undefined) porque el
+        // caller mira la CLAVE, no el valor: presente + undefined = limpiar.
+        // Así, quitar el video de una Historia lo borra de verdad.
+        video: carriesVideo ? editVideoFiles[0]?.url : undefined,
         artN: Math.max(1, editArtFiles.length),
       });
     }
@@ -123,7 +132,7 @@ export default function ArtViewer({
     label: artLabel(i, total),
     dimension: proposal.dim ?? (vertical ? "1080 × 1920 px" : "1080 × 1080 px"),
     src: proposal.images?.[i],
-    video: isReel && i === 0 ? proposal.video : undefined,
+    video: carriesVideo && i === 0 ? proposal.video : undefined,
   }));
 
   async function runDownload(indices: number[]) {
@@ -315,14 +324,29 @@ export default function ArtViewer({
             />
           </div>
         ) : (
-          <ArtUploadZone
-            label="Artes"
-            accept="image/*"
-            multiple
-            files={editArtFiles}
-            onFilesChange={setEditArtFiles}
-            proposalId={proposal.id}
-          />
+          <div className={carriesVideo ? "grid gap-3 desktop:grid-cols-2" : ""}>
+            <ArtUploadZone
+              label="Artes"
+              accept="image/*"
+              multiple
+              files={editArtFiles}
+              onFilesChange={setEditArtFiles}
+              proposalId={proposal.id}
+            />
+            {/* Una Historia puede ser una imagen o un video, así que el
+                recuadro de video aparece pero no es obligatorio (a diferencia
+                del Reel, que siempre es video + portada). */}
+            {carriesVideo && (
+              <ArtUploadZone
+                label="Video (opcional)"
+                accept="video/*"
+                multiple={false}
+                files={editVideoFiles}
+                onFilesChange={setEditVideoFiles}
+                proposalId={proposal.id}
+              />
+            )}
+          </div>
         )
       ) : gallery === "slider" ? (
         <div>
