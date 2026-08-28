@@ -672,8 +672,12 @@ export async function addCaptionOption(proposalId: string, text: string): Promis
   return captionResult(proposalId, extra);
 }
 
+/** Corregir el texto de una alternativa NO es "editar contenido": es lo que
+ * hace Jun, que es Comentarista, sobre lo único que él revisa y aprueba. Por
+ * eso alcanza con sesión, igual que selectCaptionOption. Crear alternativas
+ * sí sigue siendo de Admin/Editor (ver addCaptionOption). */
 export async function updateCaptionOption(optionId: string, text: string): Promise<CaptionOptionsResult> {
-  const session = await requireEditor();
+  const session = await requireSession();
   const value = text.trim();
   if (!value) throw new Error("El caption no puede quedar vacío.");
 
@@ -688,8 +692,11 @@ export async function updateCaptionOption(optionId: string, text: string): Promi
   return captionResult(option.proposalId, extra);
 }
 
+/** Igual que updateCaptionOption: alcanza con sesión. El invariante de que
+ * siempre quede al menos una alternativa, y de que la elegida nunca quede
+ * huérfana, lo sigue sosteniendo esta función y no el rol de quien llama. */
 export async function deleteCaptionOption(optionId: string): Promise<CaptionOptionsResult> {
-  const session = await requireEditor();
+  const session = await requireSession();
   const option = await prisma.proposalCaptionOption.findUnique({ where: { id: optionId } });
   if (!option) throw new Error("Esa alternativa ya no existe.");
 

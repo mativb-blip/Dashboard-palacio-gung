@@ -9,6 +9,22 @@ export function canEditContent(role: Role | undefined): boolean {
   return role === "ADMIN" || role === "EDITOR";
 }
 
+/** Corregir y borrar ALTERNATIVAS DE CAPTION es la excepción a
+ * canEditContent, y a pedido explícito: el caption es lo que Jun
+ * (Comentarista) revisa y aprueba, así que puede arreglarlo él mismo en vez
+ * de pedir el cambio por comentario y esperar. Mismo criterio que
+ * selectCaptionOption, que ya alcanzaba con sesión.
+ *
+ * CREAR alternativas sigue siendo de Admin/Editor: proponer opciones nuevas
+ * es trabajo de la agencia, no del cliente.
+ *
+ * Se listan los tres roles en vez de escribir `role !== undefined` para que
+ * el día que se agregue un rol nuevo (uno de solo lectura, por ejemplo) no
+ * herede este permiso por descuido. */
+export function canEditCaption(role: Role | undefined): boolean {
+  return role === "ADMIN" || role === "EDITOR" || role === "COMMENTER";
+}
+
 /** Capa "líquida" de hover: un ::before clip-path que se expande desde el
  * punto donde entró el mouse (ver `handleLiquidPointerEnter`) en vez de
  * hacer un fundido plano. El host necesita `relative overflow-hidden`, y

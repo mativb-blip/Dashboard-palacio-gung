@@ -29,7 +29,13 @@ import {
   instagramEmbedSrc,
   normalizeInstagramMusicUrl,
 } from "@/lib/dashboard/instagram-music";
-import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import {
+  canEditCaption,
+  canEditContent,
+  handleLiquidPointerEnter,
+  iconButtonClass,
+  PRESS_SCALE_CLASS,
+} from "@/lib/dashboard/ui";
 import type { Proposal, ProposalMusicOption } from "@/types/dashboard";
 
 interface CaptionPanelProps {
@@ -51,6 +57,10 @@ export default function CaptionPanel({
 }: CaptionPanelProps) {
   const { data: session } = useSession();
   const canEdit = canEditContent(session?.user.role);
+  // Corregir/borrar alternativas es más abierto que el resto del panel: Jun
+  // (Comentarista) también puede, porque el caption es lo que él revisa.
+  // Agregar alternativas sigue atado a canEdit.
+  const canEditCap = canEditCaption(session?.user.role);
   const [copied, setCopied] = useState(false);
   /** Id de la alternativa que se está editando; "" = ninguna. */
   const [editingId, setEditingId] = useState("");
@@ -315,7 +325,7 @@ export default function CaptionPanel({
             </button>
             {/* Editar en el encabezado solo tiene sentido cuando hay una sola
                 alternativa; con varias, cada una trae su propio lápiz. */}
-            {canEdit && !showAlternatives && selectedCaption && !editingId && (
+            {canEditCap && !showAlternatives && selectedCaption && !editingId && (
               <button
                 type="button"
                 onClick={() => handleStartEdit(selectedCaption.id, selectedCaption.text)}
@@ -416,7 +426,7 @@ export default function CaptionPanel({
                     </span>
                     {option.selected ? "Elegido" : "Elegir"}
                   </button>
-                  {canEdit && (
+                  {canEditCap && (
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
