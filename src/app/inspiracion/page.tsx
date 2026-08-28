@@ -21,7 +21,7 @@ import {
 import { instagramEmbedSrc } from "@/lib/dashboard/instagram-music";
 import { describeSongUrl, hostOf } from "@/lib/dashboard/link-url";
 import { isVideoUrl } from "@/lib/dashboard/media-file";
-import { canEditContent, handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import { handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type {
   InspirationItem,
   InspirationKind,
@@ -49,7 +49,10 @@ const ASPECT: Record<InspirationKind, string> = {
 export default function InspiracionPage() {
   const { brandName } = useBrand();
   const { data: session } = useSession();
-  const canEdit = canEditContent(session?.user.role);
+  // Todo Inspiración es editable por cualquiera con sesión, Jun incluido: es
+  // un repositorio de referencias, no contenido que se publique. El gate real
+  // vive en el server (ver requireEditor en inspiration-actions.ts).
+  const canEdit = Boolean(session);
 
   // El visor ampliado vive a nivel de página (es un overlay fijo) y lo
   // comparten las dos secciones. Se guarda el ítem entero y no solo la URL

@@ -29,13 +29,18 @@ async function requireSession() {
   return session;
 }
 
-// Agregar/borrar queda para Admin y Editor, igual que el resto del contenido
-// curado (Galería, Moodboard) — ver requireEditor() en proposals-actions.ts.
+// Inspiración es la excepción a requireEditor(): acá agregar y borrar queda
+// abierto a CUALQUIERA con sesión, Comentarista incluido. Es a pedido y tiene
+// sentido — es un repositorio de referencias para mirar antes de producir, y
+// el cliente es quien mejor sabe qué le gusta. No es contenido que se publique
+// ni que se apruebe, así que abrirlo no pone nada en riesgo.
+//
+// Ojo con el nombre: se mantiene `requireEditor` porque es el que ya usan las
+// ocho funciones de abajo, pero lo que exige ahora es sesión. Ver el resto del
+// dashboard (proposals-actions.ts) donde requireEditor() sí es Admin/Editor.
 async function requireEditor() {
   const session = await auth();
-  if (session?.user.role !== "ADMIN" && session?.user.role !== "EDITOR") {
-    throw new Error("Solo un Administrador o Editor puede hacer esto.");
-  }
+  if (!session) throw new Error("Necesitás iniciar sesión.");
   return session;
 }
 
