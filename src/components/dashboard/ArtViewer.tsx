@@ -9,6 +9,7 @@ import SegmentedGroup from "./SegmentedGroup";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import { downloadProposalArts } from "@/lib/dashboard/download";
 import { artLabel, fmtShort, isVerticalFormat, supportsVideo, toneHex } from "@/lib/dashboard/format";
+import { proposalShareText, whatsappShareUrl } from "@/lib/dashboard/share";
 import {
   canEditContent,
   handleLiquidPointerEnter,
@@ -68,6 +69,16 @@ export default function ArtViewer({
   const [selecting, setSelecting] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const isReel = proposal.format === "Reel";
+
+  /** Abre WhatsApp con el post ya escrito. La URL se arma acá dentro y no en
+   * el href de un <a> porque necesita `window.location.origin` para que el
+   * enlace sirva tanto en local como en producción, y leer window durante el
+   * render rompería la hidratación. `window.open` en respuesta directa a un
+   * clic no lo bloquea el navegador. */
+  function handleShareWhatsApp() {
+    const texto = proposalShareText(proposal, brand.brandName, window.location.origin);
+    window.open(whatsappShareUrl(texto), "_blank", "noopener,noreferrer");
+  }
   // Historia puede llevar video o no; Reel siempre lo lleva. De esto depende
   // que aparezca el recuadro de video al editar y que el slot 0 lo muestre.
   const carriesVideo = supportsVideo(proposal.format);
@@ -283,6 +294,21 @@ export default function ArtViewer({
                   className={iconButtonClass}
                 >
                   <PencilIcon className="relative" />
+                </button>
+              )}
+              {/* Compartir queda del lado de la agencia (Admin/Editor): es
+                  Matías quien le manda el post a Jun para que lo revise, no
+                  al revés. */}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  onPointerEnter={handleLiquidPointerEnter}
+                  title="Compartir este post por WhatsApp"
+                  aria-label="Compartir este post por WhatsApp"
+                  className={iconButtonClass}
+                >
+                  <ShareIcon className="relative" />
                 </button>
               )}
               <SegmentedGroup
@@ -524,5 +550,27 @@ function ArtSlot({ art, total }: { art: Art; total: string }) {
     <div key={art.index} className="art-fade-in h-full w-full">
       <ArtTile n={art.n} total={total} label={art.label} dimension={art.dimension} />
     </div>
+  );
+}
+
+function ShareIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="M8.6 13.5l6.8 4" />
+      <path d="M15.4 6.5l-6.8 4" />
+    </svg>
   );
 }
