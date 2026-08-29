@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-// Página de diagnóstico para el caso "inicio sesión y me rebota al login".
+// Comprobaciones del lado del NAVEGADOR. Van en un componente cliente
+// aparte de page.tsx a propósito: page.tsx se renderiza en el servidor y
+// muestra lo suyo aunque acá no corra ni una línea. Ver el comentario de
+// page.tsx sobre por qué eso importa.
+//
+// Diagnóstico para el caso "inicio sesión y me rebota al login".
 // Ese síntoma casi siempre significa que el navegador no está guardando la
 // cookie de sesión, pero desde la app no se distingue de "no hay sesión": las
 // dos cosas se ven igual. Acá se prueba cada eslabón por separado y se dice
@@ -32,7 +37,7 @@ function fetchWithTimeout(url: string, ms = 8000): Promise<Response> {
   );
 }
 
-export default function DiagnosticoPage() {
+export default function DiagnosticoChecks() {
   const [checks, setChecks] = useState<Check[]>([]);
   const [raw, setRaw] = useState("");
   const [done, setDone] = useState(false);
@@ -143,16 +148,21 @@ export default function DiagnosticoPage() {
   }, []);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 px-4 py-8 font-sans text-brand-ink">
-      <div>
-        <h1 className="text-lg font-bold">Diagnóstico de acceso</h1>
-        <p className="mt-1 text-xs leading-relaxed text-tx-3">
-          Si al iniciar sesión volvés siempre a la pantalla de login, esta página dice en qué paso se
-          corta.
+    <>
+      {/* El texto de "ejecutando" dice también qué significa que NO cambie.
+          Si el JavaScript no corre en este navegador, este párrafo es lo
+          último que se va a pintar, y quedarse mudo ahí fue exactamente lo
+          que pasó en el iPad: una pantalla congelada en "Ejecutando
+          comprobaciones…" no se distingue de una lenta. */}
+      {checks.length === 0 && !done && (
+        <p className="text-sm text-tx-3">
+          Ejecutando comprobaciones…{" "}
+          <span className="text-tx-2">
+            Si este texto no cambia en unos segundos, el navegador no está ejecutando el JavaScript
+            de la página — y eso ya es el diagnóstico: mirá el bloque de arriba.
+          </span>
         </p>
-      </div>
-
-      {checks.length === 0 && !done && <p className="text-sm text-tx-3">Ejecutando comprobaciones…</p>}
+      )}
       {checks.length === 0 && done && (
         <p className="text-sm text-brand-red">
           No se pudo ejecutar ninguna comprobación. Es probable que el navegador esté bloqueando el
@@ -185,6 +195,6 @@ export default function DiagnosticoPage() {
           <pre className="mt-2 overflow-x-auto text-[10px] leading-relaxed text-tx-3">{raw}</pre>
         </details>
       )}
-    </main>
+    </>
   );
 }
