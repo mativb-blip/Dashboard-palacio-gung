@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import packageJson from "../../../package.json";
 import DiagnosticoChecks from "./DiagnosticoChecks";
 
 // Esta parte se renderiza en el SERVIDOR y por eso es la que importa.
@@ -17,10 +18,14 @@ import DiagnosticoChecks from "./DiagnosticoChecks";
 // iOS/Safari es — que es lo que decide si este navegador puede siquiera
 // ejecutar el código que sirve Next.
 
-// Mínimo que compila Next 16 (ver node_modules/next/dist/esm/shared/lib/
-// modern-browserslist-target.js). Por debajo de esto el navegador no puede
-// parsear el bundle y la app entera queda muerta, no solo el login.
-const SAFARI_MINIMO = "16.4";
+// El mínimo se LEE del browserslist del package.json, que es lo que
+// realmente decide para qué navegadores compila Next. Escribirlo a mano acá
+// fue un error concreto: al bajar el objetivo a 15.4 esta constante quedó en
+// 16.4, y la página siguió diciéndole "tu navegador es demasiado viejo" a un
+// iPad donde la app ya funcionaba perfectamente. Un diagnóstico que miente es
+// peor que no tenerlo, así que ahora no puede desincronizarse.
+const SAFARI_MINIMO =
+  packageJson.browserslist.find((b) => b.startsWith("safari "))?.split(" ")[1] ?? "16.4";
 
 export const dynamic = "force-dynamic";
 
