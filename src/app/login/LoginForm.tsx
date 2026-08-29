@@ -36,6 +36,26 @@ function safeRedirectTarget(callbackUrl: string | undefined): string {
   }
 }
 
+/** Corta una espera que no vuelve.
+ *
+ * Es la misma lección que ya está escrita en /diagnostico: una pantalla que
+ * se queda en "ejecutando…" no dice nada. Acá el riesgo es peor, porque el
+ * botón queda deshabilitado en "Entrando…" y no hay forma de reintentar sin
+ * recargar — exactamente el síntoma de "no puedo entrar desde el iPad y la
+ * pantalla se queda ahí".
+ *
+ * Ojo: signIn() y getSession() piden a /api/auth/*. Si esa petición se cuelga
+ * (red intermitente, un proxy de por medio) ninguna promesa se rechaza sola,
+ * así que sin esto la espera es infinita. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Tiempo agotado (${label}).`)), ms),
+    ),
+  ]);
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -63,31 +83,45 @@ export default function LoginForm({ isAdmin, backgroundUrl, logoUrl, callbackUrl
     e.preventDefault();
     setError("");
     setLoading(true);
-    const result = await signIn("credentials", {
-      email: email.trim(),
-      password,
-      redirect: false,
-    });
-    if (result?.error) {
-      setLoading(false);
-      setError("Email o contraseña incorrectos.");
-      return;
-    }
 
-    // La contraseña era correcta, pero eso no garantiza que la cookie de
-    // sesión haya quedado guardada: si el navegador bloquea cookies, navegar
-    // a la app solo rebota de vuelta acá, una y otra vez, sin decir por qué
-    // (pasó en un iPad). Se confirma antes de irse, y si no está se explica.
-    const session = await getSession();
-    setLoading(false);
-    if (!session) {
-      setError(
-        "Tu usuario y contraseña son correctos, pero el navegador no guardó la sesión. Si estás en iPhone o iPad: Ajustes → Safari → desactivá «Bloquear todas las cookies», y volvé a probar. En modo de navegación privada tampoco se guarda.",
+    // Todo el flujo va dentro de try/finally: antes, cualquier excepción de
+    // signIn() o getSession() dejaba `loading` en true para siempre, con el
+    // botón en "Entrando…", deshabilitado y sin ningún mensaje. Se veía igual
+    // que "no pasa nada", que es lo peor que puede hacer un login — no hay ni
+    // causa ni forma de reintentar sin recargar la página.
+    try {
+      const result = await withTimeout(
+        signIn("credentials", { email: email.trim(), password, redirect: false }),
+        20000,
+        "iniciar sesión",
       );
-      return;
-    }
+      if (result?.error) {
+        setError("Email o contraseña incorrectos.");
+        return;
+      }
 
-    window.location.href = redirectTarget;
+      // La contraseña era correcta, pero eso no garantiza que la cookie de
+      // sesión haya quedado guardada: si el navegador bloquea cookies, navegar
+      // a la app solo rebota de vuelta acá, una y otra vez, sin decir por qué
+      // (pasó en un iPad). Se confirma antes de irse, y si no está se explica.
+      const session = await withTimeout(getSession(), 20000, "confirmar la sesión");
+      if (!session) {
+        setError(
+          "Tu usuario y contraseña son correctos, pero el navegador no guardó la sesión. Si estás en iPhone o iPad: Ajustes → Safari → desactivá «Bloquear todas las cookies», y volvé a probar. En modo de navegación privada tampoco se guarda.",
+        );
+        return;
+      }
+
+      window.location.href = redirectTarget;
+    } catch (err) {
+      // Se muestra el motivo real y se manda a /diagnostico, que prueba cada
+      // eslabón por separado y es una ruta abierta justamente para cuando no
+      // se puede iniciar sesión.
+      const motivo = err instanceof Error ? err.message : "Error desconocido.";
+      setError(`No se pudo completar el inicio de sesión: ${motivo} Probá de nuevo, y si sigue igual abrí /diagnostico para ver qué falla.`);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleAppearanceFile(e: ChangeEvent<HTMLInputElement>, field: "background" | "logo") {
