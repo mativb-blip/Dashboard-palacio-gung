@@ -31,15 +31,15 @@ import { list, type ListBlobResultBlob } from "@vercel/blob";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
-const TOKEN = process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ?? process.env.BLOB_READ_WRITE_TOKEN;
-const DATABASE_URL = process.env.DATABASE_URL;
+export const TOKEN = process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ?? process.env.BLOB_READ_WRITE_TOKEN;
+export const DATABASE_URL = process.env.DATABASE_URL;
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: DATABASE_URL }) });
 
 /** El host de la base, sin credenciales — para confirmar de un vistazo que
  * esto corrió contra producción y no contra la base local. Apuntar a la base
  * equivocada haría que casi todo se reporte como huérfano. */
-function dbHost(url: string): string {
+export function dbHost(url: string): string {
   try {
     return new URL(url).host;
   } catch {
@@ -47,7 +47,7 @@ function dbHost(url: string): string {
   }
 }
 
-function mb(bytes: number): string {
+export function mb(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
@@ -99,7 +99,7 @@ export async function collectReferencedPathnames(): Promise<Set<string>> {
   return paths;
 }
 
-async function listAllBlobs(): Promise<ListBlobResultBlob[]> {
+export async function listAllBlobs(): Promise<ListBlobResultBlob[]> {
   const all: ListBlobResultBlob[] = [];
   let cursor: string | undefined;
   do {

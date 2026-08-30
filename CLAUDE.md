@@ -131,5 +131,20 @@ MoodboardElement: { id, sessionId, type, x, y, width, height, zIndex, rotation,
                     fontSize?, textAlign?, textColor? }
 ```
 
+## Limpieza de Vercel Blob
+Borrar una foto, un audio o un elemento del Moodboard borra la FILA pero **deja el archivo en Blob** — decisión deliberada y documentada arriba (no hay forma barata de saber si algo más lo referencia). Con el tiempo eso llena la cuota, y ya pasó. Dos scripts, los dos con credenciales de PRODUCCIÓN (`npx vercel env pull .env.production.local --environment=production`):
+
+- **`scripts/audit-blob-orphans.ts`** — solo lectura, no borra nada. Dice cuántos archivos hay, cuántos no aparecen en ninguna columna, cuánto se recupera y de qué carpetas.
+- **`scripts/blob-cleanup.ts`** — borra. **Simula por defecto**; borra de verdad solo con `--borrar`.
+
+El segundo **importa la detección del primero** en vez de reimplementarla. No es prolijidad: si las dos listas de columnas se separan, la auditoría solo reporta de más, pero la limpieza borra archivos en uso.
+
+Tres barreras, en `decidirBorrado()` — que es una función pura y exportada justamente para poder probarlas sin borrar nada:
+1. **Base sin ninguna URL guardada → aborta.** Es el escenario que vacía el store: correr con la `DATABASE_URL` de desarrollo. Ni `--forzar` la saltea.
+2. **Más del 90% del store huérfano → aborta.** Un número así es señal de "estoy mirando la base equivocada", no de "había mucha basura". `--forzar` la saltea.
+3. **Nada subido en los últimos 7 días** (`--dias=N`). Hay flujos que suben a Blob ANTES de crear la fila —el audio de una canción se sube al armar el formulario y la fila recién existe al confirmar—, así que un archivo reciente sin referencia puede ser alguien a mitad de una carga, no basura.
+
+> El orden importa: **correr primero la auditoría**, mirar el desglose por carpeta, y recién después limpiar. Si una carpeta entera figura 100% huérfana es más probable que falte una columna en `collectReferencedPathnames()` que que se haya borrado todo — y esa función es la lista de columnas que hay que actualizar cuando se agregue una nueva que guarde una URL de archivo.
+
 ## Despliegue
 Pensado para Vercel (Hobby, gratis) + Neon Postgres + Vercel Blob — las tres piezas se crean desde el mismo dashboard de Vercel. Ver `.env.example` para el checklist.
