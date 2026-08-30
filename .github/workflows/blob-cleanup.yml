@@ -1,0 +1,81 @@
+name: Limpieza de Blob
+
+# Borra de Vercel Blob los archivos que ninguna fila referencia.
+#
+# Por qué existe: borrar una foto, un audio o un elemento del Moodboard borra
+# la FILA y deja el archivo. Eso ya llenó la cuota una vez. En vez de cambiar
+# la lógica de borrado —donde está el riesgo real, porque una misma URL la
+# comparten varias filas (ver "Limpieza de Vercel Blob" en CLAUDE.md)— se
+# limpia periódicamente lo que quedó suelto.
+#
+# Las barreras que impiden vaciar el store viven en decidirBorrado(), dentro
+# del script, y están probadas. Si alguna salta, el script termina con código
+# 1 y este job FALLA a propósito: un aborto significa que algo no cuadra (la
+# base equivocada, casi siempre) y hay que enterarse, no seguir de largo.
+
+on:
+  schedule:
+    # Lunes 6:00 UTC = 2:00 AM en Santo Domingo (UTC-4, sin horario de verano).
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      borrar:
+        description: "Borrar de verdad (sin esto solo simula)"
+        type: boolean
+        default: false
+      dias:
+        description: "No tocar archivos subidos en los últimos N días"
+        default: "30"
+
+jobs:
+  limpiar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` dispara el postinstall, que corre `prisma generate` — el
+      # script importa el cliente generado, que no está versionado.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Limpiar archivos huérfanos
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PUBLIC_BLOB_READ_WRITE_TOKEN: ${{ secrets.PUBLIC_BLOB_READ_WRITE_TOKEN }}
+        run: |
+          set -o pipefail
+
+          # La corrida programada borra: es a lo que viene. La manual simula,
+          # salvo que se pida lo contrario — así se puede mirar qué haría sin
+          # arriesgar nada.
+          BORRAR=""
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.borrar }}" = "true" ]; then
+            BORRAR="--borrar"
+          fi
+
+          # 30 días y no los 7 del default: nadie está mirando esta corrida, así
+          # que conviene ser más conservador que cuando la lanza una persona.
+          DIAS="${{ inputs.dias || 30 }}"
+
+          # El 2>&1 no es opcional: los abortos de las barreras se escriben en
+          # stderr, así que sin esto el resumen mostraría los números pero no
+          # el motivo del fallo — justo lo que hay que leer cuando falla.
+          # pipefail hace que el código de salida del script gane sobre el de
+          # tee, para que un aborto tumbe el job.
+          npx tsx scripts/blob-cleanup.ts --dias="$DIAS" $BORRAR 2>&1 | tee salida.txt
+
+      # El resumen queda a la vista en la pestaña Actions, sin abrir el log.
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo '### Limpieza de Blob'
+            echo '```'
+            cat salida.txt 2>/dev/null || echo 'El paso anterior no llegó a producir salida.'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
