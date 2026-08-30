@@ -43,6 +43,13 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      # ANTES de borrar nada: si el esquema tiene una columna de URL que la
+      # detección no mira, sus archivos figuran como huérfanos y se borrarían
+      # estando en uso. Ya pasó una vez con las canciones. Falla acá y el
+      # borrado ni se intenta.
+      - name: Verificar que la detección cubre todo el esquema
+        run: npx tsx scripts/check-blob-coverage.ts
+
       - name: Limpiar archivos huérfanos
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

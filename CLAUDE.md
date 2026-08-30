@@ -144,6 +144,10 @@ Tres barreras, en `decidirBorrado()` — que es una función pura y exportada ju
 2. **Más del 90% del store huérfano → aborta.** Un número así es señal de "estoy mirando la base equivocada", no de "había mucha basura". `--forzar` la saltea.
 3. **Nada subido en los últimos 7 días** (`--dias=N`). Hay flujos que suben a Blob ANTES de crear la fila —el audio de una canción se sube al armar el formulario y la fila recién existe al confirmar—, así que un archivo reciente sin referencia puede ser alguien a mitad de una carga, no basura.
 
+- **`scripts/check-blob-coverage.ts`** — falla si el esquema tiene una columna que podría guardar una URL de archivo y la detección no la mira. Corre en el workflow ANTES de borrar. No necesita credenciales.
+
+> **Esto ya falló una vez, y en producción.** La sección Canciones agregó `InspirationLink.audioUrl` y nadie la sumó a `collectReferencedPathnames()`; la primera auditoría real marcó 4 canciones EN USO como huérfanas, y la limpieza las habría borrado. Había un comentario acá avisándolo — no alcanzó, porque un comentario no corre. De ahí el chequeo de cobertura: una columna nueva tiene que estar en la detección o declararse en `NO_SON_ARCHIVOS`, y si no está en ninguna, rompe el build en vez de borrar archivos vivos.
+
 > El orden importa: **correr primero la auditoría**, mirar el desglose por carpeta, y recién después limpiar. Si una carpeta entera figura 100% huérfana es más probable que falte una columna en `collectReferencedPathnames()` que que se haya borrado todo — y esa función es la lista de columnas que hay que actualizar cuando se agregue una nueva que guarde una URL de archivo.
 
 ## Despliegue

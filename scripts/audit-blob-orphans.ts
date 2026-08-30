@@ -71,7 +71,7 @@ function pathnameOf(url: string): string | null {
 export async function collectReferencedPathnames(): Promise<Set<string>> {
   const urls: (string | null)[] = [];
 
-  const [proposals, versions, comments, music, gallery, stories, reels, elements, settings] =
+  const [proposals, versions, comments, music, gallery, stories, reels, links, elements, settings, users] =
     await Promise.all([
       prisma.proposal.findMany({ select: { images: true, video: true } }),
       prisma.proposalVersion.findMany({ select: { images: true, video: true } }),
@@ -80,8 +80,17 @@ export async function collectReferencedPathnames(): Promise<Set<string>> {
       prisma.galleryPhoto.findMany({ select: { url: true } }),
       prisma.inspirationPhoto.findMany({ select: { url: true } }),
       prisma.inspirationReel.findMany({ select: { url: true } }),
+      // InspirationLink.audioUrl guarda el AUDIO SUBIDO de una canción, que sí
+      // vive en Blob. Faltaba acá, y no es anécdota: la primera auditoría real
+      // marcó 4 canciones en uso como huérfanas y la limpieza las habría
+      // borrado. Ver scripts/check-blob-coverage.ts, que existe para que no
+      // vuelva a pasar.
+      prisma.inspirationLink.findMany({ select: { url: true, audioUrl: true } }),
       prisma.moodboardElement.findMany({ select: { url: true, embedUrl: true } }),
       prisma.siteSettings.findMany({ select: { loginBackgroundUrl: true, loginLogoUrl: true } }),
+      // Hoy nadie sube un avatar, pero es un String que podría guardar una URL
+      // y contar de más no cuesta nada.
+      prisma.user.findMany({ select: { image: true } }),
     ]);
 
   for (const p of proposals) urls.push(...p.images, p.video);
@@ -91,8 +100,10 @@ export async function collectReferencedPathnames(): Promise<Set<string>> {
   for (const g of gallery) urls.push(g.url);
   for (const s of stories) urls.push(s.url);
   for (const r of reels) urls.push(r.url);
+  for (const l of links) urls.push(l.url, l.audioUrl);
   for (const e of elements) urls.push(e.url, e.embedUrl);
   for (const s of settings) urls.push(s.loginBackgroundUrl, s.loginLogoUrl);
+  for (const u of users) urls.push(u.image);
 
   const paths = new Set<string>();
   for (const u of urls) {
