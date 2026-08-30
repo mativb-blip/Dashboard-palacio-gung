@@ -132,23 +132,29 @@ MoodboardElement: { id, sessionId, type, x, y, width, height, zIndex, rotation,
 ```
 
 ## Limpieza de Vercel Blob
-Borrar una foto, un audio o un elemento del Moodboard borra la FILA pero **deja el archivo en Blob** — decisión deliberada y documentada arriba (no hay forma barata de saber si algo más lo referencia). Con el tiempo eso llena la cuota, y ya pasó. Dos scripts, los dos con credenciales de PRODUCCIÓN en un `.env.produccion` armado **a mano** — `vercel env pull --environment=production` NO devuelve los valores, escribe `[SENSITIVE]` (comprobado el 2026-08-29); hay que copiarlos del panel de Vercel:
+Borrar una foto, un audio o un elemento del Moodboard borra la FILA pero **deja el archivo en Blob** — decisión deliberada y documentada arriba (no hay forma barata de saber si algo más lo referencia). El 2026-08-29 eso llenó la cuota: 958,6 MB de 1 GB, con 651,5 MB recuperables. Se limpió a mano y quedó en 307,1 MB.
 
-- **`scripts/audit-blob-orphans.ts`** — solo lectura, no borra nada. Dice cuántos archivos hay, cuántos no aparecen en ninguna columna, cuánto se recupera y de qué carpetas.
-- **`scripts/blob-cleanup.ts`** — borra. **Simula por defecto**; borra de verdad solo con `--borrar`.
+**La limpieza es manual, a demanda.** Hubo un GitHub Action semanal y se quitó a pedido. Tres scripts, con las credenciales de PRODUCCIÓN en un `.env.produccion` armado **a mano** — `vercel env pull --environment=production` NO devuelve los valores, escribe `[SENSITIVE]`, y en el panel figuran como tipo `Secret`/`Hidden`, o sea que tampoco se leen ahí: hay que sacarlas de la pestaña **Storage** (la base Neon y el store `dashboard-palacio-gung-blob`).
 
-El segundo **importa la detección del primero** en vez de reimplementarla. No es prolijidad: si las dos listas de columnas se separan, la auditoría solo reporta de más, pero la limpieza borra archivos en uso.
+- **`scripts/audit-blob-orphans.ts`** — solo lectura. Cuánto hay, cuánto sobra, desglose por carpeta.
+- **`scripts/blob-cleanup.ts`** — borra. **Simula por defecto**; borra solo con `--borrar`.
+- **`scripts/check-blob-coverage.ts`** — verifica que la detección cubra el esquema. No necesita credenciales.
 
-Tres barreras, en `decidirBorrado()` — que es una función pura y exportada justamente para poder probarlas sin borrar nada:
+La limpieza **importa la detección de la auditoría** en vez de reimplementarla: si las dos listas de columnas se separan, la auditoría solo reporta de más, pero la limpieza borra archivos en uso.
+
+### Las barreras
+En `decidirBorrado()`, una función pura y exportada justamente para poder probarlas sin borrar nada:
 1. **Base sin ninguna URL guardada → aborta.** Es el escenario que vacía el store: correr con la `DATABASE_URL` de desarrollo. Ni `--forzar` la saltea.
-2. **Más del 90% del store huérfano → aborta.** Un número así es señal de "estoy mirando la base equivocada", no de "había mucha basura". `--forzar` la saltea.
-3. **Nada subido en los últimos 7 días** (`--dias=N`). Hay flujos que suben a Blob ANTES de crear la fila —el audio de una canción se sube al armar el formulario y la fila recién existe al confirmar—, así que un archivo reciente sin referencia puede ser alguien a mitad de una carga, no basura.
+2. **Más del 90% del store huérfano → aborta.** Señal de "base equivocada", no de "mucha basura". `--forzar` la saltea.
+3. **Nada subido en los últimos 7 días** (`--dias=N`). Hay flujos que suben a Blob ANTES de crear la fila —el audio de una canción se sube al armar el formulario—, así que un archivo reciente sin referencia puede ser una carga a medias.
 
-- **`scripts/check-blob-coverage.ts`** — falla si el esquema tiene una columna que podría guardar una URL de archivo y la detección no la mira. Corre en el workflow ANTES de borrar. No necesita credenciales.
+Y antes de todo eso, en simulación también, `blob-cleanup.ts` corre el chequeo de cobertura y se niega a seguir si falla. Está DENTRO del script y no en un paso de CI aparte porque la limpieza se invoca a mano: un resguardo que hay que acordarse de correr no es un resguardo.
 
-> **Esto ya falló una vez, y en producción.** La sección Canciones agregó `InspirationLink.audioUrl` y nadie la sumó a `collectReferencedPathnames()`; la primera auditoría real marcó 4 canciones EN USO como huérfanas, y la limpieza las habría borrado. Había un comentario acá avisándolo — no alcanzó, porque un comentario no corre. De ahí el chequeo de cobertura: una columna nueva tiene que estar en la detección o declararse en `NO_SON_ARCHIVOS`, y si no está en ninguna, rompe el build en vez de borrar archivos vivos.
+> **Esto ya falló una vez, en producción.** La sección Canciones agregó `InspirationLink.audioUrl` y nadie la sumó a `collectReferencedPathnames()`; la primera auditoría real marcó **4 canciones EN USO** como huérfanas, y la limpieza las habría borrado. Había un comentario acá avisándolo — no alcanzó, porque un comentario no corre. De ahí `check-blob-coverage.ts`: una columna nueva tiene que estar en la detección o declararse en `NO_SON_ARCHIVOS`, y si no está en ninguna, corta.
 
-> El orden importa: **correr primero la auditoría**, mirar el desglose por carpeta, y recién después limpiar. Si una carpeta entera figura 100% huérfana es más probable que falte una columna en `collectReferencedPathnames()` que que se haya borrado todo — y esa función es la lista de columnas que hay que actualizar cuando se agregue una nueva que guarde una URL de archivo.
+> **Los huérfanos aparecen aunque nadie borre nada.** Dos fuentes que no dependen de eso: las cargas abandonadas (se sube el archivo y no se confirma el formulario) y la **poda del historial** — `updateProposal()` conserva las últimas `PROPOSAL_VERSION_LIMIT` = 8 versiones y borra las más viejas, así que las imágenes de esas versiones dejan de estar referenciadas. Al cerrar la limpieza de agosto quedaban 41 huérfanos recientes sin que se hubiera borrado nada. Conviene correr la auditoría cada tanto.
+
+> El desglose por carpeta es la comprobación que importa: si una carpeta entera figura 100% huérfana, es más probable que falte una columna que que de verdad esté toda suelta. La auditoría del 2026-08-29 sumó además una señal útil — de las 26 propuestas dueñas de archivos huérfanos, **ninguna existía ya** en el dashboard.
 
 ## Despliegue
 Pensado para Vercel (Hobby, gratis) + Neon Postgres + Vercel Blob — las tres piezas se crean desde el mismo dashboard de Vercel. Ver `.env.example` para el checklist.

@@ -30,6 +30,7 @@ import {
   mb,
   TOKEN,
 } from "./audit-blob-orphans";
+import { columnasSinCubrir, explicarSinCubrir } from "./check-blob-coverage";
 
 const args = process.argv.slice(2);
 const BORRAR = args.includes("--borrar");
@@ -111,6 +112,20 @@ async function main() {
   if (!TOKEN || !DATABASE_URL) {
     console.error("Faltan credenciales de producción.");
     console.error("Copialas del panel de Vercel a un .env.produccion — `vercel env pull` no las devuelve.");
+    process.exit(1);
+  }
+
+  // Antes que nada, y también en simulación: si el esquema tiene una columna
+  // de URL que la detección no mira, sus archivos figuran como huérfanos y se
+  // borrarían estando en uso. Ya pasó — la sección Canciones agregó
+  // InspirationLink.audioUrl y 4 canciones vivas aparecieron como basura.
+  //
+  // Va DENTRO del script y no en un paso de CI aparte porque la limpieza se
+  // corre a mano: un resguardo que hay que acordarse de invocar no es un
+  // resguardo.
+  const sinCubrir = columnasSinCubrir();
+  if (sinCubrir.length > 0) {
+    console.error(explicarSinCubrir(sinCubrir));
     process.exit(1);
   }
 

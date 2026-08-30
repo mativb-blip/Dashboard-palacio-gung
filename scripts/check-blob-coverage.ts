@@ -15,7 +15,10 @@
  *
  *   npx tsx scripts/check-blob-coverage.ts
  *
- * No necesita credenciales: lee el schema y el script, nada más.
+ * No necesita credenciales: lee el schema y el script, nada más. Además
+ * blob-cleanup.ts lo llama solo antes de borrar — la limpieza es manual, así
+ * que este resguardo tiene que viajar con ella y no depender de que alguien
+ * se acuerde de correrlo.
  */
 
 import { readFileSync } from "node:fs";
@@ -52,28 +55,46 @@ function columnasSospechosas(esquema: string): string[] {
   return encontradas;
 }
 
-const esquema = readFileSync(join(RAIZ, "prisma/schema.prisma"), "utf8");
-const deteccion = readFileSync(join(RAIZ, "scripts/audit-blob-orphans.ts"), "utf8");
+/** Columnas que podrían guardar una URL de archivo y la detección no mira.
+ * Vacío = todo cubierto. */
+export function columnasSinCubrir(): string[] {
+  const esquema = readFileSync(join(RAIZ, "prisma/schema.prisma"), "utf8");
+  const deteccion = readFileSync(join(RAIZ, "scripts/audit-blob-orphans.ts"), "utf8");
 
-const sinCubrir: string[] = [];
-for (const columna of columnasSospechosas(esquema)) {
-  if (NO_SON_ARCHIVOS.has(columna)) continue;
+  const sinCubrir: string[] = [];
+  for (const columna of columnasSospechosas(esquema)) {
+    if (NO_SON_ARCHIVOS.has(columna)) continue;
 
-  const [modelo, campo] = columna.split(".");
-  const prop = modelo[0].toLowerCase() + modelo.slice(1);
-  const consulta = new RegExp(`prisma\\.${prop}\\.findMany\\(\\{ select: \\{([^}]*)\\}`).exec(deteccion);
-  if (!consulta || !consulta[1].includes(`${campo}:`)) sinCubrir.push(columna);
+    const [modelo, campo] = columna.split(".");
+    const prop = modelo[0].toLowerCase() + modelo.slice(1);
+    const consulta = new RegExp(`prisma\\.${prop}\\.findMany\\(\\{ select: \\{([^}]*)\\}`).exec(deteccion);
+    if (!consulta || !consulta[1].includes(`${campo}:`)) sinCubrir.push(columna);
+  }
+  return sinCubrir;
 }
 
-if (sinCubrir.length > 0) {
-  console.error("Hay columnas que podrían guardar una URL de archivo y la detección no mira:\n");
-  for (const c of sinCubrir) console.error(`  ${c}`);
-  console.error(
-    "\nAgregalas a collectReferencedPathnames() en scripts/audit-blob-orphans.ts,",
-  );
-  console.error("o declaralas en NO_SON_ARCHIVOS acá si de verdad no guardan un archivo.");
-  console.error("\nMientras tanto, la limpieza borraría esos archivos aunque estén en uso.");
-  process.exit(1);
+/** Mensaje de error compartido, para que el script suelto y la limpieza digan
+ * exactamente lo mismo. */
+export function explicarSinCubrir(sinCubrir: string[]): string {
+  return [
+    "Hay columnas que podrían guardar una URL de archivo y la detección no mira:",
+    "",
+    ...sinCubrir.map((c) => `  ${c}`),
+    "",
+    "Agregalas a collectReferencedPathnames() en scripts/audit-blob-orphans.ts,",
+    "o declaralas en NO_SON_ARCHIVOS en scripts/check-blob-coverage.ts si de",
+    "verdad no guardan un archivo.",
+    "",
+    "Mientras tanto, la limpieza borraría esos archivos aunque estén en uso.",
+  ].join("\n");
 }
 
-console.log("Cobertura OK: todas las columnas de URL están en la detección.");
+// Solo al invocarlo directamente: blob-cleanup.ts importa las funciones.
+if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()!)) {
+  const sinCubrir = columnasSinCubrir();
+  if (sinCubrir.length > 0) {
+    console.error(explicarSinCubrir(sinCubrir));
+    process.exit(1);
+  }
+  console.log("Cobertura OK: todas las columnas de URL están en la detección.");
+}
