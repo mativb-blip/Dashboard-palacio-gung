@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { assertBlobUrl } from "@/lib/dashboard/blob-url";
+import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { sendAlertEmail, sendCommentNotification } from "@/lib/dashboard/notify-email";
 import { sendPushToAdmins } from "@/lib/dashboard/notify-push";
@@ -340,7 +341,15 @@ async function snapshotVersion(
     skip: PROPOSAL_VERSION_LIMIT,
   });
   if (overflow.length) {
+    // Los artes de una versión podada dejan de estar referenciados por nadie.
+    // Es la fuente de huérfanos que NO depende de que alguien borre algo:
+    // basta con editar una propuesta nueve veces.
+    const podadas = await prisma.proposalVersion.findMany({
+      where: { id: { in: overflow.map((v) => v.id) } },
+      select: { images: true, video: true },
+    });
     await prisma.proposalVersion.deleteMany({ where: { id: { in: overflow.map((v) => v.id) } } });
+    await deleteUnreferencedBlobs(podadas.flatMap((v) => [...v.images, v.video]));
   }
 }
 
@@ -457,7 +466,33 @@ export async function getProposalVersions(proposalId: string): Promise<ProposalV
 
 export async function deleteProposal(id: string): Promise<void> {
   await requireEditor();
+
+  // Se junta TODO antes de borrar: el delete cascadea a versiones,
+  // comentarios y músicas, así que después de ejecutarlo esas URLs ya no se
+  // pueden leer de ningún lado.
+  const propuesta = await prisma.proposal.findUnique({
+    where: { id },
+    select: {
+      images: true,
+      video: true,
+      versions: { select: { images: true, video: true } },
+      comments: { select: { images: true } },
+      musicOptions: { select: { audioUrl: true } },
+    },
+  });
+
   await prisma.proposal.delete({ where: { id } });
+
+  if (propuesta) {
+    await deleteUnreferencedBlobs([
+      ...propuesta.images,
+      propuesta.video,
+      ...propuesta.versions.flatMap((v) => [...v.images, v.video]),
+      ...propuesta.comments.flatMap((c) => c.images),
+      ...propuesta.musicOptions.map((m) => m.audioUrl),
+    ]);
+  }
+
   revalidatePath("/");
   revalidatePath("/calendario");
 }
@@ -825,6 +860,7 @@ export async function deleteMusicOption(optionId: string): Promise<ProposalMusic
   const option = await prisma.proposalMusicOption.findUnique({ where: { id: optionId } });
   if (!option) throw new Error("Esa música ya no existe.");
   await prisma.proposalMusicOption.delete({ where: { id: optionId } });
+  await deleteUnreferencedBlobs([option.audioUrl]);
   return listMusicOptions(option.proposalId);
 }
 
@@ -901,5 +937,7 @@ export async function clearMusicOptionAudio(optionId: string): Promise<ProposalM
     where: { id: optionId },
     data: { audioUrl: null, audioName: null },
   });
+  // No es un delete de fila, pero deja el archivo sin dueño igual.
+  await deleteUnreferencedBlobs([option.audioUrl]);
   return listMusicOptions(option.proposalId);
 }

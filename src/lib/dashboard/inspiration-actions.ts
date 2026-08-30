@@ -7,6 +7,7 @@ import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { instagramEmbedSrc, normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
 import { normalizeExternalUrl, normalizeSongUrl } from "@/lib/dashboard/link-url";
+import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
 import type {
   InspirationItem,
   InspirationKind,
@@ -143,10 +144,11 @@ export async function addInspirationStory(url: string, filename?: string): Promi
   return toInspirationStory(row, new Date());
 }
 
-/** Igual que la Galería: se borra la fila, no el archivo en Blob. */
 export async function deleteInspirationStory(id: string): Promise<void> {
   await requireEditor();
+  const fila = await prisma.inspirationPhoto.findUnique({ where: { id }, select: { url: true } });
   await prisma.inspirationPhoto.delete({ where: { id } });
+  await deleteUnreferencedBlobs([fila?.url]);
   revalidatePath("/inspiracion");
 }
 
@@ -254,9 +256,15 @@ export async function addInspirationLink(
   return toInspirationLinkItem(row, new Date());
 }
 
-/** Igual que el resto: se borra la fila, no el archivo en Blob. */
 export async function deleteInspirationLink(id: string): Promise<void> {
   await requireEditor();
+  // `url` puede ser un enlace de Spotify/Instagram: el recolector lo ignora
+  // porque no vive en nuestro storage. `audioUrl` sí es un archivo nuestro.
+  const fila = await prisma.inspirationLink.findUnique({
+    where: { id },
+    select: { url: true, audioUrl: true },
+  });
   await prisma.inspirationLink.delete({ where: { id } });
+  await deleteUnreferencedBlobs([fila?.url, fila?.audioUrl]);
   revalidatePath("/inspiracion");
 }

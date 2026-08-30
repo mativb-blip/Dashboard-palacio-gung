@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import type { GalleryPhoto, GalleryPhotoCommentEntry } from "@/types/dashboard";
+import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
 
 // Cualquier usuario con sesión puede ver la galería — mismo criterio que
 // getProposals(); el gate real de ruta vive en src/proxy.ts.
@@ -102,7 +103,12 @@ export async function addGalleryPhoto(url: string, filename?: string): Promise<G
 
 export async function deleteGalleryPhoto(id: string): Promise<void> {
   await requireEditor();
+  // La URL se lee ANTES de borrar la fila; el recolector corre DESPUÉS, para
+  // que la fila que se va no se cuente a sí misma como referencia. Si esta
+  // foto además se usó como arte de una propuesta, el archivo sobrevive.
+  const foto = await prisma.galleryPhoto.findUnique({ where: { id }, select: { url: true } });
   await prisma.galleryPhoto.delete({ where: { id } });
+  await deleteUnreferencedBlobs([foto?.url]);
   revalidatePath("/galeria");
 }
 

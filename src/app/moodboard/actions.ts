@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { deriveTitle } from "@/lib/dashboard/proposals";
@@ -295,8 +296,16 @@ export async function updateElements(
 }
 
 export async function deleteElement(elementId: string): Promise<void> {
-  await requireOwnedElement(elementId);
+  const elemento = await requireOwnedElement(elementId);
   await prisma.moodboardElement.delete({ where: { id: elementId } });
+  // Si ese mismo archivo se usó como arte de una propuesta (ver
+  // createProposalFromElement, que copia la URL sin duplicar el archivo), la
+  // propuesta lo sigue referenciando y el recolector no lo toca.
+  //
+  // A diferencia de deleteSession, acá sí se limpia: borrar UN elemento es
+  // deliberado y acotado. Borrar una sesión entera se lleva decenas de
+  // archivos de una, y ahí el criterio sigue siendo conservador.
+  await deleteUnreferencedBlobs([elemento.url]);
 }
 
 export async function duplicateElement(elementId: string): Promise<MoodboardElement> {

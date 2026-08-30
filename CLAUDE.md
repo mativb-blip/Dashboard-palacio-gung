@@ -132,13 +132,25 @@ MoodboardElement: { id, sessionId, type, x, y, width, height, zIndex, rotation,
 ```
 
 ## Limpieza de Vercel Blob
-Borrar una foto, un audio o un elemento del Moodboard borra la FILA pero **deja el archivo en Blob** — decisión deliberada y documentada arriba (no hay forma barata de saber si algo más lo referencia). El 2026-08-29 eso llenó la cuota: 958,6 MB de 1 GB, con 651,5 MB recuperables. Se limpió a mano y quedó en 307,1 MB.
+**Borrar una fila ahora también borra su archivo de Blob**, si ninguna otra fila lo referencia. Lo hace `deleteUnreferencedBlobs()` en `src/lib/dashboard/blob-gc.ts`, y hasta el 2026-08-29 no era así: la fila se iba y el archivo quedaba, que es lo que llenó la cuota: 958,6 MB de 1 GB, con 651,5 MB recuperables. Se limpió a mano y quedó en 307,1 MB.
 
-**La limpieza es manual, a demanda.** Hubo un GitHub Action semanal y se quitó a pedido. Tres scripts, con las credenciales de PRODUCCIÓN en un `.env.produccion` armado **a mano** — `vercel env pull --environment=production` NO devuelve los valores, escribe `[SENSITIVE]`, y en el panel figuran como tipo `Secret`/`Hidden`, o sea que tampoco se leen ahí: hay que sacarlas de la pestaña **Storage** (la base Neon y el store `dashboard-palacio-gung-blob`).
+### El recolector (`blob-gc.ts`)
+**Regla de oro: primero se borra la FILA, después se llama al recolector.** Al revés, la fila que se está borrando se cuenta a sí misma como referencia y no se borra nunca nada.
+
+No alcanza con "borrá el archivo de la fila que borrás": una misma URL la comparten varias filas por cuatro caminos —"Usar como post", el selector "Elegir de la galería", el puente del Moodboard, y los snapshots de `ProposalVersion`—. Por eso PREGUNTA antes, con una consulta por tabla (no un escaneo): ~11 consultas, sin importar cuántos archivos.
+
+Enganchado en: borrar propuesta (junta artes, versiones, comentarios y audios ANTES, porque el delete cascadea), borrar foto de Galería, borrar historia, borrar canción/enlace, borrar música, quitarle el audio a una música, borrar elemento del Moodboard, y **la poda del historial** (las versiones que salen se llevan sus artes).
+
+Nunca tira: si falla, el archivo queda y lo levanta la limpieza manual. Un fallo del recolector no puede romperle la operación a quien solo quería borrar una foto.
+
+> **`deleteSession` del Moodboard NO limpia, a propósito.** Borrar un tablero entero se lleva decenas de archivos de una, y el comentario que hay ahí es explícito: mantenerlos evita que "borré la sesión equivocada" sea irreversible. Borrar UN elemento sí limpia — es acotado y deliberado.
+
+### Los scripts siguen existiendo, para barrer lo que se escape
+**La limpieza por script es manual, a demanda.** Hubo un GitHub Action semanal y se quitó a pedido. Tres scripts, con las credenciales de PRODUCCIÓN en un `.env.produccion` armado **a mano** — `vercel env pull --environment=production` NO devuelve los valores, escribe `[SENSITIVE]`, y en el panel figuran como tipo `Secret`/`Hidden`, o sea que tampoco se leen ahí: hay que sacarlas de la pestaña **Storage** (la base Neon y el store `dashboard-palacio-gung-blob`).
 
 - **`scripts/audit-blob-orphans.ts`** — solo lectura. Cuánto hay, cuánto sobra, desglose por carpeta.
 - **`scripts/blob-cleanup.ts`** — borra. **Simula por defecto**; borra solo con `--borrar`.
-- **`scripts/check-blob-coverage.ts`** — verifica que la detección cubra el esquema. No necesita credenciales.
+- **`scripts/check-blob-coverage.ts`** — verifica que **la auditoría Y el recolector** cubran todas las columnas de URL del esquema. No necesita credenciales. Lo llama `blob-cleanup.ts` antes de borrar, y hay que correrlo al agregar una columna nueva.
 
 La limpieza **importa la detección de la auditoría** en vez de reimplementarla: si las dos listas de columnas se separan, la auditoría solo reporta de más, pero la limpieza borra archivos en uso.
 

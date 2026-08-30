@@ -57,9 +57,21 @@ function columnasSospechosas(esquema: string): string[] {
 
 /** Columnas que podrían guardar una URL de archivo y la detección no mira.
  * Vacío = todo cubierto. */
+/** Los DOS lugares que tienen que conocer todas las columnas de URL.
+ *
+ * El segundo importa más que el primero: la auditoría que se olvida una
+ * columna solo reporta de más, pero el recolector que se la olvida BORRA un
+ * archivo que alguien está usando, en el momento y sin que nadie mire. */
+const ARCHIVOS_QUE_DEBEN_CUBRIR = [
+  "scripts/audit-blob-orphans.ts",
+  "src/lib/dashboard/blob-gc.ts",
+];
+
+/** Columnas que podrían guardar una URL de archivo y alguno de los dos
+ * archivos de arriba no mira. Vacío = todo cubierto. */
 export function columnasSinCubrir(): string[] {
   const esquema = readFileSync(join(RAIZ, "prisma/schema.prisma"), "utf8");
-  const deteccion = readFileSync(join(RAIZ, "scripts/audit-blob-orphans.ts"), "utf8");
+  const fuentes = ARCHIVOS_QUE_DEBEN_CUBRIR.map((f) => [f, readFileSync(join(RAIZ, f), "utf8")] as const);
 
   const sinCubrir: string[] = [];
   for (const columna of columnasSospechosas(esquema)) {
@@ -67,8 +79,12 @@ export function columnasSinCubrir(): string[] {
 
     const [modelo, campo] = columna.split(".");
     const prop = modelo[0].toLowerCase() + modelo.slice(1);
-    const consulta = new RegExp(`prisma\\.${prop}\\.findMany\\(\\{ select: \\{([^}]*)\\}`).exec(deteccion);
-    if (!consulta || !consulta[1].includes(`${campo}:`)) sinCubrir.push(columna);
+    for (const [nombre, fuente] of fuentes) {
+      // `select:` puede venir en una línea o repartido en varias, de ahí el
+      // [\s\S] en vez de un punto.
+      const consulta = new RegExp(`prisma\\.${prop}\\.findMany\\(\\{[\\s\\S]{0,400}?select: \\{([\\s\\S]*?)\\}`).exec(fuente);
+      if (!consulta || !consulta[1].includes(`${campo}:`)) sinCubrir.push(`${columna}  (falta en ${nombre})`);
+    }
   }
   return sinCubrir;
 }
@@ -81,11 +97,11 @@ export function explicarSinCubrir(sinCubrir: string[]): string {
     "",
     ...sinCubrir.map((c) => `  ${c}`),
     "",
-    "Agregalas a collectReferencedPathnames() en scripts/audit-blob-orphans.ts,",
-    "o declaralas en NO_SON_ARCHIVOS en scripts/check-blob-coverage.ts si de",
-    "verdad no guardan un archivo.",
+    "Agregalas donde falten — collectReferencedPathnames() en la auditoría y/o",
+    "urlsTodaviaReferenciadas() en el recolector — o declaralas en",
+    "NO_SON_ARCHIVOS en scripts/check-blob-coverage.ts si no guardan archivos.",
     "",
-    "Mientras tanto, la limpieza borraría esos archivos aunque estén en uso.",
+    "Mientras tanto, esos archivos se borrarían aunque estén en uso.",
   ].join("\n");
 }
 
