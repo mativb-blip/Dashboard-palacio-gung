@@ -8,9 +8,12 @@
  *
  * Por defecto SIMULA. Para borrar de verdad hay que pasar --borrar.
  *
- *   npx vercel env pull .env.production.local --environment=production
- *   npx tsx --env-file=.env.production.local scripts/blob-cleanup.ts
- *   npx tsx --env-file=.env.production.local scripts/blob-cleanup.ts --borrar
+ *   npx tsx --env-file=.env.produccion scripts/blob-cleanup.ts
+ *   npx tsx --env-file=.env.produccion scripts/blob-cleanup.ts --borrar
+ *
+ * El archivo .env.produccion se arma A MANO con DATABASE_URL y
+ * PUBLIC_BLOB_READ_WRITE_TOKEN copiadas del panel de Vercel: `vercel env
+ * pull` NO devuelve los valores de producción, escribe "[SENSITIVE]".
  *
  * Opciones:
  *   --borrar        borra de verdad (sin esto solo muestra qué haría)
@@ -107,7 +110,7 @@ export function decidirBorrado(
 async function main() {
   if (!TOKEN || !DATABASE_URL) {
     console.error("Faltan credenciales de producción.");
-    console.error("Traelas con: npx vercel env pull .env.production.local --environment=production");
+    console.error("Copialas del panel de Vercel a un .env.produccion — `vercel env pull` no las devuelve.");
     process.exit(1);
   }
 

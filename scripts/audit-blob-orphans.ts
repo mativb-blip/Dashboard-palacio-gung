@@ -18,13 +18,17 @@
  * alguna cambie de contenido el script no se queda corto.
  *
  * Uso (necesita credenciales de PRODUCCIÓN):
- *   npx vercel env pull .env.production.local --environment=production
- *   npx tsx --env-file=.env.production.local scripts/audit-blob-orphans.ts
+ *   npx tsx --env-file=.env.produccion scripts/audit-blob-orphans.ts
  *
- * El --environment=production no es opcional: sin eso baja las variables de
- * desarrollo, la auditoría corre contra la base local y reporta como
- * huérfano casi todo. La primera línea de salida imprime el host consultado
- * justamente para poder verificarlo.
+ * OJO: `vercel env pull --environment=production` NO sirve para armar ese
+ * archivo. Vercel se niega a devolver los valores de producción y escribe
+ * "[SENSITIVE]" en su lugar — comprobado el 2026-08-29. Hay que copiarlos a
+ * mano del panel (Settings → Environment Variables, filtrando Production) o
+ * de la página del store correspondiente, y armar el archivo uno mismo con
+ * DATABASE_URL y PUBLIC_BLOB_READ_WRITE_TOKEN.
+ *
+ * La primera línea de salida imprime el host de la base: si dice localhost,
+ * el archivo quedó con la de desarrollo y el reporte no vale.
  */
 
 import { list, type ListBlobResultBlob } from "@vercel/blob";
@@ -115,7 +119,7 @@ async function main() {
     console.error(
       `Faltan credenciales: ${!TOKEN ? "PUBLIC_BLOB_READ_WRITE_TOKEN " : ""}${!DATABASE_URL ? "DATABASE_URL" : ""}`.trim(),
     );
-    console.error("Traelas con: npx vercel env pull .env.production.local --environment=production");
+    console.error("Copialas del panel de Vercel a un .env.produccion — `vercel env pull` no las devuelve.");
     process.exit(1);
   }
 

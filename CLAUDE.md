@@ -132,7 +132,7 @@ MoodboardElement: { id, sessionId, type, x, y, width, height, zIndex, rotation,
 ```
 
 ## Limpieza de Vercel Blob
-Borrar una foto, un audio o un elemento del Moodboard borra la FILA pero **deja el archivo en Blob** — decisión deliberada y documentada arriba (no hay forma barata de saber si algo más lo referencia). Con el tiempo eso llena la cuota, y ya pasó. Dos scripts, los dos con credenciales de PRODUCCIÓN (`npx vercel env pull .env.production.local --environment=production`):
+Borrar una foto, un audio o un elemento del Moodboard borra la FILA pero **deja el archivo en Blob** — decisión deliberada y documentada arriba (no hay forma barata de saber si algo más lo referencia). Con el tiempo eso llena la cuota, y ya pasó. Dos scripts, los dos con credenciales de PRODUCCIÓN en un `.env.produccion` armado **a mano** — `vercel env pull --environment=production` NO devuelve los valores, escribe `[SENSITIVE]` (comprobado el 2026-08-29); hay que copiarlos del panel de Vercel:
 
 - **`scripts/audit-blob-orphans.ts`** — solo lectura, no borra nada. Dice cuántos archivos hay, cuántos no aparecen en ninguna columna, cuánto se recupera y de qué carpetas.
 - **`scripts/blob-cleanup.ts`** — borra. **Simula por defecto**; borra de verdad solo con `--borrar`.
