@@ -4,9 +4,6 @@ import type { Proposal, ProposalStatus } from "@/types/dashboard";
  * (ver CaptionPanel). */
 export const DEPARTMENT_CHECK_COUNT = 1;
 
-/** Cuántas versiones anteriores de caption/media se conservan por propuesta
- * (ver ProposalVersion) antes de podar las más viejas. */
-export const PROPOSAL_VERSION_LIMIT = 8;
 
 /** Techo de alternativas de caption y de músicas por propuesta — no es un
  * límite técnico sino de lectura: Jun tiene que poder comparar las opciones

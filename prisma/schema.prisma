@@ -173,28 +173,10 @@ model Proposal {
   updatedAt DateTime @updatedAt
 
   comments ProposalComment[]
-  versions ProposalVersion[]
   captionOptions ProposalCaptionOption[]
   musicOptions   ProposalMusicOption[]
 
   @@index([date])
-}
-
-/// Snapshot del caption/media *antes* de cada edición sobre una propuesta
-/// (ficha 5) — updateProposal() en proposals-actions.ts crea uno de estos
-/// con el valor viejo antes de sobreescribir, y poda a las últimas
-/// PROPOSAL_VERSION_LIMIT (ver proposals.ts) por propuesta.
-model ProposalVersion {
-  id         String   @id @default(cuid())
-  proposalId String
-  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
-  caption    String   @db.Text
-  images     String[] @default([])
-  video      String?  @db.Text
-  editedBy   String
-  createdAt  DateTime @default(now())
-
-  @@index([proposalId])
 }
 
 model ProposalComment {

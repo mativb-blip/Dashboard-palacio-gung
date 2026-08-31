@@ -18,7 +18,6 @@ import {
   computeProposalStatus,
   deriveTitle,
   MUSIC_OPTIONS_LIMIT,
-  PROPOSAL_VERSION_LIMIT,
 } from "@/lib/dashboard/proposals";
 import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 import type {
@@ -28,7 +27,6 @@ import type {
   ProposalFormat,
   ProposalMusicOption,
   ProposalStatus,
-  ProposalVersionEntry,
 } from "@/types/dashboard";
 
 const FORMATS: ProposalFormat[] = ["Carrusel", "Reel", "Historia", "Post simple"];
@@ -275,8 +273,8 @@ export interface UpdateProposalInput {
  * publicación distinta a la aprobada. */
 const CONTENT_FIELDS = ["date", "caption", "images", "video"] as const;
 
-/** Nombre legible de quien edita, para ProposalVersion.editedBy y para el
- * texto de "aprobación invalidada". */
+/** Nombre legible de quien edita, para el texto de "aprobación invalidada" y
+ * para los avisos por mail. */
 function editorName(session: { user: { name?: string | null; email?: string | null } }): string {
   return session.user.name || session.user.email || "Desconocido";
 }
@@ -318,40 +316,6 @@ async function proposalLabel(proposalId: string): Promise<string> {
   return row?.title ? `"${row.title}"` : "Un post";
 }
 
-/** Guarda el estado anterior del caption/media antes de pisarlo (ficha 5) y
- * poda a las últimas PROPOSAL_VERSION_LIMIT versiones de esa propuesta. */
-async function snapshotVersion(
-  proposalId: string,
-  previous: { caption: string; images: string[]; video: string | null },
-  editedBy: string,
-): Promise<void> {
-  await prisma.proposalVersion.create({
-    data: {
-      proposalId,
-      caption: previous.caption,
-      images: previous.images,
-      video: previous.video,
-      editedBy,
-    },
-  });
-  const overflow = await prisma.proposalVersion.findMany({
-    where: { proposalId },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-    skip: PROPOSAL_VERSION_LIMIT,
-  });
-  if (overflow.length) {
-    // Los artes de una versión podada dejan de estar referenciados por nadie.
-    // Es la fuente de huérfanos que NO depende de que alguien borre algo:
-    // basta con editar una propuesta nueve veces.
-    const podadas = await prisma.proposalVersion.findMany({
-      where: { id: { in: overflow.map((v) => v.id) } },
-      select: { images: true, video: true },
-    });
-    await prisma.proposalVersion.deleteMany({ where: { id: { in: overflow.map((v) => v.id) } } });
-    await deleteUnreferencedBlobs(podadas.flatMap((v) => [...v.images, v.video]));
-  }
-}
 
 export interface UpdateProposalResult {
   /** Solo viene seteado cuando el server pisó lo que pedía el patch (una
@@ -409,7 +373,6 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
   // en la creación... acá siempre hay `current`, así que aplica siempre que
   // se toque contenido).
   if (contentTouched) {
-    await snapshotVersion(id, current, editorName(session));
   }
 
   await prisma.proposal.update({
@@ -447,22 +410,6 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
   return { departmentApprovals: nextApprovals, approvalInvalidatedReason: invalidatedReason };
 }
 
-export async function getProposalVersions(proposalId: string): Promise<ProposalVersionEntry[]> {
-  await requireSession();
-  const rows = await prisma.proposalVersion.findMany({
-    where: { proposalId },
-    orderBy: { createdAt: "desc" },
-  });
-  const now = new Date();
-  return rows.map((row) => ({
-    id: row.id,
-    caption: row.caption,
-    images: row.images.length ? row.images : undefined,
-    video: row.video ?? undefined,
-    editedBy: row.editedBy,
-    when: formatCommentWhen(row.createdAt, now),
-  }));
-}
 
 export async function deleteProposal(id: string): Promise<void> {
   await requireEditor();
@@ -475,7 +422,6 @@ export async function deleteProposal(id: string): Promise<void> {
     select: {
       images: true,
       video: true,
-      versions: { select: { images: true, video: true } },
       comments: { select: { images: true } },
       musicOptions: { select: { audioUrl: true } },
     },
@@ -487,7 +433,6 @@ export async function deleteProposal(id: string): Promise<void> {
     await deleteUnreferencedBlobs([
       ...propuesta.images,
       propuesta.video,
-      ...propuesta.versions.flatMap((v) => [...v.images, v.video]),
       ...propuesta.comments.flatMap((c) => c.images),
       ...propuesta.musicOptions.map((m) => m.audioUrl),
     ]);
@@ -661,8 +606,6 @@ async function commitCaptionMirror(
   });
   if (!current) throw new Error("Propuesta no encontrada.");
   if (current.caption === nextCaption) return {};
-
-  await snapshotVersion(proposalId, current, editedBy);
 
   const wasApproved = current.departmentApprovals?.[0] ?? false;
   if (!wasApproved) {

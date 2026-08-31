@@ -39,7 +39,7 @@ El estado de una propuesta se deriva automáticamente (no se elige a mano): **Pe
 
 **Editar una propuesta ya aprobada la invalida**: cambiar `date`/`caption`/`images`/`video` en `updateProposal()` sobre una propuesta con `departmentApprovals[0] === true` la desaprueba sola (vuelve `[false]`) y guarda un motivo legible en `approvalInvalidatedReason` — sin excepciones por tipo de campo. `updateProposal()` devuelve esos dos campos cuando los pisa, y los callers (`page.tsx`/`calendario/page.tsx`) reconcilian el estado optimista con `applyUpdateResult()` en vez de asumir que el patch que mandaron es lo que quedó guardado.
 
-**Historial de versiones**: cada vez que se edita `date`/`caption`/`images`/`video`, `updateProposal()` guarda un snapshot del valor *anterior* en `ProposalVersion` (podado a las últimas `PROPOSAL_VERSION_LIMIT` = 8 por propuesta) — "Ver historial" en `CaptionPanel` abre `VersionHistoryModal` con Antes/Ahora en paralelo.
+**No hay historial de versiones.** Lo hubo (`ProposalVersion`, "Ver historial", `VersionHistoryModal`) y se quitó el 2026-08-30, tabla incluida. El motivo es de costo, no de producto: cada versión guardaba los artes **enteros**, no un diff, así que el historial duplicaba material pesado. Un solo video retenido por dos snapshots ocupaba **186,6 MB — el 20% de la cuota de Blob** — de una propuesta a la que ya le habían quitado el video. Editar una propuesta hoy pisa el valor anterior y no deja rastro.
 
 ## Alternativas de caption y música
 El Editor/Admin puede cargar **varias alternativas de caption** en la vista Post y Jun (Comentarista) elige **una sola**. La elegida se refleja en `Proposal.caption`, que sigue siendo el caption "real" para el título, las versiones, el preview, el export y las notificaciones — por eso `caption` no se derivó de la relación: hay once archivos que lo consumen y el espejo los deja intactos. La invariante (`Proposal.caption` == el texto de la fila `selected`) la mantiene `commitCaptionMirror()` en `proposals-actions.ts`, único lugar por donde pasa cualquier cambio del caption vigente.
@@ -115,7 +115,6 @@ Proposal: { id, date, time, network, format, status, title, caption, hashtags, a
             images[], video, departmentApprovals[1], comments[], aspect, dim,
             contentPillar?, approvalInvalidatedReason?,
             reminderSentT60/T0, approvalReminderSent }
-ProposalVersion: { id, proposalId, caption, images[], video, editedBy, createdAt }
 ProposalCaptionOption: { id, proposalId, text, selected, order, createdAt }
 ProposalMusicOption:   { id, proposalId, url?, label?, selected, order, audioUrl?, audioName?, createdAt }
 GalleryPhoto: { id, url, filename?, uploadedBy?, createdAt, comments[] }
@@ -137,9 +136,9 @@ MoodboardElement: { id, sessionId, type, x, y, width, height, zIndex, rotation,
 ### El recolector (`blob-gc.ts`)
 **Regla de oro: primero se borra la FILA, después se llama al recolector.** Al revés, la fila que se está borrando se cuenta a sí misma como referencia y no se borra nunca nada.
 
-No alcanza con "borrá el archivo de la fila que borrás": una misma URL la comparten varias filas por cuatro caminos —"Usar como post", el selector "Elegir de la galería", el puente del Moodboard, y los snapshots de `ProposalVersion`—. Por eso PREGUNTA antes, con una consulta por tabla (no un escaneo): ~11 consultas, sin importar cuántos archivos.
+No alcanza con "borrá el archivo de la fila que borrás": una misma URL la comparten varias filas por tres caminos —"Usar como post", el selector "Elegir de la galería" y el puente del Moodboard—. Por eso PREGUNTA antes, con una consulta por tabla (no un escaneo): ~10 consultas, sin importar cuántos archivos. Hubo un cuarto camino, los snapshots de `ProposalVersion`, hasta que se quitó el historial.
 
-Enganchado en: borrar propuesta (junta artes, versiones, comentarios y audios ANTES, porque el delete cascadea), borrar foto de Galería, borrar historia, borrar canción/enlace, borrar música, quitarle el audio a una música, borrar elemento del Moodboard, y **la poda del historial** (las versiones que salen se llevan sus artes).
+Enganchado en: borrar propuesta (junta artes, versiones, comentarios y audios ANTES, porque el delete cascadea), borrar foto de Galería, borrar historia, borrar canción/enlace, borrar música, quitarle el audio a una música y borrar elemento del Moodboard.
 
 Nunca tira: si falla, el archivo queda y lo levanta la limpieza manual. Un fallo del recolector no puede romperle la operación a quien solo quería borrar una foto.
 
@@ -164,7 +163,7 @@ Y antes de todo eso, en simulación también, `blob-cleanup.ts` corre el chequeo
 
 > **Esto ya falló una vez, en producción.** La sección Canciones agregó `InspirationLink.audioUrl` y nadie la sumó a `collectReferencedPathnames()`; la primera auditoría real marcó **4 canciones EN USO** como huérfanas, y la limpieza las habría borrado. Había un comentario acá avisándolo — no alcanzó, porque un comentario no corre. De ahí `check-blob-coverage.ts`: una columna nueva tiene que estar en la detección o declararse en `NO_SON_ARCHIVOS`, y si no está en ninguna, corta.
 
-> **Los huérfanos aparecen aunque nadie borre nada.** Dos fuentes que no dependen de eso: las cargas abandonadas (se sube el archivo y no se confirma el formulario) y la **poda del historial** — `updateProposal()` conserva las últimas `PROPOSAL_VERSION_LIMIT` = 8 versiones y borra las más viejas, así que las imágenes de esas versiones dejan de estar referenciadas. Al cerrar la limpieza de agosto quedaban 41 huérfanos recientes sin que se hubiera borrado nada. Conviene correr la auditoría cada tanto.
+> **Los huérfanos aparecen aunque nadie borre nada**, por las cargas abandonadas: se sube el archivo a Blob y después no se confirma el formulario. Al cerrar la limpieza de agosto quedaban 41 así, sin que se hubiera borrado nada. Conviene correr la auditoría cada tanto. (La otra fuente era la poda del historial, que desapareció con el historial.)
 
 > El desglose por carpeta es la comprobación que importa: si una carpeta entera figura 100% huérfana, es más probable que falte una columna que que de verdad esté toda suelta. La auditoría del 2026-08-29 sumó además una señal útil — de las 26 propuestas dueñas de archivos huérfanos, **ninguna existía ya** en el dashboard.
 

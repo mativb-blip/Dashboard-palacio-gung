@@ -84,17 +84,6 @@ export interface Proposal {
   approvalInvalidatedReason?: string;
 }
 
-/** Snapshot de una versión anterior del caption/media de una propuesta —
- * ver ProposalVersion en el schema y "Ver historial" en CaptionPanel. */
-export interface ProposalVersionEntry {
-  id: string;
-  caption: string;
-  images?: string[];
-  video?: string;
-  editedBy: string;
-  when: string;
-}
-
 /** Una foto de la galería (`/galeria`) — sin relación con propuestas, ver
  * GalleryPhoto en el schema. */
 /** Nota de alguien sobre una foto de la Galería — ver GalleryPhotoComment. */

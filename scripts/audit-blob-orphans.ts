@@ -71,10 +71,9 @@ function pathnameOf(url: string): string | null {
 export async function collectReferencedPathnames(): Promise<Set<string>> {
   const urls: (string | null)[] = [];
 
-  const [proposals, versions, comments, music, gallery, stories, reels, links, elements, settings, users] =
+  const [proposals, comments, music, gallery, stories, reels, links, elements, settings, users] =
     await Promise.all([
       prisma.proposal.findMany({ select: { images: true, video: true } }),
-      prisma.proposalVersion.findMany({ select: { images: true, video: true } }),
       prisma.proposalComment.findMany({ select: { images: true } }),
       prisma.proposalMusicOption.findMany({ select: { url: true, audioUrl: true } }),
       prisma.galleryPhoto.findMany({ select: { url: true } }),
@@ -94,7 +93,6 @@ export async function collectReferencedPathnames(): Promise<Set<string>> {
     ]);
 
   for (const p of proposals) urls.push(...p.images, p.video);
-  for (const v of versions) urls.push(...v.images, v.video);
   for (const c of comments) urls.push(...c.images);
   for (const m of music) urls.push(m.url, m.audioUrl);
   for (const g of gallery) urls.push(g.url);

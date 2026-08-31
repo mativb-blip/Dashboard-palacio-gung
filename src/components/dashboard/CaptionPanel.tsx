@@ -2,7 +2,6 @@
 
 import { useSession } from "next-auth/react";
 import { useRef, useState } from "react";
-import VersionHistoryModal from "./VersionHistoryModal";
 import { dateLong, statusPillStyle } from "@/lib/dashboard/format";
 import {
   CAPTION_OPTIONS_LIMIT,
@@ -68,7 +67,6 @@ export default function CaptionPanel({
   const [addingCaption, setAddingCaption] = useState(false);
   const [newCaption, setNewCaption] = useState("");
   const [busy, setBusy] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const departmentApprovals = proposal.departmentApprovals ?? Array(DEPARTMENT_CHECK_COUNT).fill(false);
 
   const captionOptions = proposal.captionOptions ?? [];
@@ -227,13 +225,6 @@ export default function CaptionPanel({
             {status}
           </span>
           <span className="text-[13px] text-tx-2">Publica {proposal.time}</span>
-          <button
-            type="button"
-            onClick={() => setShowHistory(true)}
-            className={`text-[11px] font-bold text-brand-blue underline-offset-2 hover:underline ${PRESS_SCALE_CLASS}`}
-          >
-            Ver historial
-          </button>
         </div>
 
         {proposal.approvalInvalidatedReason && (
@@ -508,7 +499,6 @@ export default function CaptionPanel({
         </>
       )}
 
-      {showHistory && <VersionHistoryModal proposal={proposal} onClose={() => setShowHistory(false)} />}
     </div>
   );
 }

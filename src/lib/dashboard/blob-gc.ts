@@ -11,11 +11,15 @@
  * borraría nunca nada.
  *
  * POR QUÉ NO ALCANZA CON "borrá el archivo de la fila que borrás": una misma
- * URL la comparten varias filas, por cuatro caminos distintos —"Usar como
- * post" desde la Galería, el selector "Elegir de la galería", el puente del
- * Moodboard, y los snapshots de ProposalVersion—. Borrar de una rompería
- * artes que seguían en uso. Por eso acá se PREGUNTA primero, con una consulta
- * por tabla (no un escaneo): son ~11 consultas, sin importar cuántos archivos.
+ * URL la comparten varias filas, por tres caminos distintos —"Usar como post"
+ * desde la Galería, el selector "Elegir de la galería" y el puente del
+ * Moodboard—. Borrar de una rompería artes que seguían en uso. Por eso acá se
+ * PREGUNTA primero, con una consulta por tabla (no un escaneo): son ~10
+ * consultas, sin importar cuántos archivos.
+ *
+ * Hubo un cuarto camino, los snapshots de ProposalVersion, hasta que se quitó
+ * el historial del dashboard el 2026-08-30: duplicaba los artes enteros (no un
+ * diff) y un solo video retenido así ocupaba 186 MB, casi el 20% de la cuota.
  */
 
 import { del } from "@vercel/blob";
@@ -56,13 +60,9 @@ export async function urlsTodaviaReferenciadas(urls: string[]): Promise<Set<stri
     if (valor && buscadas.has(valor)) vivas.add(valor);
   };
 
-  const [proposals, versions, comments, music, gallery, stories, reels, links, elements, settings, users] =
+  const [proposals, comments, music, gallery, stories, reels, links, elements, settings, users] =
     await Promise.all([
       prisma.proposal.findMany({
-        where: { OR: [{ images: { hasSome: urls } }, { video: { in: urls } }] },
-        select: { images: true, video: true },
-      }),
-      prisma.proposalVersion.findMany({
         where: { OR: [{ images: { hasSome: urls } }, { video: { in: urls } }] },
         select: { images: true, video: true },
       }),
@@ -93,7 +93,6 @@ export async function urlsTodaviaReferenciadas(urls: string[]): Promise<Set<stri
     ]);
 
   for (const p of proposals) [...p.images, p.video].forEach(anotar);
-  for (const v of versions) [...v.images, v.video].forEach(anotar);
   for (const c of comments) c.images.forEach(anotar);
   for (const m of music) [m.url, m.audioUrl].forEach(anotar);
   for (const g of gallery) anotar(g.url);
