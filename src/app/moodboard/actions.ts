@@ -383,11 +383,11 @@ export async function createProposalFromElement(
       images: isVideo ? [] : [element.url],
       video: isVideo ? element.url : undefined,
       // Igual que createProposal(): toda propuesta nace con su alternativa de
-      // caption ya elegida. Sin esto, una propuesta creada desde el tablero
-      // quedaba sin ninguna fila en ProposalCaptionOption y rompía la
-      // invariante que asume el panel (ver "Alternativas de caption" en
+      // caption, y SIN elegir — elegir es lo que hace Jun. Sin esta fila, una
+      // propuesta creada desde el tablero quedaba con cero alternativas y
+      // rompía lo que asume el panel (ver "Alternativas de caption" en
       // CLAUDE.md).
-      captionOptions: { create: { text: caption, selected: true, order: 0 } },
+      captionOptions: { create: { text: caption, selected: false, order: 0 } },
     },
   });
 

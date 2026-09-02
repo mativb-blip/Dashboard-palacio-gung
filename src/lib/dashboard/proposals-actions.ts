@@ -237,14 +237,13 @@ export async function createProposal(input: CreateProposalInput): Promise<Propos
       aspect: input.aspect,
       dim: input.dim,
       contentPillar,
-      // La propuesta nace con la alternativa principal ya elegida — así el
-      // panel nunca ve una propuesta sin opciones y `caption` y su
-      // alternativa arrancan sincronizados. Las de `extraCaptions` (cargadas
-      // desde la misma ventana) nacen sin elegir, igual que agregarlas
-      // después desde la vista Post (ver addCaptionOption).
+      // NINGUNA nace elegida — mismo criterio que la música. Elegir es lo
+      // que hace Jun, y una alternativa premarcada le pone una decisión en la
+      // boca antes de que mire. Mientras no elija, el caption vigente es la
+      // primera (ver sincronizarEspejo), así que `caption` nunca queda vacío.
       captionOptions: {
         create: [
-          { text: input.caption.trim(), selected: true, order: 0 },
+          { text: input.caption.trim(), selected: false, order: 0 },
           ...extraCaptions.map((text, i) => ({ text, selected: false, order: i + 1 })),
         ],
       },
@@ -627,6 +626,32 @@ async function commitCaptionMirror(
   return { departmentApprovals: [false], approvalInvalidatedReason: invalidatedReason };
 }
 
+/** Deja `Proposal.caption` igual al caption VIGENTE de la propuesta.
+ *
+ * Vigente = la alternativa elegida, y si no hay ninguna elegida, la primera.
+ * Esa segunda mitad es la que importa desde que las propuestas nacen sin
+ * ninguna elegida (a pedido: en la vista Post nada aparece marcado hasta que
+ * Jun elige). Sin ella, corregir un caption mientras nadie eligió no
+ * actualizaba el espejo, y el preview, el título y el mensaje de WhatsApp
+ * seguían mostrando el texto viejo.
+ *
+ * Es el MISMO criterio que usa CaptionPanel para decidir qué texto mostrar
+ * (`find(selected) ?? [0]`), así que el server y la pantalla no pueden
+ * discrepar.
+ *
+ * Se llama después de cualquier cambio en las alternativas y sin condiciones:
+ * commitCaptionMirror() no hace nada si el texto no cambió, así que llamarla
+ * de más es gratis y olvidarse de llamarla es un bug silencioso. */
+async function sincronizarEspejo(proposalId: string, editedBy: string): Promise<UpdateProposalResult> {
+  const opciones = await prisma.proposalCaptionOption.findMany({
+    where: { proposalId },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+  });
+  const vigente = opciones.find((o) => o.selected) ?? opciones[0];
+  if (!vigente) return {};
+  return commitCaptionMirror(proposalId, vigente.text, editedBy);
+}
+
 export async function addCaptionOption(proposalId: string, text: string): Promise<CaptionOptionsResult> {
   const session = await requireEditor();
   const value = text.trim();
@@ -637,17 +662,11 @@ export async function addCaptionOption(proposalId: string, text: string): Promis
     throw new Error(`No se pueden cargar más de ${CAPTION_OPTIONS_LIMIT} alternativas.`);
   }
 
-  // `existing === 0` no debería pasar (toda propuesta nace con una), pero si
-  // pasara la primera que se cargue tiene que quedar elegida — si no, la
-  // propuesta se quedaría sin caption vigente.
   await prisma.proposalCaptionOption.create({
-    data: { proposalId, text: value, selected: existing === 0, order: existing },
+    data: { proposalId, text: value, selected: false, order: existing },
   });
 
-  const extra = existing === 0
-    ? await commitCaptionMirror(proposalId, value, editorName(session))
-    : {};
-  return captionResult(proposalId, extra);
+  return captionResult(proposalId, await sincronizarEspejo(proposalId, editorName(session)));
 }
 
 /** Corregir el texto de una alternativa NO es "editar contenido": es lo que
@@ -664,10 +683,7 @@ export async function updateCaptionOption(optionId: string, text: string): Promi
 
   await prisma.proposalCaptionOption.update({ where: { id: optionId }, data: { text: value } });
 
-  const extra = option.selected
-    ? await commitCaptionMirror(option.proposalId, value, editorName(session))
-    : {};
-  return captionResult(option.proposalId, extra);
+  return captionResult(option.proposalId, await sincronizarEspejo(option.proposalId, editorName(session)));
 }
 
 /** Igual que updateCaptionOption: alcanza con sesión. El invariante de que
@@ -686,18 +702,12 @@ export async function deleteCaptionOption(optionId: string): Promise<CaptionOpti
 
   await prisma.proposalCaptionOption.delete({ where: { id: optionId } });
 
-  // Si se borró la elegida, la propuesta se quedaría sin caption vigente:
-  // pasa a la primera que sobrevive (y eso, como cualquier cambio del caption
-  // vigente, invalida una aprobación previa).
-  let extra: UpdateProposalResult = {};
-  if (option.selected) {
-    const fallback = siblings.find((s) => s.id !== optionId);
-    if (fallback) {
-      await prisma.proposalCaptionOption.update({ where: { id: fallback.id }, data: { selected: true } });
-      extra = await commitCaptionMirror(option.proposalId, fallback.text, editorName(session));
-    }
-  }
-  return captionResult(option.proposalId, extra);
+  // Si se borró la elegida NO se promueve otra a elegida: sería inventarle a
+  // Jun una decisión que no tomó. Queda sin ninguna elegida y el caption
+  // vigente pasa a ser la primera que sobrevive, que es lo que sincroniza
+  // el espejo (y eso, como cualquier cambio del caption vigente, invalida una
+  // aprobación previa).
+  return captionResult(option.proposalId, await sincronizarEspejo(option.proposalId, editorName(session)));
 }
 
 /** Elegir alternativa NO es "editar contenido" — es justamente lo que hace
