@@ -7,6 +7,8 @@ import { assertBlobUrl } from "@/lib/dashboard/blob-url";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import type { GalleryPhoto, GalleryPhotoCommentEntry } from "@/types/dashboard";
 import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
+import { sendAlertEmail } from "@/lib/dashboard/notify-email";
+import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 
 // Cualquier usuario con sesión puede ver la galería — mismo criterio que
 // getProposals(); el gate real de ruta vive en src/proxy.ts.
@@ -130,6 +132,28 @@ export async function addGalleryPhotoComment(
       text: value.slice(0, 2000),
     },
   });
+
+  // Avisar por mail, igual que un comentario sobre una propuesta (ver
+  // addComment en proposals-actions.ts). Faltaba: la Galería se sumó después
+  // y quedó sin conectar, así que los comentarios de Jun sobre las fotos no
+  // avisaban a nadie — que es justamente cómo Jun marca las que le gustan.
+  //
+  // Mismo destinatario que el resto: commentNotifyTo si un Admin lo seteó a
+  // mano, y si no el mail de notificación del Admin.
+  const foto = await prisma.galleryPhoto.findUnique({
+    where: { id: photoId },
+    select: { filename: true },
+  });
+  const brand = resolveBrand(await getSiteSettings());
+  const notifyTo = brand.commentNotifyTo || (await getAdminEmail());
+  if (notifyTo) {
+    const cual = foto?.filename ? `"${foto.filename}"` : "una foto";
+    await sendAlertEmail({
+      to: notifyTo,
+      title: `Nuevo comentario en la Galería`,
+      body: `${row.author} comentó ${cual} de la Galería: ${row.text}`,
+    });
+  }
 
   revalidatePath("/galeria");
   return {
