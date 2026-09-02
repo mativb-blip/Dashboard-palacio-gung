@@ -61,6 +61,23 @@ export default function GaleriaPage() {
     };
   }, []);
 
+  // Escape cierra la foto ampliada, igual que el resto de los overlays del
+  // dashboard (ver PhotoLightbox, PostPreviewModal, InstagramPreview). Este
+  // visor es propio y no reusa PhotoLightbox porque suma flechas, contador,
+  // "Usar como post" y el panel de comentarios.
+  //
+  // El listener se monta SOLO mientras hay una foto abierta: si no, quedaría
+  // escuchando toda la sesión para no hacer nada, y un Escape mientras se
+  // escribe en cualquier otro lado no tendría por qué pasar por acá.
+  useEffect(() => {
+    if (!lightboxId) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setLightboxId(null);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxId]);
+
   async function handleFilesChange(next: UploadedFile[]) {
     setPendingFiles([]);
     for (const file of next) {
