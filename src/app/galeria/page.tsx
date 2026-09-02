@@ -20,6 +20,17 @@ import type { GalleryPhoto } from "@/types/dashboard";
  * galería es su propio depósito de fotos (ver comentario en el schema). */
 const GALLERY_FOLDER = "gallery";
 
+/** Marcas de la hoja de contacto. Se separan en dos porque una foto puede
+ * estar marcada por los dos lados a la vez, y ahí se muestran los dos
+ * recuadros. */
+function marcadaPorCliente(photo: GalleryPhoto): boolean {
+  return photo.comments.some((c) => c.authorIsClient);
+}
+
+function marcadaPorAgencia(photo: GalleryPhoto): boolean {
+  return photo.comments.some((c) => !c.authorIsClient);
+}
+
 export default function GaleriaPage() {
   const { brandName } = useBrand();
   const { data: session } = useSession();
@@ -185,17 +196,30 @@ export default function GaleriaPage() {
                   />
                 </button>
 
-                {/* Recuadro rojo cuando alguien la comentó — la marca de hoja
-                    de contacto. Va como CAPA APARTE encima de la foto, no como
-                    `ring` en la celda: un ring es un box-shadow `inset`, y un
-                    inset se pinta debajo del contenido hijo, así que la <img>
-                    (que cubre la celda entera) lo tapaba por completo. El bug
-                    no se veía con URLs de prueba rotas, justamente porque no
-                    había imagen que lo tapara. */}
-                {photo.comments.length > 0 && (
+                {/* La marca de hoja de contacto, con el color de QUIEN comentó:
+                    rojo el cliente (Jun), verde la agencia. Si comentaron los
+                    dos se pintan los dos recuadros, uno dentro del otro — el
+                    dato es "a quién le gustó", y quedarse con un solo color
+                    perdería la mitad.
+
+                    Va como CAPA APARTE encima de la foto, no como `ring` en la
+                    celda: un ring es un box-shadow `inset`, y un inset se pinta
+                    debajo del contenido hijo, así que la <img> (que cubre la
+                    celda entera) lo tapaba por completo. El bug no se veía con
+                    URLs de prueba rotas, justamente porque no había imagen que
+                    lo tapara. */}
+                {marcadaPorCliente(photo) && (
                   <span
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-0 rounded ring-2 ring-brand-red ring-inset"
+                  />
+                )}
+                {marcadaPorAgencia(photo) && (
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute rounded ring-2 ring-emerald-500 ring-inset ${
+                      marcadaPorCliente(photo) ? "inset-[3px]" : "inset-0"
+                    }`}
                   />
                 )}
 

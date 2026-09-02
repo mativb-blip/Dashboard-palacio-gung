@@ -48,6 +48,13 @@ function canDeleteComment(
   return Boolean(row.authorId && viewer.id && row.authorId === viewer.id);
 }
 
+/** El cliente es el Comentarista (Jun); la agencia, Admin o Editor. Un rol
+ * desconocido cuenta como cliente: es de dónde vienen casi todos los
+ * comentarios y es el color que esas fotos ya tenían. */
+function esCliente(role: string | undefined): boolean {
+  return role !== "ADMIN" && role !== "EDITOR";
+}
+
 function toGalleryPhoto(
   row: {
     id: string;
@@ -59,6 +66,9 @@ function toGalleryPhoto(
   },
   now: Date,
   viewer: { id?: string; role?: string },
+  /** Rol de cada autor, por id. Lo que falte se toma como cliente (ver
+   * authorIsClient en el tipo). */
+  rolePorAutor: Map<string, string>,
 ): GalleryPhoto {
   return {
     id: row.id,
@@ -73,6 +83,7 @@ function toGalleryPhoto(
         text: c.text,
         when: formatCommentWhen(c.createdAt, now),
         canDelete: canDeleteComment(c, viewer),
+        authorIsClient: esCliente(c.authorId ? rolePorAutor.get(c.authorId) : undefined),
       }),
     ),
   };
@@ -86,7 +97,17 @@ export async function getGalleryPhotos(): Promise<GalleryPhoto[]> {
   });
   const now = new Date();
   const viewer = { id: session.user.id, role: session.user.role };
-  return rows.map((row) => toGalleryPhoto(row, now, viewer));
+
+  // Una sola consulta para todos los autores de todos los comentarios, en vez
+  // de una por comentario. `authorId` no es una relación de Prisma (es un
+  // String suelto, ver el schema), así que no se puede pedir con include.
+  const autorIds = [...new Set(rows.flatMap((r) => r.comments.map((c) => c.authorId).filter((id): id is string => Boolean(id))))];
+  const usuarios = autorIds.length
+    ? await prisma.user.findMany({ where: { id: { in: autorIds } }, select: { id: true, role: true } })
+    : [];
+  const rolePorAutor = new Map(usuarios.map((u) => [u.id, u.role as string]));
+
+  return rows.map((row) => toGalleryPhoto(row, now, viewer, rolePorAutor));
 }
 
 export async function addGalleryPhoto(url: string, filename?: string): Promise<GalleryPhoto> {
@@ -100,7 +121,7 @@ export async function addGalleryPhoto(url: string, filename?: string): Promise<G
     include: { comments: true },
   });
   revalidatePath("/galeria");
-  return toGalleryPhoto(row, new Date(), { id: session.user.id, role: session.user.role });
+  return toGalleryPhoto(row, new Date(), { id: session.user.id, role: session.user.role }, new Map());
 }
 
 export async function deleteGalleryPhoto(id: string): Promise<void> {
@@ -163,6 +184,7 @@ export async function addGalleryPhotoComment(
     when: formatCommentWhen(row.createdAt, new Date()),
     // Quien acaba de escribirlo siempre puede borrarlo.
     canDelete: true,
+    authorIsClient: esCliente(session.user.role),
   };
 }
 

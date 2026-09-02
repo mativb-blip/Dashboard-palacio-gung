@@ -96,6 +96,15 @@ export interface GalleryPhotoCommentEntry {
    * cualquiera si es Editor/Admin. Lo decide el server (ver
    * getGalleryPhotos) para que el cliente no tenga que replicar la regla. */
   canDelete: boolean;
+  /** true si lo escribió el CLIENTE (rol Comentarista, o sea Jun); false si
+   * lo escribió la agencia (Admin/Editor). Decide el color de la marca en la
+   * grilla: rojo el cliente, verde la agencia.
+   *
+   * Se resuelve por ROL y no por nombre: un nombre se edita y dos personas
+   * pueden llamarse igual. Los comentarios viejos sin `authorId` no tienen
+   * rol que consultar y caen a `true` — así conservan el rojo que ya tenían,
+   * en vez de cambiar de color de golpe. */
+  authorIsClient: boolean;
 }
 
 export interface GalleryPhoto {
