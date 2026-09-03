@@ -36,6 +36,12 @@ const NO_SON_ARCHIVOS = new Set([
   "InspirationPhoto.filename", // idem
   "InspirationLink.audioName", // idem
   "GalleryPhotoComment.photoId", // clave foránea; matchea por "photo"
+  // Ruta INTERNA a la que lleva el click del aviso ("/?proposal=abc",
+  // "/galeria"), nunca un archivo: la arma el server con postUrl() en
+  // proposals-actions.ts, no sale de ninguna subida. Si algún día un aviso
+  // guardara la URL de un archivo, esta línea hay que sacarla — el
+  // recolector borraría ese archivo por no verlo referenciado.
+  "Notification.url",
 ]);
 
 /** Nombres que hacen sospechar que una columna guarda una URL. */

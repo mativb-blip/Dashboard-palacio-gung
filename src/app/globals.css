@@ -274,6 +274,34 @@ input[type="text"]:focus {
   }
 }
 
+/* Panel de la campana de avisos: crece DESDE el botón que lo abrió (de ahí
+   transform-origin arriba a la derecha), no desde su propio centro — un
+   popover que aparece desde el medio de la nada se lee como si no tuviera
+   que ver con lo que apretaste. Arranca en 0.96 y no en 0: nada en el mundo
+   real aparece de la nada. Corto (160ms) y ease-out porque es una respuesta
+   a un click, no una transición decorativa. */
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.popover-in {
+  animation: popover-in 160ms var(--ease-out);
+  transform-origin: top right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popover-in {
+    animation: none;
+  }
+}
+
 /* Moodboard (clonado de clevante.cz, ver grabación del 2026-08-10):
    - reveal-item: cada título/párrafo/tarjeta aparece con fade+slide-up
      apenas entra en el viewport (IntersectionObserver, ver Reveal en

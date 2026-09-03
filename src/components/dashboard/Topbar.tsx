@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { handleLiquidPointerEnter, iconButtonClass, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
-import NotificationToggle from "./NotificationToggle";
+import NotificationsBell from "./NotificationsBell";
 import SegmentedGroup, { type SegmentedItem } from "./SegmentedGroup";
 import SignOutButton from "./SignOutButton";
 
@@ -113,20 +113,24 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
         <UserMenu />
       </div>
 
-      {/* Mobile real (<640px): un solo botón de hamburguesa reemplaza toda
-          esa fila — antes se apretaba envolviendo (flex-wrap) en pantallas
-          chicas. El ícono se transforma en X (mismo botón, sin cambiar de
-          elemento). */}
-      <button
-        type="button"
-        onClick={() => setMenuOpen((v) => !v)}
-        aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-        aria-expanded={menuOpen}
-        aria-controls="topbar-mobile-menu"
-        className={`${iconButtonClass} min-[640px]:hidden`}
-      >
-        <HamburgerIcon open={menuOpen} className="relative" />
-      </button>
+      {/* Mobile real (<640px): la hamburguesa reemplaza toda esa fila —
+          antes se apretaba envolviendo (flex-wrap) en pantallas chicas. El
+          ícono se transforma en X (mismo botón, sin cambiar de elemento).
+          La campana queda AFUERA del menú, acá al lado: un contador de
+          avisos que hay que abrir un menú para ver no avisa nada. */}
+      <div className="flex items-center gap-2 min-[640px]:hidden">
+        <NotificationsBell />
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+          aria-expanded={menuOpen}
+          aria-controls="topbar-mobile-menu"
+          className={iconButtonClass}
+        >
+          <HamburgerIcon open={menuOpen} className="relative" />
+        </button>
+      </div>
 
       {menuOpen && (
         <MobileMenu id="topbar-mobile-menu" items={items} onNavigate={() => setMenuOpen(false)} />
@@ -214,18 +218,10 @@ function MobileMenu({
             </Link>
           )}
 
-          <div
-            className={`stagger-in ${mobileRowClass} justify-between hover:bg-transparent hover:text-tx-2`}
-            style={{ animationDelay: delayOf(items.length + (isAdmin ? 3 : 2)) }}
-          >
-            <span className="flex items-center gap-2.5">
-              <BellIcon className="h-4 w-4" />
-              Notificaciones
-            </span>
-            <NotificationToggle />
-          </div>
-
-          <div className="stagger-in mt-1 px-3" style={{ animationDelay: delayOf(items.length + (isAdmin ? 4 : 3)) }}>
+          {/* La campana (y con ella el interruptor de avisos en este
+              dispositivo) vive en la barra, fuera de este menú — ver el
+              comentario del Topbar. */}
+          <div className="stagger-in mt-1 px-3" style={{ animationDelay: delayOf(items.length + (isAdmin ? 3 : 2)) }}>
             <SignOutButton />
           </div>
         </>
@@ -479,7 +475,7 @@ function UserMenu() {
           <PencilIcon className="relative" />
         </Link>
       )}
-      <NotificationToggle />
+      <NotificationsBell />
       <SignOutButton iconOnly />
     </div>
   );
@@ -521,23 +517,3 @@ function PencilIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-
-function BellIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M18 8a6 6 0 1 0-12 0c0 3.5-1 5.5-2 7h16c-1-1.5-2-3.5-2-7Z" />
-      <path d="M10 20a2 2 0 0 0 4 0" />
-    </svg>
-  );
-}
-

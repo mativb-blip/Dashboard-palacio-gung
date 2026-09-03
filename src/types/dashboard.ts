@@ -169,3 +169,42 @@ export interface InspirationLinkItem {
   addedBy?: string;
   when: string;
 }
+
+/** Qué originó un aviso de la campana del Topbar. Decide el ícono y el color
+ * del punto; el texto ya viene armado del server (ver Notification en el
+ * schema). */
+export type NotificationKind =
+  | "comment"
+  | "gallery-comment"
+  | "approval"
+  | "caption"
+  | "caption-edit"
+  | "music"
+  | "post-new"
+  | "post-edit"
+  | "post-delete"
+  | "inspiration";
+
+/** Un aviso ya listo para pintar. `read` en vez de la fecha de lectura: la
+ * campana solo necesita saber si está leído o no. */
+export interface NotificationItem {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  /** Ruta interna a la que lleva el click; ausente si ya no hay a dónde ir
+   * (el post borrado, por ejemplo). */
+  url?: string;
+  actor: string;
+  read: boolean;
+  when: string;
+}
+
+/** Lo que devuelve cada consulta de la campana: la lista y el contador de no
+ * leídos, juntos. El contador NO es `items.filter(...).length` — la lista
+ * viene recortada (ver NOTIFICATIONS_LIMIT) y el número tiene que seguir
+ * siendo el real aunque haya más avisos de los que se muestran. */
+export interface NotificationsSnapshot {
+  items: NotificationItem[];
+  unread: number;
+}

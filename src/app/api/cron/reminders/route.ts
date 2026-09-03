@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendAlertEmail } from "@/lib/dashboard/notify-email";
 import { sendPushToAdmins } from "@/lib/dashboard/notify-push";
+import { pruneOldNotifications } from "@/lib/dashboard/notifications";
 import { APPROVAL_REMINDER_HOURS_BEFORE } from "@/lib/dashboard/proposals";
 import { parseProposalDateTime, todayInSantoDomingo } from "@/lib/dashboard/schedule-time";
 import { getAdminEmail } from "@/lib/dashboard/site-settings";
@@ -107,5 +108,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ checked: candidates.length, sentT60, sentT0, sentApproval });
+  // Se cuelga de este cron en vez de correr en cada aviso nuevo: sería un
+  // DELETE extra por cada comentario para limpiar algo que no urge. Nunca
+  // tira, así que no puede tumbar los recordatorios.
+  const purged = await pruneOldNotifications();
+
+  return NextResponse.json({ checked: candidates.length, sentT60, sentT0, sentApproval, purged });
 }

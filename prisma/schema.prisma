@@ -39,6 +39,7 @@ model User {
   sessions Session[]
   pushSubscriptions PushSubscription[]
   moodboardSessions MoodboardSession[]
+  notifications     Notification[]
 }
 
 model Account {
@@ -450,4 +451,45 @@ model InspirationLink {
   createdAt DateTime @default(now())
 
   @@index([kind, createdAt])
+}
+
+/// Una notificación ya entregada a UNA persona — la campana del Topbar lee
+/// de acá. Es una fila por destinatario y no un evento compartido con un
+/// registro de "quién lo leyó" aparte: leído/no leído es personal (Matías
+/// puede haber visto un comentario que otro Editor todavía no), y con una
+/// fila por persona eso es una columna, no una tabla de cruce.
+///
+/// El texto se guarda ARMADO (title/body), no como referencias a la fila que
+/// lo originó. Es a propósito: un aviso es el registro de algo que pasó en
+/// su momento, y tiene que seguir leyéndose igual aunque después se edite el
+/// caption, se borre el post o cambie el nombre de quien lo hizo. Además
+/// evita que abrir la campana dispare una consulta por cada aviso.
+model Notification {
+  id        String    @id @default(cuid())
+  /// A quién le llega. Cascade: si se borra el usuario, sus avisos se van
+  /// con él — no le sirven a nadie más.
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "comment" | "gallery-comment" | "approval" | "caption" | "caption-edit"
+  /// | "music" | "post-new" | "post-edit" | "post-delete" | "inspiration".
+  /// String simple, mismo criterio que Proposal.format: decide el ícono y
+  /// nada más, y un enum obligaría a migrar la base por cada aviso nuevo.
+  kind      String
+  title     String    @db.Text
+  body      String    @db.Text
+  /// Ruta interna a la que lleva el click (ej. "/?proposal=abc"). Null
+  /// cuando ya no hay a dónde ir — el post borrado, por ejemplo.
+  url       String?   @db.Text
+  /// Nombre de quien lo provocó, para mostrarlo. Quién NO debe recibirlo se
+  /// decide por id en recordNotification(), no por este texto.
+  actor     String
+  /// null = sin leer. Fecha y no booleano: cuesta lo mismo y deja saber
+  /// cuándo se vio.
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  /// Cubre las dos consultas de la campana: el contador de no leídos
+  /// (userId + readAt null) y la lista (userId, por fecha).
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }

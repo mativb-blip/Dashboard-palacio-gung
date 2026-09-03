@@ -38,7 +38,8 @@ function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>(searchParams.get("period") === "grid" ? "grid" : "month");
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
-  const [selectedProposalId, setSelectedProposalId] = useState(searchParams.get("proposal"));
+  const proposalParam = searchParams.get("proposal");
+  const [selectedProposalId, setSelectedProposalId] = useState(proposalParam);
   const [artIndex, setArtIndex] = useState(0);
   const [gallery, setGallery] = useState<Gallery>("slider");
   const today = todayIso();
@@ -70,6 +71,30 @@ function DashboardHome() {
       cancelled = true;
     };
   }, [today]);
+
+  // La campana del Topbar abre un post navegando a `/?proposal=<id>`. Estando
+  // ya en esta pantalla eso no remonta el componente, así que sin esto el
+  // click cambiaba la URL y no pasaba nada más.
+  //
+  // Va durante el render y no en un useEffect a propósito: es el patrón que
+  // documenta React para ajustar estado cuando cambia algo de afuera (acá, la
+  // URL). Un efecto pintaría primero el post viejo y recién después el
+  // pedido — un parpadeo visible, además de un render de más.
+  //
+  // Solo reacciona al CAMBIO del parámetro: mientras no cambie, la selección
+  // manual (click en el calendario, en la grilla) manda y no se la pisa en
+  // cada render.
+  const [paramAplicado, setParamAplicado] = useState(proposalParam);
+  if (proposalParam !== paramAplicado) {
+    setParamAplicado(proposalParam);
+    if (proposalParam) {
+      setSelectedProposalId(proposalParam);
+      setArtIndex(0);
+      // El aviso habla de un post puntual: la vista Feed muestra la grilla
+      // entera y no dejaría ver cuál.
+      setPeriod("month");
+    }
+  }
 
   const selectedProposal = proposals.find((p) => p.id === selectedProposalId) ?? null;
 

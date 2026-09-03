@@ -8,6 +8,7 @@ import { formatCommentWhen } from "@/lib/dashboard/format";
 import type { GalleryPhoto, GalleryPhotoCommentEntry } from "@/types/dashboard";
 import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
 import { sendAlertEmail } from "@/lib/dashboard/notify-email";
+import { recordNotification } from "@/lib/dashboard/notifications";
 import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 
 // Cualquier usuario con sesión puede ver la galería — mismo criterio que
@@ -167,14 +168,27 @@ export async function addGalleryPhotoComment(
   });
   const brand = resolveBrand(await getSiteSettings());
   const notifyTo = brand.commentNotifyTo || (await getAdminEmail());
+  const cual = foto?.filename ? `"${foto.filename}"` : "una foto";
   if (notifyTo) {
-    const cual = foto?.filename ? `"${foto.filename}"` : "una foto";
     await sendAlertEmail({
       to: notifyTo,
       title: `Nuevo comentario en la Galería`,
       body: `${row.author} comentó ${cual} de la Galería: ${row.text}`,
     });
   }
+
+  // La campana no depende de que el mail esté configurado ni de que
+  // notifyTo tenga valor — son dos canales distintos, y el motivo por el
+  // que este comentario existe (así marca Jun las fotos que le gustan) es
+  // el mismo por el que no puede quedar sin registrar.
+  await recordNotification({
+    actorId: session.user.id ?? null,
+    actor: row.author,
+    kind: "gallery-comment",
+    title: `${row.author} comentó ${cual} de la Galería`,
+    body: row.text,
+    url: "/galeria",
+  });
 
   revalidatePath("/galeria");
   return {

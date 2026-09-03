@@ -8,6 +8,7 @@ import { formatCommentWhen } from "@/lib/dashboard/format";
 import { instagramEmbedSrc, normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
 import { normalizeExternalUrl, normalizeSongUrl } from "@/lib/dashboard/link-url";
 import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
+import { recordNotification } from "@/lib/dashboard/notifications";
 import type {
   InspirationItem,
   InspirationKind,
@@ -43,6 +44,29 @@ async function requireEditor() {
   const session = await auth();
   if (!session) throw new Error("Necesitás iniciar sesión.");
   return session;
+}
+
+/** Aviso de que alguien sumó una referencia. Solo campana, nunca mail:
+ * Inspiración se llena de a varias cosas seguidas y un correo por cada una
+ * sería insoportable — pero que Jun deje una referencia ES una interacción
+ * suya, y es la mitad del sentido de haberle abierto la sección.
+ *
+ * Se avisa al AGREGAR y no al borrar: sumar una referencia dice algo (esto
+ * me gusta), sacarla es limpieza. */
+async function avisarReferencia(
+  session: { user: { id?: string; name?: string | null; email?: string | null } },
+  seccion: string,
+  detalle: string,
+): Promise<void> {
+  const quien = session.user.name || session.user.email || "Alguien";
+  await recordNotification({
+    actorId: session.user.id ?? null,
+    actor: quien,
+    kind: "inspiration",
+    title: `${quien} agregó ${seccion} en Inspiración`,
+    body: detalle,
+    url: "/inspiracion",
+  });
 }
 
 function toInspirationItem(
@@ -96,6 +120,7 @@ export async function addInspirationItem(url: string, kind: InspirationKind): Pr
   const row = await prisma.inspirationReel.create({
     data: { url: normalized, kind: safeKind, addedBy: session.user.name || session.user.email || null },
   });
+  await avisarReferencia(session, safeKind === "reel" ? "un reel" : "un post", normalized);
   revalidatePath("/inspiracion");
   return toInspirationItem(row, new Date());
 }
@@ -140,6 +165,7 @@ export async function addInspirationStory(url: string, filename?: string): Promi
       addedBy: session.user.name || session.user.email || null,
     },
   });
+  await avisarReferencia(session, "una historia", row.filename || "Archivo subido");
   revalidatePath("/inspiracion");
   return toInspirationStory(row, new Date());
 }
@@ -252,6 +278,11 @@ export async function addInspirationLink(
       addedBy: session.user.name || session.user.email || null,
     },
   });
+  await avisarReferencia(
+    session,
+    safeKind === "song" ? "una canción" : "un enlace",
+    row.title || row.url || row.audioName || "Sin título",
+  );
   revalidatePath("/inspiracion");
   return toInspirationLinkItem(row, new Date());
 }

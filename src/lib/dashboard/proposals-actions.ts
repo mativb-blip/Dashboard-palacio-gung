@@ -9,6 +9,7 @@ import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
 import { formatCommentWhen } from "@/lib/dashboard/format";
 import { sendAlertEmail, sendCommentNotification } from "@/lib/dashboard/notify-email";
 import { sendPushToAdmins } from "@/lib/dashboard/notify-push";
+import { recordNotification } from "@/lib/dashboard/notifications";
 import {
   describeInstagramMusicUrl,
   normalizeInstagramMusicUrl,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/dashboard/proposals";
 import { getAdminEmail, getSiteSettings, resolveBrand } from "@/lib/dashboard/site-settings";
 import type {
+  NotificationKind,
   Proposal,
   ProposalCaptionOption,
   ProposalComment,
@@ -202,7 +204,7 @@ function buildMusicCreateData(
 }
 
 export async function createProposal(input: CreateProposalInput): Promise<Proposal> {
-  await requireEditor();
+  const session = await requireEditor();
   if (!input.date || !input.time.trim() || !input.caption.trim()) {
     throw new Error("Fecha, hora y caption son obligatorios.");
   }
@@ -252,6 +254,17 @@ export async function createProposal(input: CreateProposalInput): Promise<Propos
     include: PROPOSAL_INCLUDE,
   });
 
+  // Sin mail: cargar propuestas es el trabajo diario de la agencia y avisar
+  // por correo de cada una sería ruido. En la campana sí — es justo lo que
+  // Jun necesita ver al entrar ("hay algo nuevo para revisar").
+  await recordFor(
+    session,
+    "post-new",
+    `${editorName(session)} cargó un post nuevo`,
+    `"${row.title}" — ${row.format}, ${row.date}.`,
+    postUrl(row.id),
+  );
+
   revalidatePath("/");
   revalidatePath("/calendario");
   return toProposal(row, new Date());
@@ -272,25 +285,71 @@ export interface UpdateProposalInput {
  * publicación distinta a la aprobada. */
 const CONTENT_FIELDS = ["date", "caption", "images", "video"] as const;
 
+/** Cómo se llama cada uno de esos campos en el aviso de "editó un post" —
+ * "images" no le dice nada a nadie fuera del código. */
+function NOMBRE_DE_CAMPO(key: (typeof CONTENT_FIELDS)[number]): string {
+  switch (key) {
+    case "date":
+      return "la fecha";
+    case "caption":
+      return "el caption";
+    case "images":
+      return "los artes";
+    case "video":
+      return "el video";
+  }
+}
+
 /** Nombre legible de quien edita, para el texto de "aprobación invalidada" y
  * para los avisos por mail. */
 function editorName(session: { user: { name?: string | null; email?: string | null } }): string {
   return session.user.name || session.user.email || "Desconocido";
 }
 
-/** Aviso al Admin de que alguien eligió una alternativa (caption o música).
+/** Ruta que abre un post desde la campana. La home ya lee `?proposal=` (ver
+ * DashboardHome en src/app/page.tsx), así que no hace falta una ruta nueva. */
+function postUrl(proposalId: string): string {
+  return `/?proposal=${proposalId}`;
+}
+
+/** Deja el aviso en la campana de todos menos de quien lo hizo (ver
+ * recordNotification). Envuelto acá para no repetir el armado del actor en
+ * cada acción. */
+async function recordFor(
+  session: { user: { id?: string; name?: string | null; email?: string | null } },
+  kind: NotificationKind,
+  title: string,
+  body: string,
+  url?: string | null,
+): Promise<void> {
+  await recordNotification({
+    actorId: session.user.id ?? null,
+    actor: editorName(session),
+    kind,
+    title,
+    body,
+    url,
+  });
+}
+
+/** Aviso de que alguien eligió una alternativa (caption o música).
  *
- * No se manda cuando el que elige es Admin: el destinatario es él mismo
- * (getAdminEmail), y avisarle de su propio click es ruido — el aviso existe
- * para enterarse de lo que hace Jun, que es Comentarista.
+ * La campana lo registra SIEMPRE — también cuando elige un Admin, porque ahí
+ * el que se tiene que enterar es Jun, y recordNotification ya excluye a quien
+ * lo hizo. El mail, en cambio, se saltea si el que elige es Admin: su
+ * destinatario es él mismo (getAdminEmail) y sería avisarle de su propio
+ * click.
  *
  * El cuerpo va de una sola línea a propósito: sendAlertEmail lo mete escapado
  * dentro de un único <p>, así que un \n no se vería. */
 async function notifyChoice(
-  session: { user: { role: string; name?: string | null; email?: string | null } },
+  session: { user: { id?: string; role: string; name?: string | null; email?: string | null } },
   title: string,
   body: string,
+  kind: NotificationKind,
+  url: string,
 ): Promise<void> {
+  await recordFor(session, kind, title, body, url);
   if (session.user.role === "ADMIN") return;
   const to = await getAdminEmail();
   await Promise.all([
@@ -394,13 +453,28 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
   });
 
   if (justApproved) {
-    const title = "Jun aprobó un post";
+    const title = `${editorName(session)} aprobó un post`;
     const body = current.title ? `"${current.title}" quedó aprobado.` : "Un post quedó aprobado.";
     const to = await getAdminEmail();
     await Promise.all([
       to ? sendAlertEmail({ to, title, body }) : Promise.resolve(),
       sendPushToAdmins({ title, body }),
+      recordFor(session, "approval", title, body, postUrl(id)),
     ]);
+  } else if (contentTouched) {
+    // Solo campana, sin mail: una edición de la agencia no tiene por qué
+    // interrumpir a nadie, pero Jun sí necesita poder ver que lo que aprobó
+    // (o está por aprobar) cambió — sobre todo cuando eso le tumbó la
+    // aprobación.
+    const cambios = CONTENT_FIELDS.filter((key) => key in patch).map(NOMBRE_DE_CAMPO).join(", ");
+    await recordFor(
+      session,
+      "post-edit",
+      `${editorName(session)} editó un post`,
+      `${current.title ? `"${current.title}"` : "Un post"} — cambió ${cambios}.` +
+        (invalidatedReason ? " Esto invalidó la aprobación anterior." : ""),
+      postUrl(id),
+    );
   }
 
   revalidatePath("/");
@@ -411,7 +485,7 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
 
 
 export async function deleteProposal(id: string): Promise<void> {
-  await requireEditor();
+  const session = await requireEditor();
 
   // Se junta TODO antes de borrar: el delete cascadea a versiones,
   // comentarios y músicas, así que después de ejecutarlo esas URLs ya no se
@@ -419,6 +493,7 @@ export async function deleteProposal(id: string): Promise<void> {
   const propuesta = await prisma.proposal.findUnique({
     where: { id },
     select: {
+      title: true,
       images: true,
       video: true,
       comments: { select: { images: true } },
@@ -427,6 +502,15 @@ export async function deleteProposal(id: string): Promise<void> {
   });
 
   await prisma.proposal.delete({ where: { id } });
+
+  // Sin url: el post ya no existe, y un aviso que lleva a una pantalla vacía
+  // es peor que uno que no lleva a ningún lado.
+  await recordFor(
+    session,
+    "post-delete",
+    `${editorName(session)} borró un post`,
+    propuesta?.title ? `"${propuesta.title}" ya no está en el plan.` : "Un post ya no está en el plan.",
+  );
 
   if (propuesta) {
     await deleteUnreferencedBlobs([
@@ -450,7 +534,7 @@ export interface AddCommentInput {
 }
 
 export async function addComment(proposalId: string, input: AddCommentInput): Promise<ProposalComment> {
-  await requireSession();
+  const session = await requireSession();
   const author = input.author.trim();
   const text = input.text.trim();
   if (!author || !text) throw new Error("Nombre y comentario son obligatorios.");
@@ -492,6 +576,13 @@ export async function addComment(proposalId: string, input: AddCommentInput): Pr
         title: `Nuevo comentario en "${proposal.title}"`,
         body: `${row.author}: ${row.text}`,
       }),
+      recordFor(
+        session,
+        "comment",
+        `${row.author} comentó "${proposal.title}"`,
+        excerpt(row.text),
+        postUrl(proposalId),
+      ),
     ]);
   }
 
@@ -510,7 +601,7 @@ export async function addComment(proposalId: string, input: AddCommentInput): Pr
 }
 
 export async function toggleCommentResolved(commentId: string): Promise<boolean> {
-  await requireSession();
+  const session = await requireSession();
   const current = await prisma.proposalComment.findUniqueOrThrow({ where: { id: commentId } });
 
   // Estado ANTES del toggle — necesario para saber si esta acción puntual es
@@ -544,6 +635,7 @@ export async function toggleCommentResolved(commentId: string): Promise<boolean>
       await Promise.all([
         to ? sendAlertEmail({ to, title, body }) : Promise.resolve(),
         sendPushToAdmins({ title, body }),
+        recordFor(session, "approval", title, body, postUrl(current.proposalId)),
       ]);
     }
   }
@@ -683,6 +775,18 @@ export async function updateCaptionOption(optionId: string, text: string): Promi
 
   await prisma.proposalCaptionOption.update({ where: { id: optionId }, data: { text: value } });
 
+  // Solo campana. Corregir un caption es de las cosas que Jun hace más
+  // seguido (para eso se le dio el permiso), y un mail por cada corrección
+  // de una coma sería insoportable; pero la agencia tiene que poder ver que
+  // el texto que va a publicar ya no es el que escribió.
+  await recordFor(
+    session,
+    "caption-edit",
+    `${editorName(session)} corrigió un caption`,
+    `${await proposalLabel(option.proposalId)}: ${excerpt(value)}`,
+    postUrl(option.proposalId),
+  );
+
   return captionResult(option.proposalId, await sincronizarEspejo(option.proposalId, editorName(session)));
 }
 
@@ -701,6 +805,14 @@ export async function deleteCaptionOption(optionId: string): Promise<CaptionOpti
   if (siblings.length <= 1) throw new Error("Tiene que quedar al menos una alternativa de caption.");
 
   await prisma.proposalCaptionOption.delete({ where: { id: optionId } });
+
+  await recordFor(
+    session,
+    "caption-edit",
+    `${editorName(session)} borró una alternativa de caption`,
+    `${await proposalLabel(option.proposalId)}: ${excerpt(option.text)}`,
+    postUrl(option.proposalId),
+  );
 
   // Si se borró la elegida NO se promueve otra a elegida: sería inventarle a
   // Jun una decisión que no tomó. Queda sin ninguna elegida y el caption
@@ -743,6 +855,8 @@ export async function selectCaptionOption(optionId: string): Promise<CaptionOpti
       // desaprueba (ver commitCaptionMirror) — eso es lo que hay que hacer,
       // y el Admin necesita enterarse en el mismo aviso.
       (extra.approvalInvalidatedReason ? " — Esto invalidó la aprobación anterior." : ""),
+    "caption",
+    postUrl(option.proposalId),
   );
   return result;
 }
@@ -852,6 +966,8 @@ export async function setMusicOptionSelected(
     session,
     `${editorName(session)} eligió la música`,
     `${label}: ${musicName}${option.url ? ` — ${option.url}` : ""}`,
+    "music",
+    postUrl(option.proposalId),
   );
   return result;
 }
