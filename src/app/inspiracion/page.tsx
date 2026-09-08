@@ -20,6 +20,7 @@ import {
   getInspirationLinks,
   getInspirationNotes,
   getInspirationStories,
+  reorderInspirationNotes,
   updateInspirationNote,
 } from "@/lib/dashboard/inspiration-actions";
 import { instagramEmbedSrc } from "@/lib/dashboard/instagram-music";
@@ -288,6 +289,30 @@ function NotesSection({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  /** Mueve una nota una posición y persiste la lista completa.
+   *
+   * Con flechas y no arrastrando, por lo mismo que los artes de un carrusel:
+   * el drag de HTML5 no existe en pantallas táctiles y esto se usa desde un
+   * iPad. Acá además son ↑/↓ porque la lista es vertical.
+   *
+   * Optimista: la lista se reordena en pantalla y recién después se manda.
+   * Esperar el round-trip por mover un renglón se siente roto, y si falla se
+   * vuelve al orden anterior. */
+  async function handleMove(index: number, delta: number) {
+    const destino = index + delta;
+    if (destino < 0 || destino >= notes.length) return;
+    const anterior = notes;
+    const next = [...notes];
+    [next[index], next[destino]] = [next[destino], next[index]];
+    setNotes(next);
+    try {
+      setNotes(await reorderInspirationNotes(next.map((n) => n.id)));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo cambiar el orden.");
+      setNotes(anterior);
+    }
+  }
+
   async function handleDelete(note: InspirationNote) {
     if (!window.confirm("¿Borrar esta nota?")) return;
     setNotes((prev) => prev.filter((n) => n.id !== note.id));
@@ -372,7 +397,7 @@ function NotesSection({ canEdit }: { canEdit: boolean }) {
         </p>
       ) : (
         <div className="flex flex-col gap-2">
-          {notes.map((note) =>
+          {notes.map((note, index) =>
             editingId === note.id ? (
               <div key={note.id} className="flex flex-col gap-2 rounded border border-line-2 bg-panel-2 p-3 desktop:max-w-2xl">
                 <textarea
@@ -421,6 +446,22 @@ function NotesSection({ canEdit }: { canEdit: boolean }) {
                 </div>
                 {canEdit && (
                   <div className="flex shrink-0 items-center gap-1">
+                    {notes.length > 1 && (
+                      <>
+                        <NoteMoveButton
+                          dir="arriba"
+                          position={index + 1}
+                          disabled={index === 0}
+                          onClick={() => void handleMove(index, -1)}
+                        />
+                        <NoteMoveButton
+                          dir="abajo"
+                          position={index + 1}
+                          disabled={index === notes.length - 1}
+                          onClick={() => void handleMove(index, 1)}
+                        />
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -450,6 +491,50 @@ function NotesSection({ canEdit }: { canEdit: boolean }) {
         </div>
       )}
     </>
+  );
+}
+
+/** Flecha para subir o bajar una nota una posición. Mismo criterio de
+ * etiqueta que las de los artes: dice a dónde va, y cuando no se puede, por
+ * qué — "mover a la posición 0" nombra un lugar que no existe. */
+function NoteMoveButton({
+  dir,
+  position,
+  disabled,
+  onClick,
+}: {
+  dir: "arriba" | "abajo";
+  position: number;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const destino = dir === "arriba" ? position - 1 : position + 1;
+  const etiqueta = disabled
+    ? `Esta nota ya es la ${dir === "arriba" ? "primera" : "última"}`
+    : `Mover la nota a la posición ${destino}`;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={etiqueta}
+      title={disabled ? undefined : `Mover a la posición ${destino}`}
+      className={`flex h-7 w-7 items-center justify-center rounded text-tx-3 transition-colors duration-[200ms] hover:text-brand-blue disabled:opacity-30 disabled:hover:text-tx-3 ${PRESS_SCALE_CLASS}`}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={dir === "abajo" ? { transform: "rotate(180deg)" } : undefined}
+      >
+        <path d="M18 15l-6-6-6 6" />
+      </svg>
+    </button>
   );
 }
 

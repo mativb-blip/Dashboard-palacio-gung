@@ -519,10 +519,24 @@ model InspirationNote {
   id        String   @id @default(cuid())
   text      String   @db.Text
   addedBy   String?
+  /// Orden manual, ascendente: 0 es la primera de la lista. Existe porque
+  /// las notas se pueden reordenar a mano, y entonces `createdAt` deja de
+  /// alcanzar — a diferencia del resto de Inspiración, donde el orden es
+  /// siempre "lo último arriba" y no hay nada que decidir.
+  ///
+  /// Se reescribe denso (0,1,2,…) en cada reordenamiento en vez de
+  /// intercambiar dos valores: cuesta lo mismo con esta cantidad de filas y
+  /// deja la secuencia sana aunque alguna quede repetida o con un hueco.
+  /// Una nota nueva entra en 0 y corre al resto.
+  order     Int      @default(0)
   createdAt DateTime @default(now())
-  /// Se muestra solo si difiere de createdAt — así una nota sin tocar no
-  /// dice "editada".
-  updatedAt DateTime @updatedAt
+  /// Cuándo se corrigió el TEXTO. null = nunca.
+  ///
+  /// Explícito y no un `@updatedAt`: ese se dispara con cualquier escritura
+  /// sobre la fila, y reordenar la lista escribe `order` en todas. Con
+  /// `@updatedAt`, mover una nota marcaba las demás como "editada" sin que
+  /// nadie hubiera tocado una letra. Lo setea solo updateInspirationNote().
+  editedAt  DateTime?
 
-  @@index([createdAt])
+  @@index([order])
 }

@@ -312,25 +312,25 @@ export async function deleteInspirationLink(id: string): Promise<void> {
 const NOTE_MAX = 5000;
 
 function toInspirationNote(
-  row: { id: string; text: string; addedBy: string | null; createdAt: Date; updatedAt: Date },
+  row: { id: string; text: string; addedBy: string | null; createdAt: Date; editedAt: Date | null },
   now: Date,
 ): InspirationNote {
-  // `updatedAt` siempre existe; se informa solo si de verdad hubo una edición
-  // posterior. El margen de un segundo es para el desfasaje que deja Prisma
-  // entre los dos valores al crear la fila.
-  const editada = row.updatedAt.getTime() - row.createdAt.getTime() > 1000;
   return {
     id: row.id,
     text: row.text,
     addedBy: row.addedBy ?? undefined,
     when: formatCommentWhen(row.createdAt, now),
-    editedWhen: editada ? formatCommentWhen(row.updatedAt, now) : undefined,
+    editedWhen: row.editedAt ? formatCommentWhen(row.editedAt, now) : undefined,
   };
 }
 
 export async function getInspirationNotes(): Promise<InspirationNote[]> {
   await requireSession();
-  const rows = await prisma.inspirationNote.findMany({ orderBy: { createdAt: "desc" } });
+  // `order` manda; `createdAt` solo desempata (dos notas con el mismo orden
+  // solo pueden venir de una fila insertada mientras otra se reordenaba).
+  const rows = await prisma.inspirationNote.findMany({
+    orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+  });
   const now = new Date();
   return rows.map((row) => toInspirationNote(row, now));
 }
@@ -340,12 +340,20 @@ export async function addInspirationNote(text: string): Promise<InspirationNote>
   const value = text.trim();
   if (!value) throw new Error("Escribí algo antes de agregar.");
 
-  const row = await prisma.inspirationNote.create({
-    data: {
-      text: value.slice(0, NOTE_MAX),
-      addedBy: session.user.name || session.user.email || null,
-    },
-  });
+  // Entra arriba de todo y corre al resto, que es donde aparecía cuando el
+  // orden era por fecha. Las dos operaciones van juntas: si el corrimiento
+  // se aplicara sin el insert, quedaría un 0 libre y la próxima nota se
+  // metería en el medio de la lista sin que nadie se lo haya pedido.
+  const [, row] = await prisma.$transaction([
+    prisma.inspirationNote.updateMany({ data: { order: { increment: 1 } } }),
+    prisma.inspirationNote.create({
+      data: {
+        text: value.slice(0, NOTE_MAX),
+        addedBy: session.user.name || session.user.email || null,
+        order: 0,
+      },
+    }),
+  ]);
   await avisarReferencia(session, "una nota", value);
   revalidatePath("/inspiracion");
   return toInspirationNote(row, new Date());
@@ -365,10 +373,37 @@ export async function updateInspirationNote(id: string, text: string): Promise<I
 
   const row = await prisma.inspirationNote.update({
     where: { id },
-    data: { text: value.slice(0, NOTE_MAX) },
+    // `editedAt` se setea acá y en ningún otro lado: es lo que hace que
+    // reordenar la lista no marque nada como editado.
+    data: { text: value.slice(0, NOTE_MAX), editedAt: new Date() },
   });
   revalidatePath("/inspiracion");
   return toInspirationNote(row, new Date());
+}
+
+/**
+ * Fija el orden de las notas al que venga en `ids`, de arriba hacia abajo.
+ *
+ * Recibe la lista ENTERA y no "mové esta una posición": así el server no
+ * tiene que reconstruir en qué estado creía estar el cliente, y el resultado
+ * es el mismo se haya movido lo que se haya movido. De paso reescribe la
+ * secuencia densa (0,1,2,…), así que arregla cualquier orden repetido o con
+ * huecos que haya quedado de antes.
+ *
+ * Los ids que no existan se ignoran solos: cada update apunta a un id
+ * concreto y el `updateMany` de uno inexistente no afecta ninguna fila. Eso
+ * cubre el caso de dos personas ordenando a la vez, una de ellas después de
+ * que la otra borró una nota.
+ */
+export async function reorderInspirationNotes(ids: string[]): Promise<InspirationNote[]> {
+  await requireEditor();
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.inspirationNote.updateMany({ where: { id }, data: { order: index } }),
+    ),
+  );
+  revalidatePath("/inspiracion");
+  return getInspirationNotes();
 }
 
 export async function deleteInspirationNote(id: string): Promise<void> {
