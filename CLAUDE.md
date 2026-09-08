@@ -54,6 +54,8 @@ El estado de una propuesta se deriva automáticamente (no se elige a mano): **Pe
 | `supportsVideo()` | el campo `Proposal.video` — UN video del post, con portada aparte en `images[0]` | Reel, Historia |
 | `supportsVideoSlides()` | videos entre las diapositivas de `images` | Carrusel |
 
+El orden de las diapositivas se cambia con flechas en cada miniatura (`ArtUploadZone`, tanto al crear como al editar) — **no arrastrando**: el drag-and-drop de HTML5 no funciona en pantallas táctiles y este dashboard se usa desde un iPad, y además esa misma zona ya escucha `drop` para recibir archivos, así que serían dos gestos casi iguales con significados distintos. Reordenar la lista alcanza: `images` se guarda con `files.map(f => f.url)` en los dos flujos, sin nada que tocar en el server. Las miniaturas de video muestran su primer fotograma y no un ícono genérico, porque cuatro videos seguidos rotulados "arte-2, arte-3…" son indistinguibles entre sí — y entonces no hay forma de saber cuál estás moviendo.
+
 Un Carrusel deja `Proposal.video` en null. `SlideMedia` es el componente que elige entre `<img>` y `<video>` y lo usan la miniatura del Feed, el preview del post y el de Instagram; el visor grande de la vista Post no lo usa porque `ArtSlot` ya tenía su propia rama de video (con portada y controles) desde el Reel. Que un video se muestre en un lugar y no en otro es el modo de fallar típico acá: son cinco pantallas distintas pintando la misma lista.
 
 ## Alternativas de caption y música

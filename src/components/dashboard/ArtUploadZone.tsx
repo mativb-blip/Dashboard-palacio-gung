@@ -165,6 +165,10 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
   const acceptsImage = accept.includes("image");
   const acceptsVideo = accept.includes("video");
   const mediaKind: MediaKind = acceptsImage && acceptsVideo ? "media" : acceptsImage ? "image" : "video";
+  // Reordenar solo tiene sentido donde hay una secuencia: la zona de un solo
+  // archivo (portada de Reel, video) no la tiene, y con un arte tampoco hay
+  // nada que mover.
+  const puedeReordenar = multiple && files.length > 1;
   const isImage = acceptsImage;
 
   /** Fotos elegidas de la Galería: ya están en Blob, así que no se suben ni
@@ -188,6 +192,23 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
 
   function dismissStatus(id: string) {
     setStatuses((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  /** Mueve un arte una posición. El orden de esta lista ES el orden de
+   * publicación: `images` se guarda con `files.map(f => f.url)` tanto al
+   * crear como al editar, así que reordenar acá alcanza — no hay nada que
+   * cambiar en el server.
+   *
+   * Con flechas y no arrastrando: el arrastre de HTML5 no existe en pantallas
+   * táctiles, y este dashboard se usa desde un iPad. Además la zona de arriba
+   * ya escucha `drop` para recibir archivos, así que arrastrar acá adentro
+   * sería dos gestos parecidos con significados distintos. */
+  function moveFile(index: number, delta: number) {
+    const destino = index + delta;
+    if (destino < 0 || destino >= files.length) return;
+    const next = [...files];
+    [next[index], next[destino]] = [next[destino], next[index]];
+    onFilesChange(next);
   }
 
   async function addFiles(incoming: File[] | FileList) {
@@ -410,34 +431,119 @@ export default function ArtUploadZone({ label, accept, multiple, files, onFilesC
       )}
 
       {files.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto">
-          {files.map((f) => (
-            <div
-              key={f.id}
-              className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-line-2 bg-panel-2"
-            >
-              {!isVideoUrl(f.url) ? (
-                // eslint-disable-next-line @next/next/no-img-element -- preview local del arte cargado, no un asset del sitio
-                <img src={f.url} alt={f.name} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-tx-3">
-                  <PlayIcon />
-                  <span className="max-w-full truncate px-1 text-[9px]">{f.name}</span>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {files.map((f, i) => (
+            <div key={f.id} className="flex shrink-0 flex-col gap-1">
+              <div className="relative h-16 w-16 overflow-hidden rounded border border-line-2 bg-panel-2">
+                {!isVideoUrl(f.url) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- preview local del arte cargado, no un asset del sitio
+                  <img src={f.url} alt={f.name} className="h-full w-full object-cover" />
+                ) : (
+                  <>
+                    {/* El primer fotograma, no un ícono genérico. Con cuatro
+                        videos seguidos, unas miniaturas que solo dicen
+                        "arte-2, arte-3…" son indistinguibles entre sí — y
+                        entonces no hay forma de saber cuál estás moviendo.
+                        `#t=0.1` es lo que obliga al navegador a dibujar un
+                        cuadro (mismo truco que las Historias en /inspiracion). */}
+                    <video
+                      src={`${f.url}#t=0.1`}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-white/90 drop-shadow">
+                      <PlayIcon />
+                    </span>
+                  </>
+                )}
+                {puedeReordenar && (
+                  <span className="pointer-events-none absolute bottom-0 left-0 rounded-tr bg-brand-ink/80 px-1 text-[9px] leading-[14px] font-bold text-[var(--bg)] tabular-nums">
+                    {i + 1}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeFile(f.id)}
+                  aria-label={`Quitar ${f.name}`}
+                  className={`absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-ink/80 text-[10px] leading-none text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+                >
+                  ×
+                </button>
+              </div>
+
+              {puedeReordenar && (
+                <div className="flex gap-1">
+                  <MoveButton
+                    dir="izquierda"
+                    name={f.name}
+                    position={i + 1}
+                    disabled={i === 0}
+                    onClick={() => moveFile(i, -1)}
+                  />
+                  <MoveButton
+                    dir="derecha"
+                    name={f.name}
+                    position={i + 1}
+                    disabled={i === files.length - 1}
+                    onClick={() => moveFile(i, 1)}
+                  />
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => removeFile(f.id)}
-                aria-label={`Quitar ${f.name}`}
-                className={`absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-ink/80 text-[10px] leading-none text-[var(--bg)] transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
-              >
-                ×
-              </button>
             </div>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/** Flecha para mover un arte una posición. El texto accesible dice a dónde
+ * va y no "izquierda"/"derecha" a secas: leído por un lector de pantalla,
+ * "mover a la posición 3" es accionable y "flecha derecha" no. */
+function MoveButton({
+  dir,
+  name,
+  position,
+  disabled,
+  onClick,
+}: {
+  dir: "izquierda" | "derecha";
+  name: string;
+  position: number;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const destino = dir === "izquierda" ? position - 1 : position + 1;
+  // Deshabilitada no anuncia un destino: "mover a la posición 0" describe un
+  // lugar que no existe. Dice por qué no se puede, que es lo accionable.
+  const etiqueta = disabled
+    ? `${name} ya está en ${dir === "izquierda" ? "la primera" : "la última"} posición`
+    : `Mover ${name} a la posición ${destino}`;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={etiqueta}
+      title={disabled ? undefined : `Mover a la posición ${destino}`}
+      className={`flex h-6 flex-1 items-center justify-center rounded border border-line-2 bg-panel-2 text-tx-2 transition-colors duration-[200ms] hover:border-brand-blue hover:text-brand-blue disabled:opacity-30 disabled:hover:border-line-2 disabled:hover:text-tx-2 ${PRESS_SCALE_CLASS}`}
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={dir === "derecha" ? { transform: "rotate(180deg)" } : undefined}
+      >
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+    </button>
   );
 }
 
