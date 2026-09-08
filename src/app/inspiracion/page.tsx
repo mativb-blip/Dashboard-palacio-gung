@@ -10,13 +10,17 @@ import { resolveAudioContentType } from "@/lib/dashboard/audio";
 import {
   addInspirationItem,
   addInspirationLink,
+  addInspirationNote,
   addInspirationStory,
   deleteInspirationItem,
   deleteInspirationLink,
+  deleteInspirationNote,
   deleteInspirationStory,
   getInspirationItems,
   getInspirationLinks,
+  getInspirationNotes,
   getInspirationStories,
+  updateInspirationNote,
 } from "@/lib/dashboard/inspiration-actions";
 import { instagramEmbedSrc } from "@/lib/dashboard/instagram-music";
 import { describeSongUrl, hostOf } from "@/lib/dashboard/link-url";
@@ -27,6 +31,7 @@ import type {
   InspirationKind,
   InspirationLinkItem,
   InspirationLinkKind,
+  InspirationNote,
   InspirationStory,
 } from "@/types/dashboard";
 
@@ -88,6 +93,8 @@ export default function InspiracionPage() {
             Repositorio de referencias para mirar antes de producir.
           </p>
         </div>
+
+        <NotesSection canEdit={canEdit} />
 
         <InspirationSection
           kind="reel"
@@ -205,6 +212,244 @@ export default function InspiracionPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Notas: texto suelto, lo único de Inspiración que no es un enlace ni un
+ * archivo. Va primera porque es lo más barato de dejar y lo más rápido de
+ * leer: no hay que abrir nada.
+ *
+ * Es la única sección con edición. En las otras, corregir es borrar y volver
+ * a pegar la URL — el mismo esfuerzo. Acá el contenido es un párrafo, y
+ * obligar a reescribirlo entero por una palabra no es un reemplazo. */
+function NotesSection({ canEdit }: { canEdit: boolean }) {
+  const [notes, setNotes] = useState<InspirationNote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  /** Id de la nota que se está editando (una a la vez). */
+  const [editingId, setEditingId] = useState("");
+  const [editDraft, setEditDraft] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    getInspirationNotes().then((data) => {
+      if (cancelled) return;
+      setNotes(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function resetComposer() {
+    setAdding(false);
+    setDraft("");
+    setError("");
+  }
+
+  async function handleAdd() {
+    const value = draft.trim();
+    if (!value) {
+      setError("Escribí algo antes de agregar.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const saved = await addInspirationNote(value);
+      setNotes((prev) => [saved, ...prev]);
+      resetComposer();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo agregar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveEdit(note: InspirationNote) {
+    const value = editDraft.trim();
+    if (!value || value === note.text) {
+      setEditingId("");
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await updateInspirationNote(note.id, value);
+      setNotes((prev) => prev.map((n) => (n.id === note.id ? saved : n)));
+      setEditingId("");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo guardar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(note: InspirationNote) {
+    if (!window.confirm("¿Borrar esta nota?")) return;
+    setNotes((prev) => prev.filter((n) => n.id !== note.id));
+    try {
+      await deleteInspirationNote(note.id);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo borrar.");
+      setNotes((prev) => [note, ...prev]);
+    }
+  }
+
+  return (
+    <>
+      <div className="mt-2 flex items-start justify-between gap-3 border-t border-line pt-5">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold">Notas</h2>
+          <p className="mt-1 text-sm text-tx-2">
+            Ideas sueltas, frases para un caption, lo que se te ocurra y no sea un enlace ni un archivo.
+          </p>
+        </div>
+        {canEdit && !adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            onPointerEnter={handleLiquidPointerEnter}
+            className={`${iconButtonClass} shrink-0`}
+            title="Agregar una nota"
+            aria-label="Agregar una nota"
+          >
+            <PlusIcon className="relative" />
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="flex flex-col gap-2 rounded border border-line-2 bg-panel-2 p-3 desktop:max-w-2xl">
+          <textarea
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setError("");
+            }}
+            onKeyDown={(e) => {
+              // Escape cancela y ⌘/Ctrl+Enter agrega — en un textarea, Enter
+              // solo tiene que hacer lo suyo, que es una línea nueva.
+              if (e.key === "Escape") resetComposer();
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleAdd();
+            }}
+            placeholder="Escribí la nota…"
+            rows={4}
+            autoFocus
+            className="w-full resize-y rounded border border-line-2 bg-[var(--bg)] px-3 py-2 text-[13px] leading-[1.5] text-brand-ink"
+          />
+
+          {error && <p className="text-[11px] leading-[1.4] text-[var(--color-brand-red-text)]">{error}</p>}
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={resetComposer}
+              className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-[var(--bg)] px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={saving || !draft.trim()}
+              className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+            >
+              {saving ? "Agregando…" : "Agregar"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-tx-3">Cargando…</p>
+      ) : notes.length === 0 ? (
+        <p className="text-sm text-tx-3">
+          {canEdit ? "Todavía no se escribió ninguna nota." : "Todavía no hay notas acá."}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {notes.map((note) =>
+            editingId === note.id ? (
+              <div key={note.id} className="flex flex-col gap-2 rounded border border-line-2 bg-panel-2 p-3 desktop:max-w-2xl">
+                <textarea
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setEditingId("");
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleSaveEdit(note);
+                  }}
+                  rows={4}
+                  autoFocus
+                  className="w-full resize-y rounded border border-line-2 bg-[var(--bg)] px-3 py-2 text-[13px] leading-[1.5] text-brand-ink"
+                />
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingId("")}
+                    className={`inline-flex min-h-9 items-center rounded border border-line-2 bg-[var(--bg)] px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-brand-ink transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveEdit(note)}
+                    disabled={saving || !editDraft.trim()}
+                    className={`inline-flex min-h-9 items-center rounded border border-brand-blue bg-brand-blue px-3.5 text-xs leading-none font-bold tracking-[0.04em] text-[var(--bg)] transition-transform duration-[400ms] disabled:cursor-default disabled:opacity-60 ${PRESS_SCALE_CLASS}`}
+                  >
+                    {saving ? "Guardando…" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div key={note.id} className="flex items-start gap-2 rounded border border-line-2 bg-panel-2 px-3 py-2.5 desktop:max-w-2xl">
+                <div className="min-w-0 flex-1">
+                  {/* whitespace-pre-wrap: quien escribe una nota en varios
+                      renglones espera verlos; sin esto el navegador colapsa
+                      los saltos y queda un bloque corrido. */}
+                  <p className="text-[13px] leading-[1.5] whitespace-pre-wrap break-words text-brand-ink">
+                    {note.text}
+                  </p>
+                  <p className="mt-1.5 text-[10px] text-tx-3">
+                    {note.addedBy ? `${note.addedBy} · ` : ""}
+                    {note.when}
+                    {note.editedWhen ? ` · editada ${note.editedWhen}` : ""}
+                  </p>
+                </div>
+                {canEdit && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(note.id);
+                        setEditDraft(note.text);
+                      }}
+                      aria-label="Editar la nota"
+                      title="Editar"
+                      className={`flex h-7 w-7 items-center justify-center rounded text-tx-3 transition-colors duration-[200ms] hover:text-brand-blue ${PRESS_SCALE_CLASS}`}
+                    >
+                      <PencilIcon className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(note)}
+                      aria-label="Borrar la nota"
+                      title="Borrar"
+                      className={`flex h-7 w-7 items-center justify-center rounded text-tx-3 transition-colors duration-[200ms] hover:text-[var(--color-brand-red-text)] ${PRESS_SCALE_CLASS}`}
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ),
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -877,6 +1122,24 @@ function PlusIcon({ className }: { className?: string }) {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M12 5v14" />
       <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
     </svg>
   );
 }

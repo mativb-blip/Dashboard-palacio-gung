@@ -504,3 +504,25 @@ model Notification {
   @@index([userId, readAt])
   @@index([userId, createdAt])
 }
+
+/// Respalda la sección **Notas** de /inspiracion: texto suelto, sin enlace ni
+/// archivo — una idea, una frase para un caption, algo que alguien vio y
+/// quiere dejar escrito.
+///
+/// Modelo propio y no un `kind` más de InspirationLink, a diferencia de
+/// Canciones y Enlaces: esas dos comparten tabla porque son lo mismo (una URL
+/// con un título) y solo cambia qué URL se acepta. Una nota no tiene URL
+/// ninguna, y su texto es un párrafo (`@db.Text`), no un título de 200
+/// caracteres. Forzarla en esa tabla dejaría la columna que le da sentido a
+/// las otras dos vacía para siempre.
+model InspirationNote {
+  id        String   @id @default(cuid())
+  text      String   @db.Text
+  addedBy   String?
+  createdAt DateTime @default(now())
+  /// Se muestra solo si difiere de createdAt — así una nota sin tocar no
+  /// dice "editada".
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}

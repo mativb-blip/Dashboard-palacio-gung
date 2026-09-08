@@ -14,6 +14,7 @@ import type {
   InspirationKind,
   InspirationLinkItem,
   InspirationLinkKind,
+  InspirationNote,
   InspirationStory,
 } from "@/types/dashboard";
 
@@ -297,5 +298,82 @@ export async function deleteInspirationLink(id: string): Promise<void> {
   });
   await prisma.inspirationLink.delete({ where: { id } });
   await deleteUnreferencedBlobs([fila?.url, fila?.audioUrl]);
+  revalidatePath("/inspiracion");
+}
+
+// --- Notas (sexta sección) ---------------------------------------------
+// Texto suelto, sin enlace ni archivo. Modelo propio (ver InspirationNote en
+// el schema): no comparte tabla con Canciones/Enlaces porque no tiene URL.
+
+/** Tope del texto de una nota. No es una restricción de producto, es un
+ * límite para que un pegado accidental de algo enorme no entre a la base:
+ * 5000 caracteres son varias pantallas de texto, más de lo que nadie escribe
+ * como referencia. */
+const NOTE_MAX = 5000;
+
+function toInspirationNote(
+  row: { id: string; text: string; addedBy: string | null; createdAt: Date; updatedAt: Date },
+  now: Date,
+): InspirationNote {
+  // `updatedAt` siempre existe; se informa solo si de verdad hubo una edición
+  // posterior. El margen de un segundo es para el desfasaje que deja Prisma
+  // entre los dos valores al crear la fila.
+  const editada = row.updatedAt.getTime() - row.createdAt.getTime() > 1000;
+  return {
+    id: row.id,
+    text: row.text,
+    addedBy: row.addedBy ?? undefined,
+    when: formatCommentWhen(row.createdAt, now),
+    editedWhen: editada ? formatCommentWhen(row.updatedAt, now) : undefined,
+  };
+}
+
+export async function getInspirationNotes(): Promise<InspirationNote[]> {
+  await requireSession();
+  const rows = await prisma.inspirationNote.findMany({ orderBy: { createdAt: "desc" } });
+  const now = new Date();
+  return rows.map((row) => toInspirationNote(row, now));
+}
+
+export async function addInspirationNote(text: string): Promise<InspirationNote> {
+  const session = await requireEditor();
+  const value = text.trim();
+  if (!value) throw new Error("Escribí algo antes de agregar.");
+
+  const row = await prisma.inspirationNote.create({
+    data: {
+      text: value.slice(0, NOTE_MAX),
+      addedBy: session.user.name || session.user.email || null,
+    },
+  });
+  await avisarReferencia(session, "una nota", value);
+  revalidatePath("/inspiracion");
+  return toInspirationNote(row, new Date());
+}
+
+/** Corregir el texto de una nota. Alcanza con sesión, igual que agregarla:
+ * toda Inspiración está abierta a cualquiera que entre (ver requireEditor
+ * acá arriba, que hoy solo exige sesión).
+ *
+ * Existe, a diferencia del resto de las secciones, porque una nota es un
+ * párrafo: arreglar una palabra borrando y volviendo a escribir todo no es
+ * un reemplazo razonable, y en un enlace sí lo era. */
+export async function updateInspirationNote(id: string, text: string): Promise<InspirationNote> {
+  await requireEditor();
+  const value = text.trim();
+  if (!value) throw new Error("La nota no puede quedar vacía.");
+
+  const row = await prisma.inspirationNote.update({
+    where: { id },
+    data: { text: value.slice(0, NOTE_MAX) },
+  });
+  revalidatePath("/inspiracion");
+  return toInspirationNote(row, new Date());
+}
+
+export async function deleteInspirationNote(id: string): Promise<void> {
+  await requireEditor();
+  // Sin recolector de Blob: una nota no tiene ningún archivo detrás.
+  await prisma.inspirationNote.delete({ where: { id } });
   revalidatePath("/inspiracion");
 }

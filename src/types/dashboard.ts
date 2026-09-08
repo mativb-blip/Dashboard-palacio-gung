@@ -211,3 +211,15 @@ export interface NotificationsSnapshot {
   items: NotificationItem[];
   unread: number;
 }
+
+/** Una nota de /inspiracion: texto suelto, sin enlace ni archivo. Ver
+ * `InspirationNote` en el schema. */
+export interface InspirationNote {
+  id: string;
+  text: string;
+  addedBy?: string;
+  when: string;
+  /** Solo viene cuando la nota se editó después de crearla — la UI lo dice
+   * para que no parezca que el texto original era ese. */
+  editedWhen?: string;
+}
