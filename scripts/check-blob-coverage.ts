@@ -42,6 +42,11 @@ const NO_SON_ARCHIVOS = new Set([
   // guardara la URL de un archivo, esta línea hay que sacarla — el
   // recolector borraría ese archivo por no verlo referenciado.
   "Notification.url",
+  // Imagen Open Graph del sitio ENLAZADO: vive en el servidor de esa página,
+  // no en nuestro Blob (ver el comentario de InspirationLink en el schema —
+  // no se copia a propósito, la cuota ya se llenó una vez). No hay ningún
+  // archivo nuestro que borrar detrás de este campo.
+  "InspirationLink.previewImage",
 ]);
 
 /** Nombres que hacen sospechar que una columna guarda una URL. */

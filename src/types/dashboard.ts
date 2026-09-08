@@ -171,6 +171,21 @@ export interface InspirationLinkItem {
   audioName?: string;
   addedBy?: string;
   when: string;
+  /** Metadatos Open Graph del sitio, para la tarjeta de la sección Enlaces. */
+  preview: LinkPreviewData;
+}
+
+/** Lo que se muestra en la tarjeta de un enlace. Todo opcional: un sitio
+ * puede no publicar nada, o publicar solo el título. */
+export interface LinkPreviewData {
+  title?: string;
+  description?: string;
+  image?: string;
+  site?: string;
+  /** `false` = todavía no se salió a buscar (enlaces anteriores a esta
+   * función). `true` con todo lo demás vacío = se buscó y el sitio no da
+   * metadatos, así que no hay que reintentar. */
+  fetched: boolean;
 }
 
 /** Qué originó un aviso de la campana del Topbar. Decide el ícono y el color

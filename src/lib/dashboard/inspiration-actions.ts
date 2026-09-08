@@ -9,6 +9,7 @@ import { instagramEmbedSrc, normalizeInstagramMusicUrl } from "@/lib/dashboard/i
 import { normalizeExternalUrl, normalizeSongUrl } from "@/lib/dashboard/link-url";
 import { deleteUnreferencedBlobs } from "@/lib/dashboard/blob-gc";
 import { recordNotification } from "@/lib/dashboard/notifications";
+import { fetchLinkPreview } from "@/lib/dashboard/link-preview";
 import type {
   InspirationItem,
   InspirationKind,
@@ -194,6 +195,11 @@ function toInspirationLinkItem(
     title: string | null;
     audioUrl: string | null;
     audioName: string | null;
+    previewTitle: string | null;
+    previewDescription: string | null;
+    previewImage: string | null;
+    previewSite: string | null;
+    previewFetchedAt: Date | null;
     addedBy: string | null;
     createdAt: Date;
   },
@@ -208,7 +214,43 @@ function toInspirationLinkItem(
     audioName: row.audioName ?? undefined,
     addedBy: row.addedBy ?? undefined,
     when: formatCommentWhen(row.createdAt, now),
+    preview: {
+      title: row.previewTitle ?? undefined,
+      description: row.previewDescription ?? undefined,
+      image: row.previewImage ?? undefined,
+      site: row.previewSite ?? undefined,
+      // `false` = nunca se intentó, y es lo que hace que la UI lo pida una
+      // sola vez para los enlaces que ya existían antes de esta función.
+      fetched: row.previewFetchedAt !== null,
+    },
   };
+}
+
+/** Sale a buscar los metadatos del sitio y los guarda en la fila. Devuelve
+ * el ítem ya actualizado.
+ *
+ * Va aparte del alta a propósito: la lista de Enlaces existía antes que la
+ * tarjeta, así que hay filas sin metadatos, y la pantalla las completa
+ * pidiéndolas de a una. Marca `previewFetchedAt` aunque no haya encontrado
+ * nada — sin eso, un sitio sin Open Graph se reintentaría en cada carga,
+ * para siempre. */
+export async function refreshLinkPreview(id: string): Promise<InspirationLinkItem | null> {
+  await requireSession();
+  const fila = await prisma.inspirationLink.findUnique({ where: { id }, select: { url: true } });
+  if (!fila?.url) return null;
+
+  const preview = await fetchLinkPreview(fila.url);
+  const row = await prisma.inspirationLink.update({
+    where: { id },
+    data: {
+      previewTitle: preview.title ?? null,
+      previewDescription: preview.description ?? null,
+      previewImage: preview.image ?? null,
+      previewSite: preview.site ?? null,
+      previewFetchedAt: new Date(),
+    },
+  });
+  return toInspirationLinkItem(row, new Date());
 }
 
 export async function getInspirationLinks(kind: InspirationLinkKind): Promise<InspirationLinkItem[]> {
@@ -269,7 +311,15 @@ export async function addInspirationLink(
     if (duplicate) throw new Error("Ese enlace ya está en esta sección.");
   }
 
-  const row = await prisma.inspirationLink.create({
+  // Los metadatos se traen ACÁ, con la fila ya creada y en una escritura
+  // aparte: si el sitio tarda o rechaza, el enlace igual quedó guardado. Al
+  // revés —buscar primero y crear después— un sitio caído haría fallar el
+  // alta de un enlace perfectamente válido.
+  //
+  // Solo para Enlaces: la tarjeta es de esa sección, y una canción ya tiene
+  // su reproductor y su embed. Salir a buscar metadatos de Spotify para no
+  // mostrarlos sería pura latencia.
+  let row = await prisma.inspirationLink.create({
     data: {
       kind: safeKind,
       url,
@@ -279,10 +329,25 @@ export async function addInspirationLink(
       addedBy: session.user.name || session.user.email || null,
     },
   });
+
+  if (safeKind === "link" && url) {
+    const preview = await fetchLinkPreview(url);
+    row = await prisma.inspirationLink.update({
+      where: { id: row.id },
+      data: {
+        previewTitle: preview.title ?? null,
+        previewDescription: preview.description ?? null,
+        previewImage: preview.image ?? null,
+        previewSite: preview.site ?? null,
+        previewFetchedAt: new Date(),
+      },
+    });
+  }
+
   await avisarReferencia(
     session,
     safeKind === "song" ? "una canción" : "un enlace",
-    row.title || row.url || row.audioName || "Sin título",
+    row.title || row.previewTitle || row.url || row.audioName || "Sin título",
   );
   revalidatePath("/inspiracion");
   return toInspirationLinkItem(row, new Date());

@@ -20,6 +20,7 @@ import {
   getInspirationLinks,
   getInspirationNotes,
   getInspirationStories,
+  refreshLinkPreview,
   reorderInspirationNotes,
   updateInspirationNote,
 } from "@/lib/dashboard/inspiration-actions";
@@ -928,10 +929,28 @@ function LinkListSection({
 
   useEffect(() => {
     let cancelled = false;
-    getInspirationLinks(kind).then((data) => {
+    getInspirationLinks(kind).then(async (data) => {
       if (cancelled) return;
       setItems(data);
       setLoading(false);
+
+      // Los enlaces guardados antes de que existiera la tarjeta no tienen
+      // metadatos. Se completan acá, de a uno y en serie: son pedidos a
+      // sitios ajenos, y disparar veinte a la vez es maltratar al de la otra
+      // punta además de saturar nuestro propio server. Cada uno que llega se
+      // pinta solo, así la lista se va llenando a la vista.
+      if (kind !== "link") return;
+      for (const item of data) {
+        if (cancelled) return;
+        if (item.preview.fetched || !item.url) continue;
+        try {
+          const actualizado = await refreshLinkPreview(item.id);
+          if (cancelled || !actualizado) continue;
+          setItems((prev) => prev.map((i) => (i.id === actualizado.id ? actualizado : i)));
+        } catch {
+          // Un sitio que no contesta no puede romper la lista entera.
+        }
+      }
     });
     return () => {
       cancelled = true;
@@ -1115,32 +1134,106 @@ function LinkListSection({
           {items.map((item) => {
             const embedSrc = item.url ? instagramEmbedSrc(item.url) : null;
             const showingPreview = previewId === item.id;
+            const tarjeta = !isSong && item.url ? item.preview : null;
+            const conImagen = Boolean(tarjeta?.image);
+            const hayTarjeta = Boolean(tarjeta && (tarjeta.title || tarjeta.image));
+            // Con tarjeta, la fila de abajo solo tiene sentido si quien cargó
+            // el enlace le puso un nombre propio: ese no está en la tarjeta.
+            const mostrarTextoDeFila = !hayTarjeta || Boolean(item.title);
             return (
-              <div key={item.id} className="rounded border border-line-2 bg-panel-2">
+              <div key={item.id} className="overflow-hidden rounded border border-line-2 bg-panel-2">
+                {/* La tarjeta ocupa el ancho completo de la columna y es toda
+                    clickeable: el enlace es lo único que hay que hacer con
+                    esto, así que pedir puntería sobre un texto de 13px sería
+                    gratuito. Los botones de abajo van FUERA de este <a> — un
+                    <button> adentro de un <a> es HTML inválido y el navegador
+                    lo saca del enlace, así que borrar terminaría abriendo la
+                    pestaña. */}
+                {hayTarjeta && tarjeta && (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block border-b border-line-2 transition-colors duration-[200ms] hover:bg-brand-blue/[0.04]"
+                    title={`Abrir en pestaña nueva — ${item.url}`}
+                  >
+                    {conImagen && (
+                      <div className="relative w-full overflow-hidden bg-[var(--bg)]" style={{ aspectRatio: "1.91 / 1" }}>
+                        {/* 1.91:1 es la proporción que publica Open Graph, así
+                            que la imagen entra casi siempre sin recorte feo.
+                            `object-cover` cubre las que no la respetan.
+                            Si el sitio la borró después, onError esconde el
+                            recuadro en vez de dejar el ícono de imagen rota. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element -- imagen de un sitio ajeno, no un asset nuestro */}
+                        <img
+                          src={tarjeta.image}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.parentElement?.style.setProperty("display", "none");
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1 px-3 py-2.5">
+                      {/* El copete es el HOST REAL, no `og:site_name`. El
+                          título, la bajada, la imagen y el site_name los
+                          escribe la página del otro lado: una tarjeta puede
+                          decir "GitHub" y llevar a cualquier parte. Lo único
+                          que no puede mentir es el dominio al que se va, así
+                          que es lo que se muestra — mismo criterio que ya
+                          tenía la fila de abajo. */}
+                      <span className="text-[11px] tracking-label text-tx-3 uppercase">
+                        {hostOf(item.url ?? "")}
+                      </span>
+                      {tarjeta.title && (
+                        <span className="text-sm leading-snug font-bold text-brand-ink">{tarjeta.title}</span>
+                      )}
+                      {tarjeta.description && (
+                        <span className="line-clamp-2 text-[12px] leading-snug text-tx-2">
+                          {tarjeta.description}
+                        </span>
+                      )}
+                    </div>
+                  </a>
+                )}
+
+                {/* Con tarjeta arriba, esta fila no repite lo que aquella ya
+                    dice: el dominio estaba saliendo tres veces (copete, texto
+                    del enlace y línea de host) en un enlace sin título propio.
+                    Queda solo el título que haya escrito quien lo cargó —que
+                    es suyo y no del sitio— y los botones. Sin tarjeta, la
+                    fila sigue siendo lo que era: el único lugar donde se ve
+                    qué es esto y a dónde lleva. */}
                 <div className="flex items-center gap-2 px-3 py-2.5">
                   <div className="flex min-w-0 flex-1 flex-col">
-                    {item.url ? (
-                      // Pestaña nueva y avisado con el ícono: sin eso, en el
-                      // teléfono parece que la app se fue y se perdió lo que
-                      // se estaba mirando.
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex min-w-0 items-center gap-1.5 text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue [&:hover>span]:underline"
-                        title={`Abrir en pestaña nueva — ${item.url}`}
-                      >
-                        <span className="truncate">{displayName(item)}</span>
-                        <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-60" />
-                      </a>
-                    ) : (
-                      <span className="truncate text-[13px] text-brand-ink">{displayName(item)}</span>
+                    {mostrarTextoDeFila &&
+                      (item.url ? (
+                        // Pestaña nueva y avisado con el ícono: sin eso, en el
+                        // teléfono parece que la app se fue y se perdió lo que
+                        // se estaba mirando.
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex min-w-0 items-center gap-1.5 text-[13px] text-brand-ink underline-offset-2 hover:text-brand-blue [&:hover>span]:underline"
+                          title={`Abrir en pestaña nueva — ${item.url}`}
+                        >
+                          <span className="truncate">{displayName(item)}</span>
+                          <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-60" />
+                        </a>
+                      ) : (
+                        <span className="truncate text-[13px] text-brand-ink">{displayName(item)}</span>
+                      ))}
+                    {/* El host va SIEMPRE a la vista cuando no hay tarjeta. La
+                        sección Enlaces acepta cualquier dominio, así que un
+                        título puede decir una cosa y el enlace ir a otra:
+                        mostrar a dónde lleva de verdad es lo que evita esa
+                        sorpresa. Con tarjeta, eso ya lo dice su copete. */}
+                    {item.url && !hayTarjeta && (
+                      <span className="truncate text-[11px] text-tx-3">{hostOf(item.url)}</span>
                     )}
-                    {/* El host va SIEMPRE a la vista. La sección Enlaces
-                        acepta cualquier dominio, así que un título puede
-                        decir una cosa y el enlace ir a otra: mostrar a dónde
-                        lleva de verdad es lo que evita esa sorpresa. */}
-                    {item.url && <span className="truncate text-[11px] text-tx-3">{hostOf(item.url)}</span>}
                   </div>
 
                   {embedSrc && (

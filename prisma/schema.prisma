@@ -458,6 +458,28 @@ model InspirationLink {
   audioUrl  String?  @db.Text
   /// Nombre original del archivo de audio, para mostrarlo.
   audioName String?
+
+  /// Metadatos Open Graph del sitio enlazado, para pintar la tarjeta de
+  /// previsualización de la sección Enlaces (ver link-preview.ts).
+  ///
+  /// Se guardan en la fila y no se piden en cada carga: traerlos implica
+  /// salir a internet a buscar una página entera, y hacerlo por cada enlace
+  /// cada vez que alguien abre /inspiracion sería lentísimo y grosero con el
+  /// sitio de la otra punta.
+  ///
+  /// La imagen se guarda como URL del sitio ajeno, NO se copia a Blob: son
+  /// imágenes que no controlamos, no hacen falta para siempre, y la cuota de
+  /// Blob ya se llenó una vez. El precio es que si el sitio la cambia o la
+  /// borra, la tarjeta queda sin imagen — y eso lo maneja la UI.
+  previewTitle       String?
+  previewDescription String?   @db.Text
+  previewImage       String?   @db.Text
+  previewSite        String?
+  /// Cuándo se intentó, haya salido o no. Es lo que distingue "todavía no lo
+  /// buscamos" (null) de "lo buscamos y el sitio no da metadatos" (con
+  /// fecha y los campos de arriba vacíos), para no reintentar en loop.
+  previewFetchedAt   DateTime?
+
   addedBy   String?
   createdAt DateTime @default(now())
 
