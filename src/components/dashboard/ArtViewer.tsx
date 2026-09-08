@@ -4,11 +4,12 @@ import { useSession } from "next-auth/react";
 import { useState } from "react";
 import ArtTile from "./ArtTile";
 import ArtUploadZone, { type UploadedFile } from "./ArtUploadZone";
+import { isVideoUrl } from "@/lib/dashboard/media-file";
 import PhotoLightbox from "./PhotoLightbox";
 import SegmentedGroup from "./SegmentedGroup";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import { downloadProposalArts } from "@/lib/dashboard/download";
-import { artLabel, fmtShort, isVerticalFormat, supportsVideo, toneHex } from "@/lib/dashboard/format";
+import { artLabel, fmtShort, isVerticalFormat, supportsVideo, supportsVideoSlides, toneHex } from "@/lib/dashboard/format";
 import { proposalShareText, whatsappShareUrl } from "@/lib/dashboard/share";
 import {
   canEditContent,
@@ -82,6 +83,7 @@ export default function ArtViewer({
   // Historia puede llevar video o no; Reel siempre lo lleva. De esto depende
   // que aparezca el recuadro de video al editar y que el slot 0 lo muestre.
   const carriesVideo = supportsVideo(proposal.format);
+  const artesConVideo = supportsVideoSlides(proposal.format);
   const [editArtFiles, setEditArtFiles] = useState<UploadedFile[]>([]);
   const [editCoverFiles, setEditCoverFiles] = useState<UploadedFile[]>([]);
   const [editVideoFiles, setEditVideoFiles] = useState<UploadedFile[]>([]);
@@ -142,8 +144,18 @@ export default function ArtViewer({
     n: String(i + 1).padStart(2, "0"),
     label: artLabel(i, total),
     dimension: proposal.dim ?? (vertical ? "1080 × 1920 px" : "1080 × 1080 px"),
-    src: proposal.images?.[i],
-    video: carriesVideo && i === 0 ? proposal.video : undefined,
+    // Una diapositiva de carrusel puede ser un video. Va como `video` y no
+    // como `src` para que ArtSlot ya la pinte con <video> y controles: esa
+    // rama existía para el Reel y sirve igual acá, sin duplicarla. Queda sin
+    // `poster` a propósito — no tenemos una portada aparte para cada
+    // diapositiva, y <video> muestra el primer fotograma solo.
+    src: artesConVideo && isVideoUrl(proposal.images?.[i] ?? "") ? undefined : proposal.images?.[i],
+    video:
+      carriesVideo && i === 0
+        ? proposal.video
+        : artesConVideo && isVideoUrl(proposal.images?.[i] ?? "")
+          ? proposal.images?.[i]
+          : undefined,
   }));
 
   async function runDownload(indices: number[]) {
@@ -352,8 +364,8 @@ export default function ArtViewer({
         ) : (
           <div className={carriesVideo ? "grid gap-3 desktop:grid-cols-2" : ""}>
             <ArtUploadZone
-              label="Artes"
-              accept="image/*"
+              label={artesConVideo ? "Artes (fotos y videos)" : "Artes"}
+              accept={artesConVideo ? "image/*,video/*" : "image/*"}
               multiple
               files={editArtFiles}
               onFilesChange={setEditArtFiles}

@@ -47,6 +47,15 @@ El estado de una propuesta se deriva automáticamente (no se elige a mano): **Pe
 
 **No hay historial de versiones.** Lo hubo (`ProposalVersion`, "Ver historial", `VersionHistoryModal`) y se quitó el 2026-08-30, tabla incluida. El motivo es de costo, no de producto: cada versión guardaba los artes **enteros**, no un diff, así que el historial duplicaba material pesado. Un solo video retenido por dos snapshots ocupaba **186,6 MB — el 20% de la cuota de Blob** — de una propuesta a la que ya le habían quitado el video. Editar una propuesta hoy pisa el valor anterior y no deja rastro.
 
+**Un Carrusel mezcla fotos y videos, diapositiva por diapositiva.** Todas viven en `Proposal.images` en el orden de publicación, y qué es cada una se decide por la extensión de la URL (`isVideoUrl()`), no por una columna aparte: Blob conserva el nombre original del archivo, así que el dato ya estaba en la URL y no hubo que migrar una tabla con contenido real. Ojo con la distinción de nombres, que es fácil de confundir:
+
+| Helper | Qué habilita | Formatos |
+|---|---|---|
+| `supportsVideo()` | el campo `Proposal.video` — UN video del post, con portada aparte en `images[0]` | Reel, Historia |
+| `supportsVideoSlides()` | videos entre las diapositivas de `images` | Carrusel |
+
+Un Carrusel deja `Proposal.video` en null. `SlideMedia` es el componente que elige entre `<img>` y `<video>` y lo usan la miniatura del Feed, el preview del post y el de Instagram; el visor grande de la vista Post no lo usa porque `ArtSlot` ya tenía su propia rama de video (con portada y controles) desde el Reel. Que un video se muestre en un lugar y no en otro es el modo de fallar típico acá: son cinco pantallas distintas pintando la misma lista.
+
 ## Alternativas de caption y música
 El Editor/Admin puede cargar **varias alternativas de caption** en la vista Post y Jun (Comentarista) elige **una sola**. La elegida se refleja en `Proposal.caption`, que sigue siendo el caption "real" para el título, las versiones, el preview, el export y las notificaciones — por eso `caption` no se derivó de la relación: hay once archivos que lo consumen y el espejo los deja intactos. La invariante (`Proposal.caption` == el texto de la fila `selected`) la mantiene `commitCaptionMirror()` en `proposals-actions.ts`, único lugar por donde pasa cualquier cambio del caption vigente.
 

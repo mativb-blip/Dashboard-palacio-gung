@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import CommentsPanel, { type AddCommentInput } from "./CommentsPanel";
+import SlideMedia from "./SlideMedia";
 import { dateLong, isVerticalFormat, statusPillStyle } from "@/lib/dashboard/format";
 import { computeProposalStatus } from "@/lib/dashboard/proposals";
 import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
@@ -35,7 +36,7 @@ export default function PostPreviewModal({
   const aspect = vertical ? "9 / 16" : (proposal.aspect ?? "4/5").replace("/", " / ");
   const status = computeProposalStatus(proposal);
   const statusStyle = statusPillStyle(status);
-  const hasImage = Boolean(proposal.images?.[0]);
+  const primerArte = proposal.images?.[0];
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -101,11 +102,11 @@ export default function PostPreviewModal({
 
         <div className="flex-1 overflow-y-auto">
           <div className="relative w-full bg-panel-2" style={{ aspectRatio: aspect }}>
-            {hasImage ? (
-              // eslint-disable-next-line @next/next/no-img-element -- preview de contenido cargado por el usuario
-              <img
-                src={proposal.images?.[0]}
+            {primerArte ? (
+              <SlideMedia
+                src={primerArte}
                 alt={proposal.title}
+                controls
                 className="h-full w-full object-contain"
               />
             ) : (

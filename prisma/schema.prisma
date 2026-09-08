@@ -141,11 +141,22 @@ model Proposal {
   caption   String   @db.Text
   hashtags  String   @db.Text
   artN      Int      @default(1)
-  /// URLs de artes — o bien rutas estáticas (contenido semilla) o data URLs
-  /// base64 (subidas desde ArtUploadZone). Igual que antes de la migración;
-  /// pasar a un storage real de archivos queda fuera de este cambio.
+  /// Las diapositivas del post, EN ORDEN. Casi siempre fotos, pero en un
+  /// Carrusel cualquiera puede ser un video (ver supportsVideoSlides en
+  /// format.ts) — un carrusel de Instagram mezcla los dos y el orden es el
+  /// de publicación, así que separar los videos en otra columna lo perdería.
+  ///
+  /// Qué es cada una se decide por la extensión de la URL (isVideoUrl en
+  /// media-file.ts) y no por una columna aparte: Blob conserva el nombre
+  /// original del archivo, así que el dato ya está en la URL. Eso evitó
+  /// migrar una tabla con contenido real. El precio es que un archivo sin
+  /// extensión se pintaría como foto; hoy no puede pasar, porque todas las
+  /// subidas pasan por safeBlobName.
   images    String[] @default([])
-  /// Solo Reels: portada va en `images[0]`, el video acá.
+  /// El video ÚNICO del post, con portada aparte en `images[0]`. Es solo del
+  /// Reel y de la Historia (ver supportsVideo, que no es lo mismo que
+  /// supportsVideoSlides): un Carrusel deja esto en null y pone sus videos
+  /// entre las diapositivas de `images`.
   video     String?  @db.Text
   aspect    String?
   dim       String?

@@ -12,7 +12,7 @@ import { useBrand } from "@/lib/dashboard/BrandContext";
 import { describeInstagramMusicUrl, normalizeInstagramMusicUrl } from "@/lib/dashboard/instagram-music";
 import { CAPTION_OPTIONS_LIMIT, MUSIC_OPTIONS_LIMIT } from "@/lib/dashboard/proposals";
 import { createProposal, type AddMusicOptionInput } from "@/lib/dashboard/proposals-actions";
-import { supportsVideo } from "@/lib/dashboard/format";
+import { supportsVideo, supportsVideoSlides } from "@/lib/dashboard/format";
 import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { ProposalFormat } from "@/types/dashboard";
 
@@ -119,6 +119,11 @@ function NuevaPropuestaForm() {
   // o un video. Ver supportsVideo() — de ese helper dependen además el visor,
   // la edición y la descarga.
   const carriesVideo = supportsVideo(format);
+  // Un Carrusel de Instagram mezcla fotos y videos diapositiva por
+  // diapositiva, así que sus artes van todos en la MISMA zona de carga en
+  // vez de un recuadro de video aparte: el orden en que se sueltan es el
+  // orden en que se publican, y separarlos lo perdería.
+  const artesConVideo = supportsVideoSlides(format);
   const previewImages = isReel
     ? coverFiles.map((f) => f.url)
     : artFiles.map((f) => f.url);
@@ -347,8 +352,8 @@ function NuevaPropuestaForm() {
         ) : (
           <div className={carriesVideo ? "grid gap-3 desktop:grid-cols-2" : ""}>
             <ArtUploadZone
-              label="Artes"
-              accept="image/*"
+              label={artesConVideo ? "Artes (fotos y videos)" : "Artes"}
+              accept={artesConVideo ? "image/*,video/*" : "image/*"}
               multiple
               files={artFiles}
               onFilesChange={setArtFiles}

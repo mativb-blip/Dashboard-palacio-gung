@@ -69,7 +69,10 @@ export interface Proposal {
   artN: number;
   comments: ProposalComment[];
   images?: string[];
-  /** Video del Reel (data URL) — la portada se guarda en `images[0]`. */
+  /** El video ÚNICO del post (Reel/Historia), con la portada en `images[0]`.
+   * Un Carrusel no lo usa: sus videos van entre las diapositivas de
+   * `images`, mezclados con las fotos. Ver supportsVideo() vs.
+   * supportsVideoSlides() en format.ts. */
   video?: string;
   aspect?: string;
   dim?: string;

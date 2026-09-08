@@ -6,6 +6,7 @@ import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { Proposal } from "@/types/dashboard";
 import ArtTile from "./ArtTile";
 import FormatIcon from "./FormatIcon";
+import SlideMedia from "./SlideMedia";
 
 interface PostsGridProps {
   proposals: Proposal[];
@@ -69,8 +70,7 @@ export default function PostsGrid({ proposals, onSelectProposal, onDeleteProposa
                   className={`absolute inset-0 h-full w-full transition-transform duration-[400ms] ${PRESS_SCALE_CLASS}`}
                 >
                   {proposal.images?.[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- miniatura de contenido cargado por el usuario
-                    <img
+                    <SlideMedia
                       src={proposal.images[0]}
                       alt={proposal.title}
                       className="h-full w-full object-cover"

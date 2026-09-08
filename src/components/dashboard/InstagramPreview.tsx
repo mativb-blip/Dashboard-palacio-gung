@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { ProposalFormat } from "@/types/dashboard";
+import SlideMedia from "./SlideMedia";
 
 interface InstagramPreviewProps {
   format: ProposalFormat;
@@ -58,8 +59,7 @@ export default function InstagramPreview({ format, caption, images, onClose }: I
 
         <div className="relative w-full overflow-hidden bg-[#f6f6f7]" style={{ aspectRatio: aspect }}>
           {hasImages ? (
-            // eslint-disable-next-line @next/next/no-img-element -- preview local, no un asset del sitio
-            <img src={images[activeIndex]} alt="" className="h-full w-full object-contain" />
+            <SlideMedia src={images[activeIndex]} alt="" controls className="h-full w-full object-contain" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-sm text-tx-3">
               Sin arte cargado

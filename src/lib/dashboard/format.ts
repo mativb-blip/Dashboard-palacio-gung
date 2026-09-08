@@ -149,6 +149,25 @@ export function supportsVideo(format: ProposalFormat): boolean {
   return format === "Reel" || format === "Historia";
 }
 
+/**
+ * Formatos cuyos ARTES pueden ser una mezcla de fotos y videos, diapositiva
+ * por diapositiva.
+ *
+ * Es otra cosa que `supportsVideo()`, y la distinción importa: ese habilita
+ * el campo `Proposal.video`, que es UN video con una portada aparte (el
+ * Reel). Acá no hay un video "del post": cualquiera de las diapositivas
+ * puede serlo, en cualquier orden, y todas viven mezcladas en
+ * `Proposal.images`. Es como funciona un carrusel de Instagram de verdad.
+ *
+ * Un solo helper, y no `format === "Carrusel"` suelto, porque de esto
+ * dependen el formulario de carga, la edición, el visor, el preview de
+ * Instagram, la miniatura del Feed y la descarga. Habilitar "Post simple"
+ * el día que haga falta es cambiar esta línea y nada más.
+ */
+export function supportsVideoSlides(format: ProposalFormat): boolean {
+  return format === "Carrusel";
+}
+
 const ART_LABELS = ["Portada", "Beneficio", "Detalle", "Cierre", "Modelo"];
 
 export function artLabel(index: number, total: number): string {
