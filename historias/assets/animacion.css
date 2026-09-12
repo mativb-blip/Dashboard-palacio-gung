@@ -14,7 +14,12 @@
    ------------------------------------------------------------------ */
 
 .mascara { display: block; overflow: hidden; }
-.linea   { display: block; will-change: transform; }
+.linea   { display: block; will-change: transform; white-space: nowrap; }
+
+/* El nowrap NO es cosmético: lo pide el scramble. Al revolver, la línea
+   larga de la bajada pasa de 547px a más de 700, y sin él se parte en dos
+   en pleno movimiento — la maqueta cambia sola y después vuelve. Con las
+   líneas ya separadas en bloques propios, nowrap no altera nada en reposo. */
 
 /* La bajada pasa de un <p> con <br> a cuatro bloques, para poder animar
    línea por línea. El alto de cada bloque es el mismo line-height, así

@@ -47,7 +47,17 @@
     <script src="assets/animaciones.js"></script>
     <script>
       window.__timelines = window.__timelines || {};
-      window.__timelines["root"] = window.ANIMACIONES.entrada();
+      var tl = window.ANIMACIONES.entrada();
+
+      window.__timelines["root"] = tl;
+
+      // Gancho de verificación: abrir con ?t=1.2 congela la pieza en ese
+
+      // segundo. El render no pasa ese parámetro, así que no lo afecta.
+
+      var q = new URLSearchParams(location.search);
+
+      if (q.has("t")) { tl.pause(parseFloat(q.get("t"))); }
     </script>
   </body>
 </html>

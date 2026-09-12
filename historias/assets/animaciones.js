@@ -57,3 +57,93 @@ window.ANIMACIONES = {
     return tl;
   }
 };
+
+/* ------------------------------------------------------------------
+   D — SCRAMBLE
+   Pedida explícitamente. Tiene tres trampas propias de ESTE proyecto,
+   todas medidas antes de escribirla.
+
+   1) EL HANGUL NECESITA SU PROPIO JUEGO DE CARACTERES. El set latino
+      por defecto no sirve, y además solo se puede revolver con sílabas
+      que la fuente TENGA: nuestro subconjunto trae 175, y cualquier otra
+      saldría como cuadro vacío. Se leen del cmap, no se escriben a mano.
+      De yapa, todas las sílabas hangul tienen el mismo avance (0.920em),
+      así que el hangul revuelto no cambia de ancho ni un píxel.
+
+   2) REVOLVER CAMBIA EL ANCHO DE LA LÍNEA. ScrambleText mantiene la
+      CANTIDAD de caracteres, no el ancho: una 'm' mide 1.061em y una 'i'
+      0.269em. Simulado sobre 20.000 tiradas, la línea larga de la bajada
+      (547px en reposo) llegaba a 781px con A-Z y a 720px usando su propio
+      texto — contra una caja de 594px. Se partía en dos en pleno
+      movimiento. Por eso el pool de la bajada excluye la 'm', la única
+      que se pasa del tope: con los 16 restantes el peor caso ABSOLUTO es
+      712px, o sea borde izquierdo en x=215. Garantizado, no probable.
+      Y .linea lleva white-space: nowrap como segundo cerrojo.
+
+   3) ScrambleText USA Math.random, y un render siembra la línea de tiempo
+      cuadro por cuadro. Sin sembrar, dos renders del mismo proyecto dan
+      archivos distintos. Acá se reemplaza Math.random por un generador
+      determinista sembrado con el tiempo de la línea, así el mismo
+      segundo da siempre el mismo revuelto.
+      Límite conocido: si un cuadro se renderizara DOS veces seguidas en
+      el mismo instante, la segunda pasada devolvería otra cosa. No pasa
+      en el camino normal de render, donde cada cuadro es un tiempo
+      distinto, pero queda anotado.
+   ------------------------------------------------------------------ */
+window.ANIMACIONES.scramble = function () {
+  gsap.registerPlugin(ScrambleTextPlugin);
+  var tl = gsap.timeline({ paused: true });
+
+  sembrarAzar(tl);
+
+  // sílabas que la fuente realmente tiene: se leen de la pieza, no se inventan
+  var HANGUL = "가각간감갓고곡곤곰곳구국군굼굿그극근금긋기긱긴김깃다닥단담닷도독돈돔돗" +
+               "두둑둔둠둣드득든듬듯디딕딘딤딧마막만맘맛모목몬몸못무묵문뭄뭇므믁믄믐믓" +
+               "미믹민밈밋바박반밤밧보복본봄봇부북분붐붓브븍븐븜븟비빅빈빔빗";
+  var NOMBRE = "MandGukoi";        // del propio nombre: peor caso 340px de 594
+  var BAJADA = ".acefgilnoqrstuá"; // el texto MENOS la 'm': peor caso 712px
+
+  function revolver(sel, chars, dur, retraso, cuando) {
+    document.querySelectorAll(sel).forEach(function (el, i) {
+      if (!el.dataset.final) { el.dataset.final = el.textContent; }
+      var entra = cuando + i * 0.12;
+      // Sin esto, la línea muestra su texto FINAL hasta que le toca el turno:
+      // se ve bien, después se rompe y después se arregla, que es al revés de
+      // lo que tiene que pasar. Aparece recién cuando empieza a revolverse.
+      tl.set(el, { autoAlpha: 0 }, 0);
+      tl.set(el, { autoAlpha: 1 }, entra);
+      tl.to(el, {
+        duration: dur,
+        ease: "none",
+        scrambleText: {
+          text: el.dataset.final,
+          chars: chars,
+          speed: 0.5,
+          revealDelay: retraso
+        }
+      }, entra);
+    });
+  }
+
+  revolver("#n .linea", NOMBRE, 1.2, 0.30, 0.15);
+  revolver("#h .linea", HANGUL, 1.0, 0.25, 0.35);
+  revolver("#b .linea", BAJADA, 1.0, 0.22, 0.55);
+  tl.set({}, {}, 5);
+  return tl;
+};
+
+/* Generador determinista: mismo segundo -> mismo revuelto. Ver la nota 3. */
+function sembrarAzar(tl) {
+  if (window.__azarSembrado) { window.__azarSembrado(tl); return; }
+  var ultimo = null, i = 0, linea = tl;
+  Math.random = function () {
+    var t = Math.round(linea.time() * 1e4);
+    if (t !== ultimo) { ultimo = t; i = 0; }
+    var x = (t * 2654435761 + (i++) * 40503) >>> 0;
+    x ^= x << 13; x >>>= 0;
+    x ^= x >> 17;
+    x ^= x << 5;  x >>>= 0;
+    return x / 4294967296;
+  };
+  window.__azarSembrado = function (nueva) { linea = nueva; ultimo = null; i = 0; };
+}

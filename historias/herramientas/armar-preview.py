@@ -40,6 +40,9 @@ VERSIONES = [
     ("revelado", "C · Revelado por línea",
      "Cada línea sube desde detrás de su máscara, escalonadas. La más diseñada, y "
      "por eso la más riesgosa: le devuelve el protagonismo a la tipografía."),
+    ("scramble", "D · Scramble",
+     "Cada línea se revuelve y se resuelve. El hangul usa sílabas coreanas reales de "
+     "la fuente; la bajada, un pool acotado para que la línea no desborde al revolver."),
 ]
 
 marca = re.search(r'<div id="bloque".*?</div>\n      </div>',
@@ -72,8 +75,8 @@ body {{ display: flex; flex-direction: column; align-items: center;
 #root {{ box-shadow: 0 10px 50px rgba(0,0,0,.6); }}
 #panel {{ padding: 14px 20px 20px; text-align: center; max-width: 620px; }}
 #botones {{ display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }}
-button {{ font: 600 13px/1 "Montserrat", sans-serif; color: #ddd; background: #222;
-          border: 1px solid #3a3a3a; border-radius: 3px; padding: 9px 18px; cursor: pointer; }}
+button {{ font: 600 12.5px/1 "Montserrat", sans-serif; color: #ddd; background: #222;
+          border: 1px solid #3a3a3a; border-radius: 3px; padding: 9px 15px; cursor: pointer; }}
 button:hover {{ background: #2c2c2c; }}
 button[aria-pressed="true"] {{ background: #e8e8e8; color: #111; border-color: #e8e8e8; }}
 #panel p {{ display: none; font-size: 12.5px; line-height: 1.55; color: #9a9a9a; }}
@@ -99,6 +102,7 @@ button[aria-pressed="true"] {{ background: #e8e8e8; color: #111; border-color: #
   </div>
 
 <script>{(RAIZ / 'assets/vendor/gsap.min.js').read_text()}</script>
+<script>{(RAIZ / 'assets/vendor/ScrambleTextPlugin.min.js').read_text()}</script>
 <script>{(RAIZ / 'assets/animaciones.js').read_text()}</script>
 <script>
 (function () {{
@@ -124,6 +128,12 @@ button[aria-pressed="true"] {{ background: #e8e8e8; color: #111; border-color: #
     // limpiar lo que dejó la versión anterior
     gsap.set(["#foto", "#bloque", "#n", "#h", "#b", ".linea"],
              {{ clearProps: "all" }});
+    // clearProps no toca el texto, y el scramble deja el DOM revuelto si se
+    // cambia de versión a mitad de camino. Hay que devolverlo a mano.
+    document.querySelectorAll(".linea").forEach(function (el) {{
+      if (!el.dataset.final) {{ el.dataset.final = el.textContent; }}
+      el.textContent = el.dataset.final;
+    }});
     cual = v;
     actual = window.ANIMACIONES[v]();
     actual.repeat(-1).repeatDelay(0.9).play(0);
