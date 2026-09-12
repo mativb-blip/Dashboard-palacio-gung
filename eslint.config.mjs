@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Proyecto HyperFrames aparte (historia 9:16 de Instagram), no es código del app.
+    "historias/**",
   ]),
 ]);
 

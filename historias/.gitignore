@@ -1,0 +1,11 @@
+# Proyecto HyperFrames independiente del app de Next.js de la raíz.
+# El .gitignore de la raíz ancla /node_modules, así que este de acá hace falta.
+node_modules/
+
+# Verificación, no entregable: se regenera con `npx hyperframes snapshot`.
+snapshots/
+contact-sheet.jpg
+
+# Artefactos intermedios de render
+.hyperframes/
+.debug/

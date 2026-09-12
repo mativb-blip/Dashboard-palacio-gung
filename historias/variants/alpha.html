@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Palacio Gung — Estamos open (alfa)</title>
+    <link rel="stylesheet" href="../assets/story.css" />
+    <style>
+      /* Variante para montar sobre foto o video: sin fondo propio.
+         Vive en variants/ y no en la raíz a propósito — dos HTML con
+         data-composition-id en la raíz disparan multiple_root_compositions,
+         y ese error de lint APAGA los audits de layout y contraste
+         (check reporta «0 samples», que parece limpio y no lo es). */
+      html, body, #root { background: transparent; }
+      #glow { background: none; }
+    </style>
+    <!-- GSAP vendorizado: el CDN (cdn.jsdelivr.net) está bloqueado en el
+         contenedor de render y falla con ERR_TUNNEL_CONNECTION_FAILED / 403. -->
+    <script src="../assets/vendor/gsap.min.js"></script>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="alpha"
+      data-start="0"
+      data-duration="5"
+      data-fps="30"
+      data-width="1080"
+      data-height="1920"
+    >
+      <!-- #glow se queda (vacío) porque la línea de tiempo lo anima;
+           sin él GSAP avisaría por un target inexistente. -->
+      <div id="glow"></div>
+
+      <div id="kicker">
+        <span id="k-mark">Palacio Gung</span>
+        <div id="k-rule"></div>
+      </div>
+
+      <!-- Textura, no copy. El audit de contraste la reprueba (3.95:1) y
+           tiene razón: nadie tiene que poder leerla. data-layout-ignore es
+           el opt-out que el audit honra. -->
+      <div id="microtext" data-layout-ignore aria-hidden="true">ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY? ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY? ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY? ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY? ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY? ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY? ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY? ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY? ESTAMOS OPEN. ¿QUÉ VAS A PEDIR HOY?</div>
+
+      <div id="g-a" class="group">
+        <div id="a1" class="h-line">Estamos</div>
+        <div id="a2" class="h-line"><span id="w-open" class="em">open</span><span class="dot">.</span></div>
+      </div>
+
+      <div id="g-b" class="group">
+        <div id="b1" class="h-line">¿Qué vas a</div>
+        <div id="b2" class="h-line"><span id="w-pedir" class="em">pedir</span> Hoy?</div>
+      </div>
+
+      <div id="b-rule"></div>
+    </div>
+
+    <script src="../assets/timeline.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["alpha"] = window.buildStoryTimeline();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,173 @@
+/* ------------------------------------------------------------------
+   Palacio Gung — historia 9:16, solo tipografía.
+   Compartido por index.html (con fondo) y variants/alpha.html (sin fondo).
+   Las url() de @font-face son relativas a ESTE archivo, así que sirven
+   igual desde la raíz y desde variants/.
+   ------------------------------------------------------------------ */
+
+/* Montserrat variable, subconjunto latin (cubre ñ á é í ó ú ¿ ¡).
+   Descargada de la API css2 de Google Fonts y servida local: un <link>
+   a fonts.googleapis.com hace fallar `hyperframes check` por timeout. */
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("fonts/montserrat-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("fonts/montserrat-var-italic.woff2") format("woff2");
+}
+
+:root {
+  --bg-0: #0a141d;
+  --bg-1: #172b3d;
+  --ink: #f4efe6;
+  --muted: rgba(244, 239, 230, 0.44);
+  --hair: rgba(244, 239, 230, 0.22);
+  --accent: #c8a972;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Montserrat", Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+#root {
+  position: relative;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  color: var(--ink);
+  /* las medidas tipográficas van en cqmin: 1cqmin = 10.8px sobre 1080x1920 */
+  container-type: size;
+}
+
+/* ---------- fondo: solo CSS, ninguna imagen ---------- */
+
+#glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(58% 42% at 50% 40%, var(--bg-1) 0%, rgba(23, 43, 61, 0) 100%),
+    radial-gradient(72% 40% at 50% 106%, rgba(200, 169, 114, 0.11) 0%, rgba(200, 169, 114, 0) 100%),
+    var(--bg-0);
+}
+
+#vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(78% 60% at 50% 46%, rgba(0, 0, 0, 0) 34%, rgba(0, 0, 0, 0.62) 100%);
+}
+
+/* ---------- masthead ---------- */
+
+#kicker {
+  position: absolute;
+  top: 300px;
+  left: 84px;
+  z-index: 3;
+}
+
+#k-mark {
+  display: block;
+  font-size: 3cqmin;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+#k-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -14px;
+  height: 3px;
+  background: var(--accent);
+  transform-origin: left center;
+}
+
+/* ---------- textura decorativa (NO es copy legible) ---------- */
+
+#microtext {
+  position: absolute;
+  top: 296px;
+  right: 84px;
+  width: 258px;
+  height: 292px;
+  overflow: hidden;
+  z-index: 3;
+  font-size: 1.18cqmin;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1.5;
+  text-align: justify;
+  text-transform: uppercase;
+  /* 0.44 (--muted) x 0.55 (autoAlpha final) = 24% efectivo */
+  color: var(--muted);
+}
+
+/* ---------- titulares ---------- */
+
+.group {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 380px 84px 340px;
+}
+
+.h-line {
+  display: block;
+  width: 100%;
+  font-size: 13.2cqmin;
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.024em;
+  text-transform: uppercase;
+}
+
+/* El corazón de la pieza: 800 versalita contra 300 itálica minúscula.
+   El margin-right NO es decorativo — sin él la itálica se pega a la
+   palabra siguiente en el pico del pulso de escala. */
+.em {
+  display: inline-block;
+  margin-right: 0.06em;
+  font-style: italic;
+  font-weight: 300;
+  letter-spacing: -0.004em;
+  text-transform: lowercase;
+}
+
+.dot { color: var(--accent); }
+
+#b-rule {
+  position: absolute;
+  bottom: 300px;
+  left: 84px;
+  width: 300px;
+  height: 2px;
+  background: var(--accent);
+  transform-origin: left center;
+  z-index: 3;
+}
