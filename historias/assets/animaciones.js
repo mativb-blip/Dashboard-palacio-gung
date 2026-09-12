@@ -171,7 +171,7 @@ function sembrarAzar(tl) {
 window.ANIMACIONES.bloom = function () {
   gsap.registerPlugin(SplitText);
   var tl = gsap.timeline({ paused: true });
-  var partes = SplitText.create(".cita, .linea, .plato .es, .plato .kr", { type: "chars" });
+  var partes = SplitText.create(".cita, .linea, .plato", { type: "chars" });
 
   tl.from(partes.chars, {
     autoAlpha: 0,

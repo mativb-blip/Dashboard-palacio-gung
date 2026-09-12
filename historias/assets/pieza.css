@@ -154,19 +154,26 @@ html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; 
 .plato {
   margin-top: 1.45em;
 }
-.plato .es {
-  display: block;
-  font-size: 2.61cqmin;
-  font-weight: 600;
+.plato {
   line-height: 1.15;
 }
-.plato .kr {
-  display: block;
-  font-family: "Noto Sans KR", "Montserrat", sans-serif;
-  font-size: 2.06cqmin;
+/* Van en UNA línea, separados por un punto medio. La regla de compartir
+   altura de tinta se vuelve más literal así: sobre la misma base y con la
+   misma altura, los dos alfabetos se leen como un solo nombre. De ahí que
+   el hangul lleve un font-size menor — 19.7/0.885 contra 19.7/0.700. */
+.plato .es {
+  font-weight: 600;
+  font-size: 2.61cqmin;
+}
+.plato .sep {
   font-weight: 400;
-  line-height: 1.15;
-  margin-top: 0.03em;
+  font-size: 2.61cqmin;
+  padding: 0 0.28em;
+}
+.plato .kr {
+  font-family: "Noto Sans KR", "Montserrat", sans-serif;
+  font-weight: 400;
+  font-size: 2.06cqmin;
 }
 
 /* Nivel 3 — bajada */
