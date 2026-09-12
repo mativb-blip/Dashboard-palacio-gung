@@ -1,0 +1,102 @@
+/* ------------------------------------------------------------------
+   Sistema tipográfico photo-led — Palacio Gung
+   La foto manda. El texto vive en espacio neutro y no interseca nada.
+
+   Todas las medidas van en cqmin (1cqmin = 10.8px sobre 1080x1920) para
+   que la escala sea relativa al lienzo y no a un tamaño en píxeles.
+
+   El bloque se coloca con tres variables, que se fijan por pieza porque
+   las decide la foto, no una retícula:
+     --ancla    : left | right   (qué borde abraza)
+     --margen   : distancia a ese borde
+     --arriba   : dónde empieza el bloque
+     --tinta    : color, decidido por la luminancia del parche
+   ------------------------------------------------------------------ */
+
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("fonts/montserrat-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("fonts/montserrat-var-italic.woff2") format("woff2");
+}
+/* Subconjunto con SOLO los glifos que usamos (30 KB en vez de ~5 MB).
+   Montserrat no tiene hangul. */
+@font-face {
+  font-family: "Noto Sans KR";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("fonts/notosanskr-subset.woff2") format("woff2");
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+
+#root {
+  position: relative;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  container-type: size;
+  font-family: "Montserrat", Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+/* ---------- el bloque ---------- */
+
+.bloque {
+  position: absolute;
+  top: var(--arriba);
+  z-index: 1;
+  width: var(--medida, 48%);
+  color: var(--tinta, #ffffff);
+}
+
+/* Bandera hacia el borde que abraza. Nunca centrado, nunca justificado. */
+.bloque[data-ancla="right"] { right: var(--margen); text-align: right; }
+.bloque[data-ancla="left"]  { left:  var(--margen); text-align: left;  }
+
+/* Nivel 1 — nombre latino */
+.nombre {
+  font-size: 4.3cqmin;
+  font-weight: var(--peso-nombre, 600);
+  line-height: 1.12;
+  letter-spacing: -0.005em;
+}
+
+/* Nivel 2 — hangul. Cuelga del latino con interlineado cerrado:
+   los dos leen como UNA unidad, no como dos líneas sueltas. */
+.hangul {
+  font-family: "Noto Sans KR", "Montserrat", sans-serif;
+  font-size: 2.9cqmin;
+  font-weight: 400;
+  line-height: 1.15;
+  margin-top: 0.06em;
+}
+
+/* Nivel 3 — bajada */
+.bajada {
+  font-size: 2.3cqmin;
+  font-weight: 400;
+  line-height: 1.5;
+  margin-top: 1.5em;
+}
+.bajada + .bajada { margin-top: 1em; }

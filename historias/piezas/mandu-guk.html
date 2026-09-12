@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Palacio Gung — Mandu Guk</title>
+    <link rel="stylesheet" href="assets/pieza.css" />
+    <script src="assets/vendor/gsap.min.js"></script>
+    <style>
+      /* Medido sobre la foto, no elegido a ojo:
+         zona neutra x 0-1080, y 0-580 (30% superior).
+         Luminancia media 0.0067 -> contraste con blanco 18.5:1. */
+      .bloque {
+        --ancla: right;
+        --margen: 13%;
+        --arriba: 270px;
+        --medida: 48%;
+        --tinta: #ffffff;
+        --peso-nombre: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="root"
+      data-start="0"
+      data-duration="1"
+      data-fps="30"
+      data-width="1080"
+      data-height="1920"
+    >
+      <img id="foto" src="fotos/mandu-guk-cenital.jpg" alt="Mandu guk servido en cuenco negro, visto desde arriba" />
+
+      <div class="bloque" data-ancla="right">
+        <h1 class="nombre">Mandu Guk</h1>
+        <p class="hangul">만둣국</p>
+        <p class="bajada">Hay días en Corea<br />que solo saben a manduguk:<br />los fríos, los lluviosos, los que piden<br />algo que reconforte más que alimente.</p>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["root"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>
