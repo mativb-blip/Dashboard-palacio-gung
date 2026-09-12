@@ -116,6 +116,23 @@ html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; 
   margin-top: 0.03em;
 }
 
+/* CITA — segundo tipo de pieza.
+   Una frase suelta, sin plato: no hay nombre ni hangul, así que la cita
+   ocupa el nivel 1 y no se inventa un tamaño nuevo. Lo único propio es
+   el interlineado: el nivel 1 usa 1.12 porque es UNA línea corta, y una
+   cita es texto corrido de varias, así que hereda el 1.35 de la bajada.
+   En este sistema el interlineado lo decide el PAPEL del texto, no su
+   tamaño.
+   Todo lo demás es idéntico: bandera hacia el borde que abraza, una sola
+   tinta decidida por el parche, y cero decoración — de ahí que no lleve
+   la comilla de apertura grande de la tarjeta de referencia, que sería
+   el primer elemento decorativo del sistema. */
+.cita {
+  font-size: 4.28cqmin;
+  font-weight: var(--peso-cita, 500);
+  line-height: 1.35;
+}
+
 /* Nivel 3 — bajada */
 .bajada {
   font-size: 2.60cqmin;

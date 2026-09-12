@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Palacio Gung — No hay tradición</title>
+    <link rel="stylesheet" href="assets/pieza.css" />
+    <script src="assets/vendor/gsap.min.js"></script>
+    <style>
+      /* Medido, no elegido: la franja clara de arriba (y 0-470) da 14.82:1
+         con tinta oscura en su peor punto sobre la MITAD DERECHA, contra
+         7.98:1 en la izquierda. De ahí el ancla. Segunda pieza del sistema
+         con tinta oscura, como la referencia de Mandu Guk con vapor. */
+      .bloque {
+        --ancla: right;
+        --margen: 14.2%;
+        --arriba: 226px;
+        --medida: 58%;
+        --tinta: #1a1a1a;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="root"
+      data-start="0"
+      data-duration="1"
+      data-fps="30"
+      data-width="1080"
+      data-height="1920"
+    >
+      <img id="foto" src="fotos/ojingeo-bokkeum.jpg" alt="Salteado de calamar con vegetales y fideos, en primer plano" />
+
+      <div class="bloque" data-ancla="right">
+        <p class="cita">No hay tradición<br />sin personas dispuestas<br />a defenderla.</p>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["root"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>
