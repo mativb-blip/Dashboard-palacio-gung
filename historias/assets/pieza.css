@@ -74,19 +74,37 @@ html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; 
 .bloque[data-ancla="right"] { right: var(--margen); text-align: right; }
 .bloque[data-ancla="left"]  { left:  var(--margen); text-align: left;  }
 
+/* ---------- LA ESCALA ----------
+   Se define por ALTURA DE TINTA, no por font-size, porque la tinta es lo
+   que el ojo compara. Razón geométrica 1.367 entre niveles.
+
+   Y entre alfabetos hay que corregir ópticamente: al mismo font-size una
+   mayúscula de Montserrat mide 0.700em y un glifo hangul de Noto Sans KR
+   mide 0.885em, así que el hangul se ve 1.26x más alto. Sin corregirlo el
+   만둣국 sale casi tan grande como el nombre y los niveles 1 y 2 se pisan.
+
+     nivel     tinta      font-size     de dónde sale
+     nombre    32.5 px    4.30cqmin     32.5 / 0.700
+     hangul    23.8 px    2.49cqmin     23.8 / 0.885   <- NO es 2.30 + algo
+     bajada    17.4 px    2.30cqmin     17.4 / 0.700
+
+   Si se cambia la fuente coreana hay que recalcular 2.49: ese número
+   depende de cuánto del cuadratín ocupa el glifo, no del diseño.        */
+
 /* Nivel 1 — nombre latino */
 .nombre {
-  font-size: 4.3cqmin;
+  font-size: 4.30cqmin;
   font-weight: var(--peso-nombre, 600);
   line-height: 1.12;
   letter-spacing: -0.005em;
 }
 
 /* Nivel 2 — hangul. Cuelga del latino con interlineado cerrado:
-   los dos leen como UNA unidad, no como dos líneas sueltas. */
+   los dos leen como UNA unidad, no como dos líneas sueltas.
+   El font-size sale de la tabla de arriba, ya corregido ópticamente. */
 .hangul {
   font-family: "Noto Sans KR", "Montserrat", sans-serif;
-  font-size: 2.9cqmin;
+  font-size: 2.49cqmin;
   font-weight: 400;
   line-height: 1.15;
   margin-top: 0.06em;
