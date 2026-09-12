@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Palacio Gung — Mandu Guk · C · revelado por línea</title>
+    <link rel="stylesheet" href="assets/pieza.css" />
+    <link rel="stylesheet" href="assets/animacion.css" />
+    <style>
+      /* Medido sobre la foto: zona neutra x 0-1080, y 0-580 (30% superior),
+         luminancia 0.0067 -> contraste con blanco 18.5:1. */
+      .bloque {
+        --ancla: right;
+        --margen: 14.2%;
+        --arriba: 231px;
+        --medida: 55%;
+        --tinta: #ffffff;
+        --peso-nombre: 500;
+      }
+    </style>
+    <script src="assets/vendor/gsap.min.js"></script>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="root"
+      data-start="0"
+      data-duration="5"
+      data-fps="30"
+      data-width="1080"
+      data-height="1920"
+    >
+      <img id="foto" src="fotos/mandu-guk-cenital.jpg" alt="Mandu guk servido en cuenco negro, visto desde arriba" />
+
+      <div id="bloque" class="bloque" data-ancla="right">
+        <h1 id="n" class="nombre"><span class="mascara"><span class="linea">Mandu Guk</span></span></h1>
+        <p id="h" class="hangul"><span class="mascara"><span class="linea">만둣국</span></span></p>
+        <div id="b" class="bajada">
+          <p><span class="mascara"><span class="linea">Hay días en Corea</span></span></p>
+          <p><span class="mascara"><span class="linea">que solo saben a manduguk:</span></span></p>
+          <p><span class="mascara"><span class="linea">los fríos, los lluviosos, los que piden</span></span></p>
+          <p><span class="mascara"><span class="linea">algo que reconforte más que alimente.</span></span></p>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/animaciones.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["root"] = window.ANIMACIONES.revelado();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+/* ------------------------------------------------------------------
+   Capa de animación. Se carga DESPUÉS de pieza.css y no le toca nada:
+   el sistema estático sigue siendo el mismo.
+
+   Lo único que agrega es la estructura de máscara por línea, que la
+   necesita el revelado (versión C) y que las otras dos ignoran sin
+   costo. Por eso las tres comparten el mismo HTML.
+
+   Ojo con la máscara: recorta lo que se sale de su caja de línea. Con
+   line-height 1.35 la caja mide 37.9px y el alto total de la fuente
+   (ascendente + descendente = 1.219em) mide 34.2px, así que las tildes
+   de "días" y las colas de "que" entran. Si alguien baja el interlineado
+   por debajo de ~1.25, empiezan a cortarse.
+   ------------------------------------------------------------------ */
+
+.mascara { display: block; overflow: hidden; }
+.linea   { display: block; will-change: transform; }
+
+/* La bajada pasa de un <p> con <br> a cuatro bloques, para poder animar
+   línea por línea. El alto de cada bloque es el mismo line-height, así
+   que la maqueta no se mueve ni un píxel. */
+.bajada p { line-height: inherit; }
+
+/* El acercamiento de cámara escala la foto; sin esto se ve el borde. */
+#root { overflow: hidden; }
+#foto { will-change: transform; }

@@ -9,3 +9,7 @@ contact-sheet.jpg
 # Artefactos intermedios de render
 .hyperframes/
 .debug/
+
+# La hoja de comparación se arma con herramientas/armar-preview.py
+# y pesa 2.5 MB de foto incrustada: se regenera, no se versiona.
+piezas/animacion/comparar.html
