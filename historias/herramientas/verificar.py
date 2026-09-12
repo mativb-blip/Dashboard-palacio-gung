@@ -95,12 +95,30 @@ def main(foto_path, render_path, esperadas=6):
     primera = abajo[0]
     aire = primera - ys.max()
     print(f"\n  primer detalle fuerte de la foto: y {primera}")
-    if aire < 0:
-        print(f"  !! EL TEXTO PISA UN ELEMENTO: se superpone {-aire} px. Hay que subir o acortar el bloque.")
-    elif aire < 40:
-        print(f"  aire {aire} px — pasa, pero es poco: no entra otra línea.")
-    else:
+    if aire >= 40:
         print(f"  aire {aire} px — holgado.")
+        return
+    if aire >= 0:
+        print(f"  aire {aire} px — pasa, pero es poco: no entra otra línea.")
+        return
+
+    # Pisa algo. Que "pise" no siempre es un defecto: el vapor es
+    # translúcido y el texto puede seguir leyéndose. Sin el contraste no
+    # hay con qué decidir, así que lo damos acá mismo.
+    print(f"  !! EL TEXTO PISA UN ELEMENTO: se superpone {-aire} px.")
+    a = np.asarray(Image.open(foto_path).convert("RGB").resize((1080, 1920)), np.float32)/255
+    lin = np.where(a <= 0.04045, a/12.92, ((a+0.055)/1.055)**2.4)
+    Y = lin[..., 0]*0.2126 + lin[..., 1]*0.7152 + lin[..., 2]*0.0722
+    huella = Y[ys.min():ys.max()+1, xs.min():xs.max()+1]
+    def c(Ya, Yb): return (max(Ya, Yb)+0.05)/(min(Ya, Yb)+0.05)
+    tinta = 1.0 if huella.mean() < 0.18 else 0.0103
+    peor = c(tinta, float(huella.max() if tinta == 1.0 else huella.min()))
+    print(f"     contraste en la huella: peor {peor:.2f}:1   medio "
+          f"{c(tinta, float(huella.mean())):.2f}:1   (AA pide 4.5:1)")
+    if peor >= 4.5:
+        print("     sigue legible: es cuestión de criterio, no de contraste. MIRALO.")
+    else:
+        print("     además pierde legibilidad: hay que subir o acortar el bloque.")
 
 
 if __name__ == "__main__":
