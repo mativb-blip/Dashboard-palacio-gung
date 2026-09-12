@@ -123,3 +123,82 @@ layout en 9 muestras · 10/10 de contraste WCAG AA**.
   vacío de la propia foto, un solo color, título al 4.3 % del ancho. Esta pieza
   es lo contrario — *type-led*, titular al 13.2 %. Fue decisión explícita del
   cliente («sin imagen de fondo, solo el texto»), no un descuido.
+
+---
+
+# Sistema photo-led (el vigente)
+
+La pieza de arriba es *type-led* — solo tipografía, sin foto — y fue una
+decisión puntual del cliente. El sistema real de la marca es el contrario:
+**la foto manda y el texto vive en un hueco vacío de ella**.
+
+```
+piezas/<plato>.html     una pieza = una foto + su bloque de texto
+assets/pieza.css        la escala y la jerarquía, compartidas por todas
+fotos/                  las fotos originales y las piezas de referencia
+herramientas/           medición: nada se estima a ojo
+```
+
+## Las reglas
+
+1. **La posición la dicta la foto, no una retícula.** El bloque cae donde la
+   foto está vacía, y eso cambia de foto en foto.
+2. **Bandera hacia el borde que abraza.** Nunca centrado, nunca justificado.
+3. **Un solo color**, decidido por la luminancia del parche donde cae.
+4. **Cero decoración**: sin subrayados, sin acentos de color, sin versalitas.
+
+Cada pieza fija cuatro variables; el resto lo hereda de `pieza.css`:
+
+```css
+--ancla: right;    /* qué borde abraza */
+--margen: 14.2%;
+--arriba: 231px;
+--tinta: #ffffff;
+```
+
+## La escala
+
+Medida sobre `fotos/referencia-mandu-guk.jpg`, normalizada a 1080×1920:
+
+| Nivel | font-size | Tinta que da |
+|---|---|---|
+| nombre | 4.28cqmin | 32.4 px |
+| hangul | 3.32cqmin | 31.7 px |
+| bajada | 2.60cqmin | 19.7 px |
+
+Interlineado de la bajada 1.35. Los tres cierran con **letter-spacing cero**.
+
+> **El hangul no baja de escalón.** Su tinta mide lo mismo que la mayúscula
+> del nombre, y por eso los dos leen como una unidad. Su `font-size` es 22 %
+> menor solo para *llegar* a esa misma altura: un glifo hangul ocupa 0.885em
+> del cuadratín y una mayúscula de Montserrat 0.700em. Si se cambia la fuente
+> coreana, ese 3.32 hay que recalcularlo.
+
+> **El tamaño se despeja del ancho de tinta, no de la altura de mayúscula.**
+> 543 px de ancho sobre 36 glifos tiene 0.4 % de error; una mayúscula de 20 px
+> tiene 5 %. Anclar al alto me hizo "descubrir" un interletrado que no existe.
+
+## Las herramientas
+
+```bash
+# ¿dónde puede ir el texto en esta foto, y de qué color?
+python3 herramientas/espacio-negativo.py fotos/mi-foto.jpg
+
+# ¿el render coincide con la referencia? ¿pisa algo?
+python3 herramientas/verificar.py fotos/mi-foto.jpg render.png
+```
+
+`verificar.py` cuenta las bandas de texto además de medirlas. Si salen más de
+las esperadas, una línea se partió sola — que es un bug silencioso: la pieza
+se ve casi bien y nadie lo nota. Así se detectó que un interlineado de 1.5
+partía la última línea de la bajada en dos.
+
+## Renderizar una pieza
+
+```bash
+npx hyperframes render . -c piezas/<plato>.html --format png-sequence --fps 1 -q high -o /tmp/salida
+```
+
+> Las rutas a los assets dentro de `piezas/` van **relativas a la raíz del
+> proyecto** (`assets/...`, `fotos/...`), no con `../`: el render reescribe el
+> `../` pero Studio resuelve contra la raíz y da 404.
