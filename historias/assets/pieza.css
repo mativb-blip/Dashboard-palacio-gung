@@ -133,6 +133,42 @@ html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; 
   line-height: 1.35;
 }
 
+/* Énfasis dentro de una cita: peso Y cursiva a la vez.
+   En una serif la cursiva sola alcanza, porque cambia la forma de la
+   letra. Montserrat es geométrica: su cursiva es una inclinación y poco
+   más, así que sin el salto de peso el énfasis casi no se ve. */
+.cita em {
+  font-style: italic;
+  font-weight: 700;
+}
+
+/* NOMBRE DEL PLATO — jerarquía menor, debajo de la cita.
+   Conserva la regla del sistema: el latino y el coreano comparten ALTURA
+   DE TINTA y por eso leen como una unidad. Acá esa altura es la del nivel
+   3 (19.7 px), o sea el escalón más bajo, y de ahí salen los dos
+   font-size: 19.7/0.700 para el latino y 19.7/0.885 para el hangul.
+
+   El peso va al revés de lo esperable —600 el nombre contra 500 la cita,
+   que es más grande— a propósito: chico y firme lee como rótulo, grande y
+   medio lee como enunciado. Los papeles quedan claros sin agrandar nada. */
+.plato {
+  margin-top: 1.45em;
+}
+.plato .es {
+  display: block;
+  font-size: 2.61cqmin;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.plato .kr {
+  display: block;
+  font-family: "Noto Sans KR", "Montserrat", sans-serif;
+  font-size: 2.06cqmin;
+  font-weight: 400;
+  line-height: 1.15;
+  margin-top: 0.03em;
+}
+
 /* Nivel 3 — bajada */
 .bajada {
   font-size: 2.60cqmin;
@@ -141,3 +177,23 @@ html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; 
   margin-top: 0.70em;
 }
 .bajada + .bajada { margin-top: 1em; }
+
+/* ---------- LOGO ----------
+   Marca abajo, del lado contrario al bloque de texto: arriba a la derecha
+   el texto, abajo a la izquierda la marca. La diagonal no es gusto, es lo
+   que la foto permite — el granate de marca (#74202A, luminancia 0.049)
+   saca 6.75:1 sobre los fideos blancos de la izquierda y 1.24:1 sobre la
+   comida oscura de la derecha, donde directamente se perdería.
+
+   El margen inferior es el 14.2% del sistema, el mismo que el lateral.
+   Eso además lo deja en y 1647, por encima de los ~250px que se come la
+   barra de respuesta de Instagram. */
+.logo {
+  position: absolute;
+  bottom: 14.2%;
+  width: var(--logo-ancho, 15%);
+  height: auto;
+  z-index: 1;
+}
+.logo[data-ancla="left"]  { left:  var(--margen, 14.2%); }
+.logo[data-ancla="right"] { right: var(--margen, 14.2%); }

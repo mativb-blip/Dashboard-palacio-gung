@@ -171,7 +171,7 @@ function sembrarAzar(tl) {
 window.ANIMACIONES.bloom = function () {
   gsap.registerPlugin(SplitText);
   var tl = gsap.timeline({ paused: true });
-  var partes = SplitText.create(".cita, .linea", { type: "chars" });
+  var partes = SplitText.create(".cita, .linea, .plato .es, .plato .kr", { type: "chars" });
 
   tl.from(partes.chars, {
     autoAlpha: 0,
@@ -181,6 +181,13 @@ window.ANIMACIONES.bloom = function () {
     ease: "power2.out",
     stagger: 0.02
   }, 0.2);
+
+  // La marca entra al final, cuando el texto ya se resolvió: es una firma,
+  // no un elemento más de la composición. Si no hay logo en la pieza, el
+  // selector no encuentra nada y GSAP lo ignora sin romper.
+  if (document.querySelector(".logo")) {
+    tl.from(".logo", { autoAlpha: 0, duration: 0.7, ease: "sine.out" }, 2.55);
+  }
 
   tl.set({}, {}, 5);
   return tl;
