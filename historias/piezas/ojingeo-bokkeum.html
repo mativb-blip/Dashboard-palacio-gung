@@ -6,6 +6,7 @@
     <title>Palacio Gung — No hay tradición</title>
     <link rel="stylesheet" href="assets/pieza.css" />
     <script src="assets/vendor/gsap.min.js"></script>
+    <script src="assets/vendor/SplitText.min.js"></script>
     <style>
       /* Medido, no elegido: la franja clara de arriba (y 0-470) da 14.82:1
          con tinta oscura en su peor punto sobre la MITAD DERECHA, contra
@@ -25,7 +26,7 @@
       id="root"
       data-composition-id="root"
       data-start="0"
-      data-duration="1"
+      data-duration="5"
       data-fps="30"
       data-width="1080"
       data-height="1920"
@@ -37,9 +38,15 @@
       </div>
     </div>
 
+    <script src="assets/animaciones.js"></script>
     <script>
       window.__timelines = window.__timelines || {};
-      window.__timelines["root"] = gsap.timeline({ paused: true });
+      var tl = window.ANIMACIONES.bloom();
+      window.__timelines["root"] = tl;
+      // Gancho de verificación: ?t=1.2 congela la pieza en ese segundo.
+      // El render no pasa ese parámetro, así que no lo afecta.
+      var q = new URLSearchParams(location.search);
+      if (q.has("t")) { tl.pause(parseFloat(q.get("t"))); }
     </script>
   </body>
 </html>

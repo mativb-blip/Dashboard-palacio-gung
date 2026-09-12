@@ -93,43 +93,40 @@ window.ANIMACIONES = {
 window.ANIMACIONES.scramble = function () {
   gsap.registerPlugin(ScrambleTextPlugin);
   var tl = gsap.timeline({ paused: true });
-
   sembrarAzar(tl);
 
-  // sílabas que la fuente realmente tiene: se leen de la pieza, no se inventan
-  var HANGUL = "가각간감갓고곡곤곰곳구국군굼굿그극근금긋기긱긴김깃다닥단담닷도독돈돔돗" +
-               "두둑둔둠둣드득든듬듯디딕딘딤딧마막만맘맛모목몬몸못무묵문뭄뭇므믁믄믐믓" +
-               "미믹민밈밋바박반밤밧보복본봄봇부북분붐붓브븍븐븜븟비빅빈빔빗";
-  var NOMBRE = "MandGukoi";        // del propio nombre: peor caso 340px de 594
-  var BAJADA = ".acefgilnoqrstuá"; // el texto MENOS la 'm': peor caso 712px
+  document.querySelectorAll(".linea").forEach(function (el, i) {
+    if (!el.dataset.final) { el.dataset.final = el.textContent; }
+    var chars = POOLS[el.dataset.pool] || el.dataset.pool;
+    if (!chars) {
+      throw new Error("cada .linea necesita data-pool: el juego de caracteres " +
+                      "depende de SU texto y SU tamaño (ver la nota 2)");
+    }
+    var entra = 0.15 + i * 0.12;
+    // Sin esto, la línea muestra su texto FINAL hasta que le toca el turno:
+    // se ve bien, después se rompe y después se arregla, que es al revés de
+    // lo que tiene que pasar. Aparece recién cuando empieza a revolverse.
+    tl.set(el, { autoAlpha: 0 }, 0);
+    tl.set(el, { autoAlpha: 1 }, entra);
+    tl.to(el, {
+      duration: 1.1,
+      ease: "none",
+      scrambleText: { text: el.dataset.final, chars: chars, speed: 0.5, revealDelay: 0.26 }
+    }, entra);
+  });
 
-  function revolver(sel, chars, dur, retraso, cuando) {
-    document.querySelectorAll(sel).forEach(function (el, i) {
-      if (!el.dataset.final) { el.dataset.final = el.textContent; }
-      var entra = cuando + i * 0.12;
-      // Sin esto, la línea muestra su texto FINAL hasta que le toca el turno:
-      // se ve bien, después se rompe y después se arregla, que es al revés de
-      // lo que tiene que pasar. Aparece recién cuando empieza a revolverse.
-      tl.set(el, { autoAlpha: 0 }, 0);
-      tl.set(el, { autoAlpha: 1 }, entra);
-      tl.to(el, {
-        duration: dur,
-        ease: "none",
-        scrambleText: {
-          text: el.dataset.final,
-          chars: chars,
-          speed: 0.5,
-          revealDelay: retraso
-        }
-      }, entra);
-    });
-  }
-
-  revolver("#n .linea", NOMBRE, 1.2, 0.30, 0.15);
-  revolver("#h .linea", HANGUL, 1.0, 0.25, 0.35);
-  revolver("#b .linea", BAJADA, 1.0, 0.22, 0.55);
   tl.set({}, {}, 5);
   return tl;
+};
+
+/* Juegos con nombre. El hangul va acá y no en el HTML porque son 175
+   sílabas y porque se leyeron del cmap de la fuente: no es una decisión
+   de cada pieza, es lo que la fuente tiene. Los juegos latinos SÍ van en
+   cada pieza, en data-pool, porque dependen de su texto y su tamaño. */
+var POOLS = {
+  hangul: "가각간감갓고곡곤곰곳구국군굼굿그극근금긋기긱긴김깃다닥단담닷도독돈돔돗" +
+          "두둑둔둠둣드득든듬듯디딕딘딤딧마막만맘맛모목몬몸못무묵문뭄뭇므믁믄믐믓" +
+          "미믹민밈밋바박반밤밧보복본봄봇부북분붐붓브븍븐븜븟비빅빈빔빗"
 };
 
 /* Generador determinista: mismo segundo -> mismo revuelto. Ver la nota 3. */
@@ -147,3 +144,44 @@ function sembrarAzar(tl) {
   };
   window.__azarSembrado = function (nueva) { linea = nueva; ultimo = null; i = 0; };
 }
+
+/* ------------------------------------------------------------------
+   E — BLOOM (SplitText por caracter)
+   Cada glifo entra desenfocado, agrandado y transparente, y se resuelve.
+
+   Notas propias de este proyecto:
+
+   a) SplitText envuelve cada caracter en un span inline-block, y eso
+      puede correr la maqueta: hay que verificar que las líneas caigan
+      donde caían. Verificado sobre la cita: mismas 3 bandas, mismas
+      posiciones.
+
+   b) scale 1.4 saca a cada caracter de su caja. NO usar esta animación
+      dentro de .mascara (overflow: hidden), o el bloom se recorta contra
+      el borde de la línea. Por eso la pieza de cita no lleva máscaras.
+
+   c) 47 caracteres, por debajo del tope de ~120 donde conviene bajar a
+      palabras: animar un filter por caracter es caro, y el render de
+      este proyecto va por software (no hay GPU en el contenedor).
+      Si alguna vez el texto crece, cambiar type a "words".
+
+   d) No usa azar, así que —a diferencia del scramble— es reproducible
+      sin sembrar nada.
+   ------------------------------------------------------------------ */
+window.ANIMACIONES.bloom = function () {
+  gsap.registerPlugin(SplitText);
+  var tl = gsap.timeline({ paused: true });
+  var partes = SplitText.create(".cita, .linea", { type: "chars" });
+
+  tl.from(partes.chars, {
+    autoAlpha: 0,
+    scale: 1.4,
+    filter: "blur(8px)",
+    duration: 0.85,
+    ease: "power2.out",
+    stagger: 0.02
+  }, 0.2);
+
+  tl.set({}, {}, 5);
+  return tl;
+};
