@@ -58,6 +58,15 @@ El orden de las diapositivas se cambia con flechas en cada miniatura (`ArtUpload
 
 Un Carrusel deja `Proposal.video` en null. `SlideMedia` es el componente que elige entre `<img>` y `<video>` y lo usan la miniatura del Feed, el preview del post y el de Instagram; el visor grande de la vista Post no lo usa porque `ArtSlot` ya tenía su propia rama de video (con portada y controles) desde el Reel. Que un video se muestre en un lugar y no en otro es el modo de fallar típico acá: son cinco pantallas distintas pintando la misma lista.
 
+## Evolución (`/evolucion`)
+Sección de estadística, al lado de Inspiración. **Todo se deriva de las propuestas que ya existen** — no hay tabla de métricas ni nada que alguien tenga que ir cargando: una estadística que depende de mantenimiento manual deja de ser cierta a la segunda semana. Se agrega en el server (`evolution-actions.ts`) y viaja ya sumada; mandar las propuestas enteras al navegador para contarlas ahí sería pagar el peso de artes y captions para mostrar cuatro números.
+
+El estado **no** se cuenta desde la columna `Proposal.status`, se deriva con `computeProposalStatus()` — contar la columna daría números que no coinciden con lo que muestran las pills del resto del dashboard, que es la peor clase de estadística.
+
+> **Un solo color para las magnitudes.** Todo lo que mide "cuánto" va en azul de marca: las barras de un gráfico se comparan entre sí, no compiten. Los cuatro colores de estado se usan únicamente donde el dato ES un estado, y **siempre con su etiqueta al lado**. Ese cuarteto (azul/rojo/ámbar/gris), corrido contra el validador de paletas, no pasa como paleta *categórica* —dos colores quedan fuera de la banda de luminosidad y dos leen como gris— pero sí pasa separación CVD (ΔE 16.1) y contraste. Se conserva porque cambiarlo haría que esta pantalla contradiga las pills de todas las demás, y porque con texto al lado el color no es lo que carga el dato.
+
+> **El nav de texto completo pasó a 1280px, y no es arbitrario.** Con ocho ítems la fila mide ~1270px: entre el breakpoint `desktop` (861px) y 1280 se salía del header y se montaba encima del nombre de la marca. Se movió **solo** el corte del nav (`min-[1280px]`), no la variable global `desktop`, que gobierna el layout de dos columnas del panel y a 900px anda bien. Entre 640 y 1280 va la fila de solo íconos que ya existía.
+
 ## Alternativas de caption y música
 El Editor/Admin puede cargar **varias alternativas de caption** en la vista Post y Jun (Comentarista) elige **una sola**. La elegida se refleja en `Proposal.caption`, que sigue siendo el caption "real" para el título, las versiones, el preview, el export y las notificaciones — por eso `caption` no se derivó de la relación: hay once archivos que lo consumen y el espejo los deja intactos. La invariante (`Proposal.caption` == el texto de la fila `selected`) la mantiene `commitCaptionMirror()` en `proposals-actions.ts`, único lugar por donde pasa cualquier cambio del caption vigente.
 

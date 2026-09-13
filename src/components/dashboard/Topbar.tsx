@@ -20,11 +20,26 @@ const COMPACT_NAV_QUERY = "(min-width: 640px)";
  * navegan de vuelta al panel (`/?period=...`) en lugar de alternar in-place.
  * "estrategia" y "moodboard" son páginas propias, sin relación con
  * proposals/período: se comportan igual que "calendario" a efectos del nav. */
-type TopbarView = "month" | "grid" | "calendario" | "estrategia" | "moodboard" | "galeria" | "inspiracion";
+type TopbarView =
+  | "month"
+  | "grid"
+  | "calendario"
+  | "estrategia"
+  | "moodboard"
+  | "galeria"
+  | "inspiracion"
+  | "evolucion";
 
 /** Vistas que son una página aparte (no un período del panel): desde ellas
  * Post/Feed navegan por href en vez de alternar el período in-place. */
-const STANDALONE_VIEWS: TopbarView[] = ["calendario", "estrategia", "moodboard", "galeria", "inspiracion"];
+const STANDALONE_VIEWS: TopbarView[] = [
+  "calendario",
+  "estrategia",
+  "moodboard",
+  "galeria",
+  "inspiracion",
+  "evolucion",
+];
 
 interface TopbarProps {
   view: TopbarView;
@@ -78,6 +93,7 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
     // El Moodboard lo ven todos los roles; editarlo, solo el Admin (el gate
     // de escritura vive en moodboard/actions.ts).
     pageItem("inspiracion", "Inspiración", "/inspiracion"),
+    pageItem("evolucion", "Evolución", "/evolucion"),
     pageItem("moodboard", "Moodboard", "/moodboard"),
     pageItem("estrategia", "Estrategia", "/estrategia"),
     pageItem("calendario", "Calendario", "/calendario"),
@@ -97,17 +113,22 @@ export default function Topbar({ view, onPeriodChange, planLabel }: TopbarProps)
         <div className="text-[15px] font-bold whitespace-nowrap">{planLabel}</div>
       </div>
 
-      {/* Desktop: sin cambios — segmented group + divisor + menú de usuario. */}
-      <div className="hidden items-center gap-3 desktop:flex">
+      {/* Fila completa con etiquetas de texto. El corte es 1280px y NO el
+          breakpoint `desktop` (861px) del resto de la app: medido, los ocho
+          ítems con texto piden ~1270px, así que entre 861 y 1280 la fila se
+          salía del header y se montaba encima del nombre de la marca. El
+          breakpoint global no se toca — gobierna el layout de dos columnas
+          del panel, que con 900px anda perfecto. */}
+      <div className="hidden items-center gap-3 min-[1280px]:flex">
         <SegmentedGroup items={items} />
         <div className="h-[26px] w-px shrink-0 bg-line" />
         <UserMenu />
       </div>
 
-      {/* Tramo intermedio (640px–861px): ya sobra ancho para botones sueltos,
-          pero no para las etiquetas de texto completas del row de desktop —
-          misma fila, solo íconos en vez de pills con texto. */}
-      <div className="hidden min-[640px]:flex desktop:hidden items-center gap-2">
+      {/* Tramo intermedio (640px–1280px): ya sobra ancho para botones
+          sueltos, pero no para las etiquetas de texto completas de la fila de
+          arriba — misma fila, solo íconos en vez de pills con texto. */}
+      <div className="hidden min-[640px]:flex min-[1280px]:hidden items-center gap-2">
         <CompactNav items={items} />
         <div className="h-[26px] w-px shrink-0 bg-line" />
         <UserMenu />
@@ -277,6 +298,8 @@ function NavIcon({ itemKey, className }: { itemKey: string; className?: string }
   switch (itemKey) {
     case "inspiracion":
       return <InspirationIcon className={className} />;
+    case "evolucion":
+      return <EvolutionIcon className={className} />;
     case "moodboard":
       return <MoodboardIcon className={className} />;
     case "estrategia":
@@ -316,6 +339,29 @@ function InspirationIcon({ className }: { className?: string }) {
       <path d="m18.4 5.6-2.1 2.1" />
       <path d="m7.7 16.3-2.1 2.1" />
       <circle cx="12" cy="12" r="3.2" />
+    </svg>
+  );
+}
+
+/** Barras que suben — la sección mide cómo viene el contenido en el tiempo,
+ * así que el glifo es una tendencia y no un gráfico de torta. */
+function EvolutionIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M3 21h18" />
+      <rect x="4" y="13" width="3.5" height="5" rx="0.75" />
+      <rect x="10.25" y="9" width="3.5" height="9" rx="0.75" />
+      <rect x="16.5" y="4" width="3.5" height="14" rx="0.75" />
     </svg>
   );
 }
@@ -459,7 +505,7 @@ function UserMenu() {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <span
-        className="hidden max-w-[140px] truncate text-xs text-tx-3 desktop:inline"
+        className="hidden max-w-[140px] truncate text-xs text-tx-3 min-[1280px]:inline"
         title={label}
       >
         {label}
