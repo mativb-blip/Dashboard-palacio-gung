@@ -67,19 +67,6 @@ El estado **no** se cuenta desde la columna `Proposal.status`, se deriva con `co
 
 > **El nav de texto completo pasó a 1280px, y no es arbitrario.** Con ocho ítems la fila mide ~1270px: entre el breakpoint `desktop` (861px) y 1280 se salía del header y se montaba encima del nombre de la marca. Se movió **solo** el corte del nav (`min-[1280px]`), no la variable global `desktop`, que gobierna el layout de dos columnas del panel y a 900px anda bien. Entre 640 y 1280 va la fila de solo íconos que ya existía.
 
-### Bloque de Instagram
-Segundo bloque de `/evolucion`, separado de Producción porque **no se actualiza al mismo ritmo**: Producción se deriva sola de las propuestas, esto es una captura manual de una ventana cerrada del panel de Instagram. Juntarlos en el mismo scroll sugeriría que se refrescan igual.
-
-> **Se guardan las LECTURAS, nunca las derivadas.** Las ~30 cifras del informe salen de 17 números que se leen del panel; el resto son fórmulas (`instagram-metrics.ts`, función pura). Guardar las derivadas metería en la base el problema que el propio informe detecta en su §3.7: la cabecera dice 1.348 interacciones y el desglose suma 1.087. Con solo lecturas, un dato inconsistente no se puede ni cargar — y esa diferencia se **muestra** en "Qué no mide esto" en vez de corregirse, porque es del panel de Instagram, no de la transcripción.
-
-> **`scripts/check-instagram-metrics.ts` corre las fórmulas contra el informe real de agosto 2026 y compara con sus cifras publicadas** (38 comprobaciones, sin base ni credenciales). Es lo que hace auditable una pantalla que afirma treinta números que no guarda: sin eso, la única forma de saber si una fórmula está bien sería mirarla y creerle.
-
-- **Deltas solo con una medición anterior.** La primera dice "Primera medición — sin comparación" en vez de un 0 %, que se leería como "no cambió". Van con flecha y signo además del color.
-- **Números en `es-ES`, no `es-DO`.** `Intl` para República Dominicana devuelve formato estadounidense (10,479 · 1.14) y el informe usa el europeo (10.479 · 1,14). Se lee con el documento al lado. Además `useGrouping: "always"`: el español no agrupa cuatro cifras por defecto, así que 42.427 y 4194 quedaban en la misma columna con criterios distintos. Las **fechas** siguen en es-DO.
-- **Alcance y eficiencia por formato van en dos escalas separadas**, nunca en un mismo eje: la comparación honesta es entre formatos dentro de cada columna.
-- **La tarjeta de horarios es lo único que se cruza con el resto del dashboard**: `getScheduleFit()` cuenta cuántas propuestas del período caen dentro de la franja activa, reusando `parseProposalDateTime()` (que ya asume UTC-4). Lo que no se puede parsear no se cuenta ni dentro ni fuera — inventarle una hora sería peor.
-- **La validación NO cruza campos entre sí**, a propósito: el panel de Instagram es incoherente consigo mismo, y una validación cruzada impediría cargar el dato real.
-
 ## Alternativas de caption y música
 El Editor/Admin puede cargar **varias alternativas de caption** en la vista Post y Jun (Comentarista) elige **una sola**. La elegida se refleja en `Proposal.caption`, que sigue siendo el caption "real" para el título, las versiones, el preview, el export y las notificaciones — por eso `caption` no se derivó de la relación: hay once archivos que lo consumen y el espejo los deja intactos. La invariante (`Proposal.caption` == el texto de la fila `selected`) la mantiene `commitCaptionMirror()` en `proposals-actions.ts`, único lugar por donde pasa cualquier cambio del caption vigente.
 

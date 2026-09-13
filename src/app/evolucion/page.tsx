@@ -1,14 +1,12 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Topbar from "@/components/dashboard/Topbar";
-import InstagramBlock from "./InstagramBlock";
 import { useBrand } from "@/lib/dashboard/BrandContext";
 import { getEvolutionStats, type EvolutionStats, type Tajada } from "@/lib/dashboard/evolution-actions";
 import { statusPillStyle } from "@/lib/dashboard/format";
-import { canEditContent, PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
+import { PRESS_SCALE_CLASS } from "@/lib/dashboard/ui";
 import type { ProposalStatus } from "@/types/dashboard";
 
 /**
@@ -27,8 +25,6 @@ import type { ProposalStatus } from "@/types/dashboard";
  */
 export default function EvolucionPage() {
   const { brandName } = useBrand();
-  const { data: session } = useSession();
-  const canEdit = canEditContent(session?.user.role);
   const [stats, setStats] = useState<EvolutionStats | null>(null);
   const [error, setError] = useState("");
 
@@ -70,17 +66,7 @@ export default function EvolucionPage() {
           <div className="text-[11px] tracking-label text-tx-3 uppercase">Plan de contenido</div>
           <h1 className="text-2xl font-bold">Evolución</h1>
           <p className="mt-1 text-sm text-tx-2">
-            Dos cosas distintas: lo que produjiste y lo que Instagram hizo con eso.
-          </p>
-        </div>
-
-        {/* Producción se deriva sola de las propuestas; Instagram es una
-            captura manual de una ventana cerrada. Van en bloques separados
-            justamente porque no se actualizan al mismo ritmo. */}
-        <div>
-          <h2 className="text-xl font-bold">Producción</h2>
-          <p className="mt-0.5 text-sm text-tx-2">
-            Cuánto se cargó, qué se aprobó y qué está esperando respuesta.
+            Cómo viene el contenido: cuánto se cargó, qué se aprobó y qué está esperando respuesta.
           </p>
         </div>
 
@@ -141,8 +127,6 @@ export default function EvolucionPage() {
             </Card>
           </>
         )}
-
-        <InstagramBlock canEdit={canEdit} />
       </div>
     </div>
   );
