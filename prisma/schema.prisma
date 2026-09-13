@@ -562,3 +562,85 @@ model InspirationNote {
 
   @@index([order])
 }
+
+/// Una medición de Estadísticas de Instagram para una ventana cerrada.
+///
+/// SOLO SE GUARDAN LAS LECTURAS, nunca las métricas derivadas. Las 30 cifras
+/// del informe salen de ~17 números que se leen del panel; el resto son
+/// fórmulas (ver instagram-metrics.ts). Guardar las derivadas metería en la
+/// base el problema que el propio informe detectó: su cabecera dice 1.348
+/// interacciones y su desglose suma 1.087. Con solo las lecturas, un dato
+/// inconsistente no se puede ni cargar.
+///
+/// Es una captura MANUAL de una ventana cerrada, no una serie que se
+/// actualiza sola — a diferencia de todo lo demás en /evolucion, que se
+/// deriva de las propuestas. Por eso vive en su propia tabla y su propio
+/// bloque en la pantalla: mezclarlos sugeriría que se actualizan juntos.
+model InstagramSnapshot {
+  id          String   @id @default(cuid())
+  /// yyyy-mm-dd, mismo criterio que Proposal.date (texto, comparable
+  /// lexicográficamente, sin zona horaria de por medio).
+  periodStart String
+  periodEnd   String
+  /// Cuándo se sacó la captura. No es lo mismo que el fin del período: el
+  /// informe de agosto se capturó el 13 de septiembre, y esa distancia
+  /// importa para saber cuánto contenido siguió circulando.
+  capturedAt  DateTime
+
+  // ── Cabecera de rendimiento ────────────────────────────────────────
+  views        Int
+  /// Cuentas únicas alcanzadas. No es la suma por tipo de contenido: una
+  /// misma cuenta puede ver publicaciones y reels.
+  viewers      Int
+  interactions Int
+  follows      Int
+  unfollows    Int
+  /// Seguidores al CIERRE. Los de inicio no se cargan: son
+  /// followersEnd - (follows - unfollows), y pedirlos aparte sería pedir un
+  /// dato que puede contradecir a los otros tres.
+  followersEnd Int
+
+  // ── Composición (porcentajes 0-100, como los muestra el panel) ──────
+  viewersFollowersPct      Float
+  interactionsFollowersPct Float
+
+  // ── Actividad del perfil ───────────────────────────────────────────
+  profileVisits Int
+  bioLinkTaps   Int
+  addressTaps   Int
+
+  // ── Por tipo de contenido ──────────────────────────────────────────
+  viewersPosts       Int
+  viewersReels       Int
+  viewersStories     Int
+  interactionsPosts  Int
+  interactionsReels  Int
+  interactionsStories Int
+
+  // ── Desglose por acción, a nivel de cuenta (opcional) ──────────────
+  // Opcional porque son seis campos más para cargar a mano y solo
+  // habilitan un indicador (la conversación). Sin ellos el resto funciona.
+  likes    Int?
+  shares   Int?
+  saves    Int?
+  comments Int?
+  reposts  Int?
+  replies  Int?
+
+  // ── Momentos de actividad ──────────────────────────────────────────
+  // Lo único del informe que conecta con el resto del dashboard: se compara
+  // contra la hora a la que están programadas las propuestas.
+  bestDays     String[] @default([])
+  /// Hora de inicio y fin de la franja, 0-23 (18 y 21 = "6 a 9 p. m.").
+  bestHourFrom Int?
+  bestHourTo   Int?
+
+  notes     String?  @db.Text
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  /// Una medición por ventana: cargar dos veces el mismo período daría dos
+  /// verdades para la misma pregunta.
+  @@unique([periodStart, periodEnd])
+  @@index([periodEnd])
+}
