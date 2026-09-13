@@ -274,6 +274,32 @@ input[type="text"]:focus {
   }
 }
 
+/* Tokens de los gráficos de Evolución. Se declaran acá y no dentro de los
+   componentes para que los SVG no lleven colores literales: un hex suelto en
+   un <path> es lo que hace que un gráfico deje de seguir el tema cuando el
+   white-label cambia el azul de marca. `--panel` es la versión OPACA de la
+   superficie: el borde de un marcador que tapa la curva necesita un fondo
+   real, y --surface es translúcida. */
+.charts {
+  --ground: var(--bg);
+  --panel: #16181b;
+  --accent: var(--color-brand-blue);
+  --rojo: var(--color-brand-red-text);
+  --rojo-dim: rgba(234, 53, 73, 0.22);
+  --ink: var(--fg);
+}
+
+/* Los numerales de los gráficos van en la fuente fina, igual que las cifras
+   grandes del resto del dashboard. `fill` y no `color`: es texto SVG. */
+.charts .fig {
+  font-family: var(--font-thin);
+  font-weight: 300;
+  fill: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.charts svg { display: block; width: 100%; height: auto; overflow: visible; }
+
 /* Panel de la campana de avisos: crece DESDE el botón que lo abrió (de ahí
    transform-origin arriba a la derecha), no desde su propio centro — un
    popover que aparece desde el medio de la nada se lee como si no tuviera

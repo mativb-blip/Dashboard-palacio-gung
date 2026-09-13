@@ -67,6 +67,22 @@ El estado **no** se cuenta desde la columna `Proposal.status`, se deriva con `co
 
 > **El nav de texto completo pasó a 1280px, y no es arbitrario.** Con ocho ítems la fila mide ~1270px: entre el breakpoint `desktop` (861px) y 1280 se salía del header y se montaba encima del nombre de la marca. Se movió **solo** el corte del nav (`min-[1280px]`), no la variable global `desktop`, que gobierna el layout de dos columnas del panel y a 900px anda bien. Entre 640 y 1280 va la fila de solo íconos que ya existía.
 
+### Bloque de Instagram
+Segundo bloque de `/evolucion`, separado de Producción porque **no se actualiza al mismo ritmo**: Producción se deriva sola de las propuestas, esto es una captura manual de una ventana cerrada del panel de Instagram.
+
+> **Se guardan las LECTURAS, nunca las derivadas.** Las ~30 cifras de un informe salen de 17 números que se leen del panel; el resto son fórmulas (`instagram-metrics.ts`, función pura). Guardar las derivadas metería en la base el problema que el propio panel tiene: su cabecera dice 1.348 interacciones y su desglose suma 1.087. Esa diferencia se **muestra** en "Qué no mide esto", no se corrige. Por lo mismo la validación **no cruza campos entre sí**: el panel es incoherente consigo mismo y una validación cruzada impediría cargar el dato real.
+
+> **`scripts/check-instagram-metrics.ts` corre las fórmulas contra el informe real de agosto 2026 y las compara con sus cifras publicadas** (38 comprobaciones, sin base ni credenciales). Es lo que hace auditable una pantalla que afirma treinta números que no guarda.
+
+**Los gráficos viven en `InstagramCharts.tsx`, y cada uno declara su escala arriba.** Nada se posiciona a ojo. Una auditoría de la primera versión encontró **tres gráficos que mentían**: el embudo con el polígono cruzado sobre sí mismo, dos de tres burbujas fuera de su coordenada horizontal, y una barra dibujando 81,4 % donde el dato decía 78,7 %. De ahí la regla: toda figura define `x()`/`y()` a partir de sus extremos y todas las posiciones salen de ahí.
+
+- **Un solo color para las magnitudes** (azul de marca). El rojo aparece únicamente donde hay pérdida (bajas) o un camino cortado (enlace de bio en cero), nunca como "otra serie".
+- **Los SVG no llevan colores literales**: usan los tokens de `.charts` en `globals.css`. Un hex suelto en un `<path>` es lo que hace que un gráfico deje de seguir el tema cuando el white-label cambia el azul.
+- **El área de las burbujas es proporcional, no el radio.** Con radio proporcional, el doble de interacciones se vería cuatro veces más grande.
+- **El reloj de audiencia es lo único que se cruza con el resto del dashboard**: `getScheduleFit()` devuelve la hora de CADA propuesta del período (sin agrupar, para que dos a la misma hora se vean como dos puntos) y el gráfico las pinta sobre la curva, azules dentro de la franja y en tinta fuera.
+- **Deltas solo con medición anterior.** La primera dice "Primera medición, sin comparación" en vez de un 0 %, que se leería como "no cambió". Van con flecha y signo además del color.
+- **Números en `es-ES` con `useGrouping: "always"`.** `Intl` para República Dominicana devuelve formato estadounidense (10,479 · 1.14) y los informes usan el europeo (10.479 · 1,14); se leen con el documento al lado. Y el español no agrupa cuatro cifras por defecto, así que sin `useGrouping` quedaban 42.427 y 4194 en la misma columna con criterios distintos. Las **fechas** siguen en es-DO.
+
 ## Alternativas de caption y música
 El Editor/Admin puede cargar **varias alternativas de caption** en la vista Post y Jun (Comentarista) elige **una sola**. La elegida se refleja en `Proposal.caption`, que sigue siendo el caption "real" para el título, las versiones, el preview, el export y las notificaciones — por eso `caption` no se derivó de la relación: hay once archivos que lo consumen y el espejo los deja intactos. La invariante (`Proposal.caption` == el texto de la fila `selected`) la mantiene `commitCaptionMirror()` en `proposals-actions.ts`, único lugar por donde pasa cualquier cambio del caption vigente.
 
