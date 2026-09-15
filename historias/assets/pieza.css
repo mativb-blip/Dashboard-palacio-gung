@@ -142,6 +142,13 @@ html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; 
   font-weight: 700;
 }
 
+/* El mismo recurso en la bajada, un escalón más contenido: a 28px un salto
+   de 400 a 700 se vuelve una mancha. 600 alcanza para marcar el remate. */
+.bajada em {
+  font-style: italic;
+  font-weight: 600;
+}
+
 /* NOMBRE DEL PLATO — jerarquía menor, debajo de la cita.
    Conserva la regla del sistema: el latino y el coreano comparten ALTURA
    DE TINTA y por eso leen como una unidad. Acá esa altura es la del nivel

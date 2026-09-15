@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Palacio Gung — Mugeunji Bossam</title>
+    <link rel="stylesheet" href="assets/pieza.css" />
+    <script src="assets/vendor/gsap.min.js"></script>
+    <style>
+      /* Anclado a la IZQUIERDA: es el lado donde la foto está abierta — el
+         plato entra desde la derecha. Coincide además con la referencia de
+         Bossam de la marca, que también va a la izquierda.
+
+         La veta de la madera NO cuenta como detalle (decisión del cliente).
+         Sobre esa zona el blanco da 12.53:1 de media; los puntos flojos son
+         los brillos especulares de la madera, no el fondo. */
+      .bloque {
+        --ancla: left;
+        --margen: 14.2%;
+        --arriba: 231px;
+        --medida: 48%;
+        --tinta: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="root"
+      data-start="0"
+      data-duration="1"
+      data-fps="30"
+      data-width="1080"
+      data-height="1920"
+    >
+      <img id="foto" src="fotos/mugeunji-bossam.jpg" alt="Mugeunji bossam servido con banchan, visto desde arriba" />
+
+      <div class="bloque" data-ancla="left">
+        <h1 class="nombre">Mugeunji Bossam</h1>
+        <p class="hangul">묵은지보쌈</p>
+        <p class="bajada">Panceta dorada, kimchi añejo,<br /><em>un shot de soju al lado</em></p>
+      </div>
+
+      <img id="logo" class="logo" data-ancla="left" src="assets/logo-gung-blanco.png"
+           alt="Palacio Gung — Korean Cuisine" />
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["root"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>
